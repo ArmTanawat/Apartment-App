@@ -1,0 +1,166 @@
+// db.js — creates the database file and defines every table.
+// Runs on every server start; nothing is destroyed because of IF NOT EXISTS.
+
+const Database = require('better-sqlite3');
+const path = require('path');
+
+const dbPath = path.join(__dirname, 'apartment.db');
+const db = new Database(dbPath);
+
+// SQLite ships with foreign key enforcement OFF for backwards compatibility.
+// Without this line the REFERENCES clauses below are decorative — you could
+// insert a lease pointing at tenant 999 that does not exist. Turn it on.
+db.pragma('foreign_keys = ON');
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS tenants (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    full_name  TEXT NOT NULL,
+    phone      TEXT,
+    id_card    TEXT,
+    address    TEXT,
+    note       TEXT
+  );
+
+  CREATE TABLE IF NOT EXISTS units (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    unit_number TEXT NOT NULL UNIQUE,
+    floor       INTEGER,
+    base_rent   REAL NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS leases (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    tenant_id    INTEGER NOT NULL REFERENCES tenants(id),
+    unit_id      INTEGER NOT NULL REFERENCES units(id),
+    start_date   TEXT NOT NULL,
+    end_date     TEXT,
+    monthly_rent REAL NOT NULL,
+    deposit      REAL DEFAULT 0
+  );
+
+  CREATE TABLE IF NOT EXISTS meter_readings (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    unit_id        INTEGER NOT NULL REFERENCES units(id),
+    period         TEXT NOT NULL,
+    water_prev     REAL NOT NULL,
+    water_curr     REAL,
+    water_rollover REAL NOT NULL DEFAULT 0,
+    elec_prev      REAL NOT NULL,
+    elec_curr      REAL,
+    elec_rollover  REAL NOT NULL DEFAULT 0,
+    UNIQUE (unit_id, period)
+  );
+
+  CREATE TABLE IF NOT EXISTS fee_types (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    name           TEXT NOT NULL UNIQUE,
+    default_amount REAL NOT NULL DEFAULT 0,
+    is_active      INTEGER NOT NULL DEFAULT 1
+  );
+
+  CREATE TABLE IF NOT EXISTS lease_fees (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    lease_id    INTEGER NOT NULL REFERENCES leases(id) ON DELETE CASCADE,
+    fee_type_id INTEGER NOT NULL REFERENCES fee_types(id),
+    amount      REAL NOT NULL,
+    UNIQUE (lease_id, fee_type_id)
+  );
+
+  CREATE TABLE IF NOT EXISTS one_time_charges (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    lease_id    INTEGER NOT NULL REFERENCES leases(id) ON DELETE CASCADE,
+    period      TEXT NOT NULL,
+    description TEXT NOT NULL,
+    amount      REAL NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS bills (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    lease_id      INTEGER NOT NULL REFERENCES leases(id),
+    period        TEXT NOT NULL,
+    rent_amount   REAL NOT NULL,
+    water_amount  REAL NOT NULL,
+    elec_amount   REAL NOT NULL,
+    fees_amount   REAL NOT NULL,
+    total         REAL NOT NULL,
+    created_at    TEXT DEFAULT (datetime('now','localtime')),
+    UNIQUE (lease_id, period)
+  );
+
+  CREATE TABLE IF NOT EXISTS bill_items (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    bill_id     INTEGER NOT NULL REFERENCES bills(id) ON DELETE CASCADE,
+    label       TEXT NOT NULL,
+    detail      TEXT,
+    amount      REAL NOT NULL,
+    sort_order  INTEGER NOT NULL DEFAULT 0
+  );
+
+  CREATE TABLE IF NOT EXISTS settings (
+    key   TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS period_settings (
+    period        TEXT PRIMARY KEY,
+    apply_minimum INTEGER NOT NULL DEFAULT 1
+  );
+`);
+
+// Seed the utility rates only if missing. INSERT OR IGNORE does nothing when
+// the key already exists, so edited rates are never reset on restart.
+//
+// Water and electricity have completely separate figures. A minimum charge
+// means the first `min_units` are covered by a flat `min_amount`, and anything
+// above that is charged at `rate` per unit.
+const seedSetting = db.prepare(`INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)`);
+
+// The building's own details. These print as the header of an invoice, so the
+// tenant can see who issued it and where to ask about it. Stored as text, which
+// is why `value` is TEXT rather than REAL — numeric settings convert on read.
+seedSetting.run('building_name', 'บ้านสวนพลู');
+seedSetting.run('building_address', '');
+seedSetting.run('building_phone', '');
+
+// Printed at the foot of an invoice. Rent is taken both in cash and by
+// transfer, so the account details go on the bill; nothing about a payment is
+// recorded, this is only the text a tenant needs in order to pay.
+//
+// bill_note is deliberately free text. Due dates, holiday closures, a change of
+// office hours — anything that has to reach every tenant this month goes here
+// rather than needing a new setting each time.
+seedSetting.run('bank_name', '');
+seedSetting.run('bank_account_number', '');
+seedSetting.run('bank_account_name', '');
+seedSetting.run('bill_note', '');
+
+seedSetting.run('water_rate', 9);
+seedSetting.run('water_min_units', 5);
+seedSetting.run('water_min_amount', 100);
+
+seedSetting.run('electricity_rate', 9);
+seedSetting.run('electricity_min_units', 5);
+seedSetting.run('electricity_min_amount', 100);
+
+// How many digits each meter's dial has. Needed only when a dial fills and
+// wraps back to zero: four digits wrap at 10000, five at 100000.
+//
+// This cannot be worked out from a reading — a five-digit meter showing 500
+// reads as three digits and would be guessed wrong — so it is set here from
+// the actual meters in the building. Four is what this building uses; change
+// it if the meters differ.
+seedSetting.run('water_meter_digits', 4);
+seedSetting.run('electricity_meter_digits', 4);
+
+// Starter fee types so the app is usable immediately. These are ordinary rows —
+// add, rename, or retire them through the UI without touching this file.
+//
+// Names are bilingual because they are printed on the bill exactly as stored.
+// A new fee type should be typed the same way: Thai first, then English.
+const seedFee = db.prepare(`INSERT OR IGNORE INTO fee_types (name, default_amount) VALUES (?, ?)`);
+seedFee.run('ค่าส่วนกลาง Facility fee', 500);
+seedFee.run('ที่จอดรถยนต์ Car parking', 500);
+seedFee.run('ที่จอดมอเตอร์ไซค์ Motorcycle parking', 300);
+
+module.exports = db;
