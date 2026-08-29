@@ -1,34 +1,57 @@
+import { useState } from 'react';
 import BillPaper from '../components/BillPaper.jsx';
+import ErrBox from '../components/ErrBox.jsx';
+import { get, messageOf } from '../lib/api.js';
+import { billDiff, wasProrated } from '../lib/bills.js';
 import { baht } from '../lib/helpers.js';
-import { billDiff, buildBill } from '../lib/buildBill.js';
+import { useApi } from '../lib/useApi.js';
 import { useData } from '../state/DataContext.jsx';
 import { useUi } from '../state/UiContext.jsx';
 
 /* One saved bill, with a check against what the same inputs would produce now.
-   The comparison is line by line, never on the total. */
+ * The comparison is line by line, never on the total. */
 export default function BillPage({ id }){
-  const { bills, data, saveBill, deleteBill } = useData();
+  const { deleteBill, generateBill } = useData();
   const { go, openModal } = useUi();
+  const [error, setError] = useState(null);
+  const [busy, setBusy] = useState(false);
 
-  const b = bills.find(x => x.id === id);
-  if(!b) return <p className="none">ไม่พบบิล</p>;
+  // The bill and the fresh preview arrive together: a bill that is opened is
+  // quietly compared against GET /bills/preview, and the difference is what
+  // the banner reports. The user never asks for the comparison.
+  const req = useApi(async () => {
+    const bill = await get(`/bills/${id}`);
+    return { bill, d: await billDiff(bill) };
+  }, [id]);
 
-  const d = billDiff(data, b);
+  if(req.loading) return <p className="sub">กำลังโหลด…</p>;
+  if(req.error) return <>
+    <button className="back noprint" onClick={() => go({name:"bills"})}>← บิล</button>
+    <ErrBox>{messageOf(req.error)}</ErrBox>
+  </>;
+
+  const { bill: b, d } = req.data;
   const stale = d.changes && d.changes.length > 0;
 
   // Delete then regenerate, in one action. The old figures are replaced, not
   // edited, because a bill stores what it charged rather than recomputing.
-  const regen = () => {
-    const built = buildBill(data, b.lease_id, b.period,
-      {prorate: b.items[0].detail.includes("จาก"), prorateDays:null});
-    if(built.error){ alert(built.error); return; }
-    deleteBill(b.id);
-    const fresh = saveBill(built);
-    go({name:"bill", id:fresh.id});
+  // A regenerated bill has a new id — if the old one was printed and handed
+  // over, it needs reprinting, which the note under the buttons says.
+  const regen = async () => {
+    setBusy(true); setError(null);
+    try {
+      await deleteBill(b.id);
+      const fresh = await generateBill({ lease_id: b.lease_id, period: b.period,
+        prorate: wasProrated(b) });
+      go({name:"bill", id:fresh.id});
+    } catch (e) {
+      setError(messageOf(e));
+    } finally { setBusy(false); }
   };
 
   return <>
     <button className="back noprint" onClick={() => go({name:"bills"})}>← บิล</button>
+    <ErrBox>{error}</ErrBox>
     {stale && (
       <div className="stale noprint">
         <b>ข้อมูลเปลี่ยนไปหลังออกบิลนี้</b><br />
@@ -40,7 +63,7 @@ export default function BillPage({ id }){
         ))}</ul>
         <div className="actions">
           <button className="btn quiet" onClick={() => go({name:"bills"})}>เก็บบิลเดิมไว้</button>
-          <button className="btn" onClick={regen}>ออกบิลใหม่</button>
+          <button className="btn" disabled={busy} onClick={regen}>ออกบิลใหม่</button>
         </div>
         <div style={{fontSize:"12px",color:"var(--muted)",marginTop:"8px"}}>
           ออกใหม่จะได้บิลคนละใบ ถ้าพิมพ์ใบเดิมให้ผู้เช่าไปแล้ว ต้องพิมพ์ใหม่ให้ด้วย</div>

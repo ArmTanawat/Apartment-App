@@ -26,7 +26,17 @@ const { default: App } = await import('../src/App.jsx');
 
 const container = document.getElementById('root');
 const root = createRoot(container);
+
+// Everything on screen now arrives over the network, so a step is not finished
+// when the click returns. settle() lets the pending requests and the re-renders
+// they cause run to completion before the next assertion looks at the page.
+export async function settle(ms = 60){
+  await act(async () => { await new Promise(r => setTimeout(r, ms)); });
+  await act(async () => { await new Promise(r => setTimeout(r, 10)); });
+}
+
 await act(async () => { root.render(<App />); });
+await settle(200);
 
 export const $  = (sel, ctx = document) => ctx.querySelector(sel);
 export const $$ = (sel, ctx = document) => [...ctx.querySelectorAll(sel)];
@@ -36,18 +46,19 @@ export const body = () => document.body.textContent;
 export const byText = (sel, s, ctx = document) =>
   $$(sel, ctx).find(e => e.textContent.includes(s));
 
-export async function click(el){
+export async function click(el, wait = 80){
   if(!el) throw new Error('click: no element');
   await act(async () => {
     el.dispatchEvent(new dom.window.MouseEvent('mousedown', {bubbles:true}));
     el.dispatchEvent(new dom.window.MouseEvent('mouseup', {bubbles:true}));
     el.dispatchEvent(new dom.window.MouseEvent('click', {bubbles:true}));
   });
+  await settle(wait);
 }
 
 // React overrides the value setter on inputs, so a plain el.value = x is not
 // seen. Set through the prototype descriptor, then fire input.
-export async function type(el, value){
+export async function type(el, value, wait = 60){
   if(!el) throw new Error('type: no element');
   const proto = el.tagName === 'TEXTAREA'
     ? dom.window.HTMLTextAreaElement.prototype : dom.window.HTMLInputElement.prototype;
@@ -56,6 +67,13 @@ export async function type(el, value){
     setter.call(el, value);
     el.dispatchEvent(new dom.window.Event('input', {bubbles:true}));
   });
+  await settle(wait);
+}
+
+// The meter page saves shortly after typing stops, so a value typed and then
+// looked at straight away has not been written yet.
+export async function typeAndSave(el, value){
+  await type(el, value, 600);
 }
 
 export async function select(el, value){
@@ -64,10 +82,11 @@ export async function select(el, value){
     setter.call(el, value);
     el.dispatchEvent(new dom.window.Event('change', {bubbles:true}));
   });
+  await settle();
 }
 
 export async function nav(label){
-  await click(byText('.nav a', label));
+  await click(byText('.nav a', label), 250);
 }
 
 let fails = 0;

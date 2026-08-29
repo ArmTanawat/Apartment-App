@@ -1,6 +1,6 @@
 import RoomCard from '../components/RoomCard.jsx';
-import { periodLabel } from '../lib/helpers.js';
-import { thisMonth, useData } from '../state/DataContext.jsx';
+import { periodLabel, thisMonth } from '../lib/helpers.js';
+import { useData } from '../state/DataContext.jsx';
 import { useUi } from '../state/UiContext.jsx';
 
 /* ห้องพัก — the room board.
@@ -12,16 +12,17 @@ export default function BoardPage(){
   const { units, h } = useData();
   const { period, setPeriod, editMode, setEditMode, filter, setFilter, go, openModal } = useUi();
 
+  // is_occupied and leaving_on come straight from GET /units.
   const filterDefs = [
     {k:"all", l:"ทั้งหมด",        f:()=>true},
-    {k:"vac", l:"ว่าง",           f:u=>!h.activeLease(u.id)},
-    {k:"nom", l:"ยังไม่จดมิเตอร์", f:u=>h.activeLease(u.id)&&!h.metered(u.id, period)},
-    {k:"nob", l:"ยังไม่ออกบิล",    f:u=>h.activeLease(u.id)&&!h.billed(u.id, period)},
-    {k:"soon",l:"กำลังจะว่าง",     f:u=>!!h.leavingOn(u.id)}
+    {k:"vac", l:"ว่าง",           f:u=>!u.is_occupied},
+    {k:"nom", l:"ยังไม่จดมิเตอร์", f:u=>u.is_occupied&&!h.metered(u.id, period)},
+    {k:"nob", l:"ยังไม่ออกบิล",    f:u=>u.is_occupied&&!h.billed(u.id, period)},
+    {k:"soon",l:"กำลังจะว่าง",     f:u=>!!u.is_leaving}
   ];
 
-  const occ = units.filter(u=>h.activeLease(u.id)).length;
-  const nm  = units.filter(u=>h.activeLease(u.id)&&!h.metered(u.id, period)).length;
+  const occ = units.filter(u=>u.is_occupied).length;
+  const nm  = units.filter(u=>u.is_occupied&&!h.metered(u.id, period)).length;
   const fn  = filterDefs.find(f=>f.k===filter).f;
   const shown = units.filter(fn);
 
@@ -32,17 +33,14 @@ export default function BoardPage(){
       <div className="floor" key={fl}>
         <div className="floorlab">ชั้น {fl}</div>
         <div className="grid">
-          {rs.map(u => {
-            const l = h.activeLease(u.id);
-            return (
-              <RoomCard key={u.id} unit={u} lease={l}
-                tenant={l ? h.tenantOf(l.id) : null}
-                leaving={h.leavingOn(u.id)}
-                metered={h.metered(u.id, period)}
-                billed={h.billed(u.id, period)}
-                onClick={() => go({name:"room", id:u.id})} />
-            );
-          })}
+          {rs.map(u => (
+            <RoomCard key={u.id} unit={u}
+              occupied={u.is_occupied} tenantName={u.tenant_name}
+              leaving={u.leaving_on}
+              metered={h.metered(u.id, period)}
+              billed={h.billed(u.id, period)}
+              onClick={() => go({name:"room", id:u.id})} />
+          ))}
           {editMode && (
             <button className="addcard" title={`เพิ่มห้องชั้น ${fl}`}
               onClick={() => openModal({kind:"addRoom", floor:fl})}>+</button>

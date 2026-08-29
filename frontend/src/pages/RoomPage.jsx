@@ -1,5 +1,9 @@
+import { useState } from 'react';
+import ErrBox from '../components/ErrBox.jsx';
+import { get, messageOf } from '../lib/api.js';
 import { baht } from '../lib/helpers.js';
-import { TODAY, useData } from '../state/DataContext.jsx';
+import { useApi } from '../lib/useApi.js';
+import { useData } from '../state/DataContext.jsx';
 import { useUi } from '../state/UiContext.jsx';
 
 /* ห้อง — the room page. Reached by tapping a card, not in the nav.
@@ -9,18 +13,37 @@ import { useUi } from '../state/UiContext.jsx';
  * still gets a bill for that month, and a repair found afterwards is theirs to
  * pay. Filtering by "who is here now" makes that impossible, silently. */
 export default function RoomPage({ id }){
-  const { units, leases, bills, leaseFees, charges, readings, h,
-          updateLease, deleteCharge } = useData();
-  const { period, go, openModal } = useUi();
+  const { units, leases, bills, readings, h, updateLease, deleteCharge } = useData();
+  const { period, go, openModal, detailRevision, bumpDetail } = useUi();
 
   const u = units.find(x=>x.id===id);
   const l = h.activeLease(u.id);
   const t = l ? h.tenantOf(l.id) : null;
+  const TODAY = h.today();
   const r = readings.find(x=>x.unit_id===u.id && x.period===period);
-  const fees = l ? leaseFees.filter(f=>f.lease_id===l.id) : [];
   const past = bills.filter(b => leases.some(x=>x.id===b.lease_id && x.unit_id===u.id));
+  // Fees and charges are scoped to every lease that occupied the room during
+  // the working month, not to the lease active today.
   const periodLeases = h.leasesInPeriod(u.id, period);
   const hasHistory = leases.some(x=>x.unit_id===u.id);
+
+  const feesReq = useApi(() => get(`/fees/lease/${l.id}`),
+    [l && l.id, detailRevision], { skip: !l });
+  const fees = feesReq.data || [];
+
+  const chargeIds = periodLeases.map(x => x.id).join(",");
+  const chargesReq = useApi(
+    () => Promise.all(periodLeases.map(pl =>
+      get(`/fees/onetime/${pl.id}?period=${period}`).then(cs => [pl.id, cs])))
+      .then(Object.fromEntries),
+    [chargeIds, period, detailRevision], { skip: periodLeases.length === 0 });
+  const chargesFor = leaseId => (chargesReq.data && chargesReq.data[leaseId]) || [];
+
+  const [actionError, setActionError] = useState(null);
+  const run = async fn => {
+    setActionError(null);
+    try { await fn(); } catch(e){ setActionError(messageOf(e)); }
+  };
 
   const missing = t ? [!t.phone?"เบอร์โทร":null,!t.address?"ที่อยู่":null].filter(Boolean) : [];
 
@@ -36,6 +59,9 @@ export default function RoomPage({ id }){
         onClick={() => openModal({kind:"deleteRoom", id:u.id})}>ลบห้อง</button>
     </div>
     <p className="sub">ชั้น {u.floor} · ค่าเช่ามาตรฐาน <span className="num">{baht(u.base_rent)}</span> บาท</p>
+    {/* A refused action is not an error state — the message names the reason
+        and, where there is one, the alternative. */}
+    <ErrBox>{actionError}</ErrBox>
 
     <div className="cards">
       <div className="card">
@@ -71,7 +97,7 @@ export default function RoomPage({ id }){
                   takes an explicit null here; sending nothing would leave the
                   old date in place. */}
               <button className="linkbtn" style={{marginLeft:"8px"}}
-                onClick={() => updateLease(l.id, {end_date:null})}>ยกเลิกกำหนด</button>
+                onClick={() => run(() => updateLease(l.id, {end_date:null}))}>ยกเลิกกำหนด</button>
             </div>
           )}
           <div className="actions">
@@ -105,7 +131,7 @@ export default function RoomPage({ id }){
                   <button className="linkbtn" style={{marginLeft:"10px"}}
                     onClick={() => openModal({kind:"fee", leaseId:f.lease_id, feeId:f.id})}>แก้</button>
                   <button className="linkbtn danger" style={{marginLeft:"6px"}}
-                    onClick={() => openModal({kind:"deleteFee", feeId:f.id})}>ลบ</button>
+                    onClick={() => openModal({kind:"deleteFee", leaseId:l.id, feeId:f.id})}>ลบ</button>
                 </span>
               </div>
             ))}</div>
@@ -136,7 +162,7 @@ export default function RoomPage({ id }){
           ? <p className="none">เดือนนี้ไม่มีผู้เช่าอยู่</p>
           : periodLeases.map(pl => {
               const pt = h.tenantOf(pl.id);
-              const pc = charges.filter(c=>c.lease_id===pl.id && c.period===period);
+              const pc = chargesFor(pl.id);
               const gone = !!(pl.end_date && pl.end_date <= TODAY);
               return (
                 <div style={{marginBottom:"14px"}} key={pl.id}>
@@ -151,7 +177,7 @@ export default function RoomPage({ id }){
                         <span>{c.description}</span>
                         <span><span className="num">{baht(c.amount)}</span>
                           <button className="linkbtn danger" style={{marginLeft:"10px"}}
-                            onClick={() => deleteCharge(c.id)}>ลบ</button>
+                            onClick={() => run(async () => { await deleteCharge(c.id); bumpDetail(); })}>ลบ</button>
                         </span>
                       </div>
                     ))}</div>

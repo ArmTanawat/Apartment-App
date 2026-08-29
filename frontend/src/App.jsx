@@ -20,7 +20,7 @@ const NAV = [
 ];
 
 function Shell(){
-  const { units, settings } = useData();
+  const { units, settings, down, reload } = useData();
   const { view, go } = useUi();
 
   // Detail pages are reached from their list, so they keep the list highlighted.
@@ -54,7 +54,20 @@ function Shell(){
           ))}
         </nav>
       </aside>
-      <main className="main">{page}</main>
+      <main className="main">
+        {/* The server not being there affects everything on the screen, so it
+            is said once at the top with a way to retry — not repeated beside
+            every field, which is how a user learns to ignore it. */}
+        {down && (
+          <div className="err noprint" style={{maxWidth:"640px",display:"flex",
+            alignItems:"center",justifyContent:"space-between",gap:"12px"}}>
+            <span>ติดต่อเซิร์ฟเวอร์ไม่ได้ — ตัวเลขที่เห็นอาจไม่ใช่ล่าสุด และยังบันทึกอะไรไม่ได้</span>
+            <button className="btn quiet" style={{padding:"5px 12px",fontSize:"13px"}}
+              onClick={reload}>ลองใหม่</button>
+          </div>
+        )}
+        {page}
+      </main>
     </div>
     <ModalHost />
   </>;
@@ -62,10 +75,10 @@ function Shell(){
 
 export default function App(){
   return (
-    <DataProvider>
-      <UiProvider>
+    <UiProvider>
+      <DataProvider>
         <Shell />
-      </UiProvider>
-    </DataProvider>
+      </DataProvider>
+    </UiProvider>
   );
 }

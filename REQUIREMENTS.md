@@ -51,6 +51,7 @@ Damage is charged as a normal one-time charge on a monthly bill, so the deposit 
 | 3.8 | Handle a meter that wrapped past its last digit | Done |
 | 3.9 | Handle a meter that was replaced and restarted at zero | Done |
 | 3.10 | Correct a previous reading upward without first inflating the current one | Done |
+| 3.12 | Clear a current reading, leaving the room outstanding on the checklist | Done |
 | 3.11 | Fix water and electricity independently when both read low | Done |
 | 3.6 | One reading per room per month, no duplicates | Done |
 | 3.7 | View reading history for a room | Backend done, no UI |
@@ -77,6 +78,7 @@ Recurring and one-time are separate. The question when adding a charge is always
 | 5.3 | Set a minimum charge for electricity, with its own separate figures | Done |
 | 5.4 | Turn the minimum charge on or off for a given month, for the whole building at once | Done |
 | 5.5 | All figures editable — the threshold, the flat amount, and the per-unit rate | Done |
+| 5.11 | Show a worked example of what N units cost, from the same code that prices a bill | Done |
 | 5.6 | Set how many digits the water and electricity meters have | Done |
 | 5.7 | Set the building's own name | Done |
 | 5.8 | Set the building's address and phone, printed as the invoice header | Done |
@@ -113,6 +115,7 @@ Rates in force are read at bill generation and the resulting baht amount is froz
 | 6.8 | Generate bills for several rooms at once | Done |
 | 6.9 | Choose rooms by range, by tick list, or select all | Done |
 | 6.10 | Charge rent by the day instead of the full month, when chosen | Done |
+| 6.15 | Rent by the day applies to a batch as well as to a single bill | Done |
 | 6.12 | Detect a bill whose underlying data changed after it was issued | Done |
 | 6.13 | Correct a bill in one action — delete and regenerate | Done |
 | 6.14 | Print every bill for a month in one pass | Done |

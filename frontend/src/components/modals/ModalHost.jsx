@@ -23,7 +23,7 @@ export default function ModalHost(){
     case "meter":         return <MeterModal unitId={modal.unitId} />;
     case "editPrev":      return <EditPrevModal unitId={modal.unitId} />;
     case "fee":           return <FeeModal leaseId={modal.leaseId} feeId={modal.feeId} />;
-    case "deleteFee":     return <DeleteFeeModal feeId={modal.feeId} />;
+    case "deleteFee":     return <DeleteFeeModal leaseId={modal.leaseId} feeId={modal.feeId} />;
     case "charge":        return <ChargeModal leaseId={modal.leaseId} />;
     case "feeType":       return <FeeTypeModal id={modal.id} />;
     case "deleteFeeType": return <DeleteFeeTypeModal id={modal.id} />;

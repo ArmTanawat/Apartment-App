@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useSubmit } from '../../lib/useSubmit.js';
 import ErrBox from '../ErrBox.jsx';
 import Modal from '../Modal.jsx';
 import { useData } from '../../state/DataContext.jsx';
@@ -10,19 +11,16 @@ export function AddRoomModal({ floor }){
   const [num, setNum] = useState("");
   const [fl, setFl] = useState(String(floor));
   const [rent, setRent] = useState(String((units.find(u=>u.floor===floor)||{}).base_rent||3800));
-  const [error, setError] = useState(null);
+  const { error, busy, run } = useSubmit();
 
-  const save = () => {
-    const n = num.trim();
-    const f = parseInt(fl, 10);
-    const r = parseFloat(rent);
-    if(!n)                       return setError("ต้องใส่เลขห้อง");
-    if(units.some(u=>u.unit_number===n)) return setError(`ห้อง ${n} มีอยู่แล้ว`);
-    if(!f || f<1)                return setError("ชั้นต้องเป็นตัวเลขตั้งแต่ 1 ขึ้นไป");
-    if(isNaN(r) || r<0)          return setError("ค่าเช่าต้องเป็นตัวเลข");
-    addUnit({unit_number:n, floor:f, base_rent:r});
-    closeModal();
-  };
+  // unit_number is UNIQUE in the schema and POST /units names the clash, so
+  // there is no second copy of that rule here — only the checks the server
+  // never sees.
+  const save = () => run(
+    async () => { await addUnit({unit_number:num.trim(), floor:parseInt(fl,10), base_rent:parseFloat(rent)}); closeModal(); },
+    () => !num.trim() ? "ต้องใส่เลขห้อง"
+      : (!parseInt(fl,10) || parseInt(fl,10) < 1) ? "ชั้นต้องเป็นตัวเลขตั้งแต่ 1 ขึ้นไป"
+      : (isNaN(parseFloat(rent)) || parseFloat(rent) < 0) ? "ค่าเช่าต้องเป็นตัวเลข" : null);
 
   return (
     <Modal>
@@ -41,7 +39,7 @@ export function AddRoomModal({ floor }){
       </div>
       <div className="actions">
         <button className="btn ghost" onClick={closeModal}>ยกเลิก</button>
-        <button className="btn" onClick={save}>เพิ่มห้อง</button>
+        <button className="btn" disabled={busy} onClick={save}>เพิ่มห้อง</button>
       </div>
     </Modal>
   );
@@ -54,19 +52,13 @@ export function EditRoomModal({ id }){
   const [num, setNum] = useState(u.unit_number);
   const [fl, setFl] = useState(String(u.floor));
   const [rent, setRent] = useState(String(u.base_rent));
-  const [error, setError] = useState(null);
+  const { error, busy, run } = useSubmit();
 
-  const save = () => {
-    const n = num.trim();
-    const f = parseInt(fl, 10);
-    const r = parseFloat(rent);
-    if(!n)                        return setError("ต้องใส่เลขห้อง");
-    if(units.some(x=>x.unit_number===n && x.id!==id)) return setError(`ห้อง ${n} มีอยู่แล้ว`);
-    if(!f || f<1)                 return setError("ชั้นต้องเป็นตัวเลขตั้งแต่ 1 ขึ้นไป");
-    if(isNaN(r) || r<0)           return setError("ค่าเช่าต้องเป็นตัวเลข");
-    updateUnit(id, {unit_number:n, floor:f, base_rent:r});
-    closeModal();
-  };
+  const save = () => run(
+    async () => { await updateUnit(id, {unit_number:num.trim(), floor:parseInt(fl,10), base_rent:parseFloat(rent)}); closeModal(); },
+    () => !num.trim() ? "ต้องใส่เลขห้อง"
+      : (!parseInt(fl,10) || parseInt(fl,10) < 1) ? "ชั้นต้องเป็นตัวเลขตั้งแต่ 1 ขึ้นไป"
+      : (isNaN(parseFloat(rent)) || parseFloat(rent) < 0) ? "ค่าเช่าต้องเป็นตัวเลข" : null);
 
   return (
     <Modal>
@@ -84,7 +76,7 @@ export function EditRoomModal({ id }){
       </div>
       <div className="actions">
         <button className="btn ghost" onClick={closeModal}>ยกเลิก</button>
-        <button className="btn" onClick={save}>บันทึก</button>
+        <button className="btn" disabled={busy} onClick={save}>บันทึก</button>
       </div>
     </Modal>
   );
@@ -93,7 +85,10 @@ export function EditRoomModal({ id }){
 export function DeleteRoomModal({ id }){
   const { units, leases, deleteUnit } = useData();
   const { closeModal, go } = useUi();
+  const { error, busy, run } = useSubmit();
   const u = units.find(x=>x.id===id);
+  // Deletion is blocked when history depends on it. The server refuses it too;
+  // saying so before the button is pressed is the point of this dialog.
   const used = leases.some(l=>l.unit_id===id);
 
   return (
@@ -105,9 +100,11 @@ export function DeleteRoomModal({ id }){
         <div className="actions"><button className="btn ghost" onClick={closeModal}>ปิด</button></div>
       </> : <>
         <p className="lead">ห้องนี้ยังไม่เคยมีสัญญาเช่า ลบได้ เลขห้องอื่นจะไม่ขยับตาม</p>
+        <ErrBox>{error}</ErrBox>
         <div className="actions">
           <button className="btn ghost" onClick={closeModal}>ยกเลิก</button>
-          <button className="btn danger" onClick={() => { deleteUnit(id); closeModal(); go({name:"board"}); }}>ลบห้อง</button>
+          <button className="btn danger" disabled={busy}
+            onClick={() => run(async () => { await deleteUnit(id); closeModal(); go({name:"board"}); })}>ลบห้อง</button>
         </div>
       </>}
     </Modal>

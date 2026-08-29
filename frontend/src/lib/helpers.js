@@ -28,6 +28,25 @@ export const shiftPeriod = (p, by) => {
 export const thaiDate = iso => { const [y,m,d] = iso.split("-").map(Number);
   return d + " " + ["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.","ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."][m-1]; };
 
+const p2 = n => String(n).padStart(2, "0");
+
+// The machine's local date, as YYYY-MM-DD.
+//
+// NOT new Date().toISOString().slice(0,10), which is UTC. The backend uses
+// date('now','localtime') everywhere for exactly this reason: Thailand is
+// seven hours ahead, so between midnight and 7am a UTC date is yesterday and
+// a room whose lease ends today would show as occupied all morning.
+export const todayLocal = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}`;
+};
+
+export const thisMonth = () => todayLocal().slice(0, 7);
+
+// The timestamp format the bills and the backup list are shown in.
+export const stampLocal = (d = new Date()) =>
+  `${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())} ${p2(d.getHours())}:${p2(d.getMinutes())}`;
+
 export const floors = units => [...new Set(units.map(u=>u.floor))].sort((a,b)=>a-b);
 
 // end_date is THE DAY THE ROOM BECOMES FREE, not the last night slept.

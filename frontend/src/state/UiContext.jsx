@@ -7,14 +7,22 @@
  */
 
 import { createContext, useCallback, useContext, useMemo, useState } from 'react';
-import { shiftPeriod } from '../lib/helpers.js';
-import { thisMonth } from './DataContext.jsx';
+import { shiftPeriod, thisMonth } from '../lib/helpers.js';
 
 const UiContext = createContext(null);
 
 export function UiProvider({ children }){
   const [view, setView] = useState({ name: 'board' });
-  const [period, setPeriodRaw] = useState(thisMonth());
+  // The working month survives a reload. It is clamped on the way back in,
+  // because a stored month can be in the past but must never be in the future
+  // — the browser could have been left open across a month boundary.
+  const [period, setPeriodRaw] = useState(() => {
+    try {
+      const saved = window.localStorage.getItem('workingMonth');
+      if(saved && /^\d{4}-\d{2}$/.test(saved) && saved <= thisMonth()) return saved;
+    } catch { /* private mode, or storage disabled */ }
+    return thisMonth();
+  });
   const [monthOpen, setMonthOpen] = useState(false);
 
   // board
@@ -44,6 +52,12 @@ export function UiProvider({ children }){
   const [meterRevision, setMeterRevision] = useState(0);
   const bumpMeter = useCallback(() => setMeterRevision(n => n + 1), []);
 
+  // Detail that belongs to one lease — its recurring fees, its charges for the
+  // month — is fetched by the screen that shows it, but written from a modal
+  // that the screen does not own. Bumping this tells the screen to fetch again.
+  const [detailRevision, setDetailRevision] = useState(0);
+  const bumpDetail = useCallback(() => setDetailRevision(n => n + 1), []);
+
   const go = useCallback(v => setView(v), []);
 
   // The working month never goes past the current one. Nothing can be read or
@@ -52,6 +66,7 @@ export function UiProvider({ children }){
   const setPeriod = useCallback(next => {
     if(next > thisMonth()) return;
     setPeriodRaw(next);
+    try { window.localStorage.setItem('workingMonth', next); } catch { /* not worth failing over */ }
     // Anything scoped to the old month is meaningless in the new one.
     setPicked(new Set());
     setLastResult(null);
@@ -71,10 +86,11 @@ export function UiProvider({ children }){
     lastResult, setLastResult,
     exampleUnits, setExampleUnits,
     meterRevision, bumpMeter,
+    detailRevision, bumpDetail,
     modal, openModal: setModal, closeModal: () => setModal(null),
   }), [view, go, period, setPeriod, shiftMonth, monthOpen, editMode, filter,
        meterFilter, showVacant, tenantSearch, tenantFilter, picked, prorateOn,
-       prorateDays, lastResult, exampleUnits, meterRevision, bumpMeter, modal]);
+       prorateDays, lastResult, exampleUnits, meterRevision, bumpMeter, detailRevision, bumpDetail, modal]);
 
   return <UiContext.Provider value={value}>{children}</UiContext.Provider>;
 }

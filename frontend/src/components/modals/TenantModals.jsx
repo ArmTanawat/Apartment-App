@@ -1,7 +1,8 @@
 import { useState } from 'react';
+import { useSubmit } from '../../lib/useSubmit.js';
 import ErrBox from '../ErrBox.jsx';
 import Modal from '../Modal.jsx';
-import { TODAY, useData } from '../../state/DataContext.jsx';
+import { useData } from '../../state/DataContext.jsx';
 import { useUi } from '../../state/UiContext.jsx';
 
 export function AddTenantModal(){
@@ -11,15 +12,18 @@ export function AddTenantModal(){
   const [phone, setPhone] = useState("");
   const [addr, setAddr] = useState("");
   const [idCard, setIdCard] = useState("");
-  const [error, setError] = useState(null);
+  const { error, busy, run } = useSubmit();
 
-  const save = () => {
-    const nm = name.trim();
-    if(!nm) return setError("ต้องมีชื่อ");
-    if(tenants.some(t => t.full_name === nm)) return setError(`มีผู้เช่าชื่อ "${nm}" อยู่แล้ว`);
-    addTenant({full_name:nm, phone:phone.trim(), address:addr.trim(), id_card:idCard.trim()});
-    closeModal();
-  };
+  // tenants.full_name is not UNIQUE in the schema — two people really can
+  // share a name — so this warning is the screen's, not the server's.
+  const save = () => run(
+    async () => {
+      await addTenant({full_name:name.trim(), phone:phone.trim(),
+        address:addr.trim(), id_card:idCard.trim()});
+      closeModal();
+    },
+    () => !name.trim() ? "ต้องมีชื่อ"
+      : tenants.some(t => t.full_name === name.trim()) ? `มีผู้เช่าชื่อ "${name.trim()}" อยู่แล้ว` : null);
 
   return (
     <Modal>
@@ -39,15 +43,16 @@ export function AddTenantModal(){
         <input className="num" value={idCard} onChange={e=>setIdCard(e.target.value)} /></div>
       <div className="actions">
         <button className="btn ghost" onClick={closeModal}>ยกเลิก</button>
-        <button className="btn" onClick={save}>เพิ่ม</button>
+        <button className="btn" disabled={busy} onClick={save}>เพิ่ม</button>
       </div>
     </Modal>
   );
 }
 
 export function EditTenantModal({ tenantId }){
-  const { tenants, leases, units, updateTenant } = useData();
+  const { tenants, leases, units, h, updateTenant } = useData();
   const { closeModal } = useUi();
+  const TODAY = h.today();
   const t = tenants.find(x=>x.id===tenantId);
   const held = leases.filter(l=>l.unit_id && l.tenant_id===tenantId
     && (!l.end_date || l.end_date > TODAY))
@@ -57,15 +62,15 @@ export function EditTenantModal({ tenantId }){
   const [phone, setPhone] = useState(t.phone||"");
   const [addr, setAddr] = useState(t.address||"");
   const [idCard, setIdCard] = useState(t.id_card||"");
-  const [error, setError] = useState(null);
+  const { error, busy, run } = useSubmit();
 
-  const save = () => {
-    const nm = name.trim();
-    if(!nm) return setError("ต้องมีชื่อ");
-    updateTenant(tenantId, {full_name:nm, phone:phone.trim(),
-      address:addr.trim(), id_card:idCard.trim()});
-    closeModal();
-  };
+  const save = () => run(
+    async () => {
+      await updateTenant(tenantId, {full_name:name.trim(), phone:phone.trim(),
+        address:addr.trim(), id_card:idCard.trim()});
+      closeModal();
+    },
+    () => !name.trim() ? "ต้องมีชื่อ" : null);
 
   return (
     <Modal>
@@ -84,7 +89,7 @@ export function EditTenantModal({ tenantId }){
         <input className="num" value={idCard} onChange={e=>setIdCard(e.target.value)} /></div>
       <div className="actions">
         <button className="btn ghost" onClick={closeModal}>ยกเลิก</button>
-        <button className="btn" onClick={save}>บันทึก</button>
+        <button className="btn" disabled={busy} onClick={save}>บันทึก</button>
       </div>
     </Modal>
   );
@@ -93,7 +98,11 @@ export function EditTenantModal({ tenantId }){
 export function DeleteTenantModal({ id }){
   const { tenants, leases, deleteTenant } = useData();
   const { closeModal, go } = useUi();
+  const { error, busy, run } = useSubmit();
   const t = tenants.find(x => x.id === id);
+  // A tenant with leases cannot be deleted, by design — their billing history
+  // points back at them. The server refuses it as well; saying so here is what
+  // lets the alternative be offered instead of an error.
   const held = leases.filter(l => l.tenant_id === id);
 
   return (
@@ -105,10 +114,11 @@ export function DeleteTenantModal({ id }){
         <div className="actions"><button className="btn ghost" onClick={closeModal}>ปิด</button></div>
       </> : <>
         <p className="lead">ผู้เช่ารายนี้ยังไม่เคยมีสัญญาเช่า ลบได้</p>
+        <ErrBox>{error}</ErrBox>
         <div className="actions">
           <button className="btn ghost" onClick={closeModal}>ยกเลิก</button>
-          <button className="btn danger"
-            onClick={() => { deleteTenant(id); closeModal(); go({name:"tenants"}); }}>ลบ</button>
+          <button className="btn danger" disabled={busy}
+            onClick={() => run(async () => { await deleteTenant(id); closeModal(); go({name:"tenants"}); })}>ลบ</button>
         </div>
       </>}
     </Modal>

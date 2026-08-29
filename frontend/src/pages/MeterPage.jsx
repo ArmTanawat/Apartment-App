@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import MonthPicker from '../components/MonthPicker.jsx';
 import Switch from '../components/Switch.jsx';
+import { messageOf } from '../lib/api.js';
 import { useData } from '../state/DataContext.jsx';
 import { useUi } from '../state/UiContext.jsx';
 
@@ -69,15 +70,26 @@ export default function MeterPage(){
 }
 
 function MeterRows({ rows }){
-  const { readings, settings, h, upsertReading } = useData();
+  const { readings, settings, h, createReading, patchReading } = useData();
   const { period, meterFilter, openModal, bumpMeter } = useUi();
 
   // What is in the boxes. Kept as the typed text rather than a number, so a
   // half-typed figure is not rewritten under the caret.
   const [drafts, setDrafts] = useState({});
-  // Whether this row has been typed into since the table was drawn, and which
-  // of its two meters came out below last month.
+  // Per room: whether it has been typed into since the table was drawn, which
+  // of its two meters came out below last month, and whether the last save of
+  // each meter failed. A failed write must never look like a successful one —
+  // this page saves silently as you type, and an unnoticed failure means a
+  // missing reading discovered at billing time.
   const [rowState, setRowState] = useState({});
+
+  // Writes for one room run one after another. Two meters typed before the
+  // row exists would otherwise both POST, and the second would be refused by
+  // UNIQUE (unit_id, period).
+  const queues = useRef({});
+  // The id of a row this table created, before the reload that will carry it.
+  const madeRows = useRef({});
+  const timers = useRef({});
 
   const shown = rows.filter(u => {
     if(meterFilter === "no")   return !h.metered(u.id, period);
@@ -86,6 +98,7 @@ function MeterRows({ rows }){
   });
 
   const readingFor = unitId => readings.find(x => x.unit_id === unitId && x.period === period);
+  const rowIdFor = unitId => { const r = readingFor(unitId); return r ? r.id : madeRows.current[unitId]; };
 
   const displayed = (unitId, kind) => {
     const d = drafts[unitId];
@@ -95,71 +108,109 @@ function MeterRows({ rows }){
     return v === null || v === undefined ? "" : String(v);
   };
 
+  const setRow = (unitId, patch) =>
+    setRowState(s => ({ ...s, [unitId]: { ...(s[unitId] || {}), ...patch } }));
+
+  const enqueue = (unitId, fn) => {
+    const prev = queues.current[unitId] || Promise.resolve();
+    const next = prev.then(fn, fn);
+    queues.current[unitId] = next.catch(() => {});
+    return next;
+  };
+
   // Each meter is stored on its own. A water figure that is wrong must not
-  // discard an electricity figure that was typed correctly beside it, which is
-  // what returning early here used to do.
-  const commitMeter = (unitId, next) => {
-    const wIn = next.w !== undefined ? next.w : displayed(unitId, "w");
-    const eIn = next.e !== undefined ? next.e : displayed(unitId, "e");
-    setDrafts(d => ({ ...d, [unitId]: { w: wIn, e: eIn } }));
-
+  // discard an electricity figure that was typed correctly beside it.
+  const save = (unitId, kind, value) => enqueue(unitId, async () => {
     const r = readingFor(unitId);
-    const prev = h.previousReading(unitId, period);
-    const wp = r ? r.water_prev : prev.water;
-    const ep = r ? r.elec_prev  : prev.elec;
-    const wroll = r ? (r.water_rollover || 0) : 0;
-    const eroll = r ? (r.elec_rollover  || 0) : 0;
-    const wc = wIn.trim() === "" ? null : parseFloat(wIn);
-    const ec = eIn.trim() === "" ? null : parseFloat(eIn);
+    const prev = h.previousReading(unitId);
+    const isWater = kind === "w";
+    const p    = r ? (isWater ? r.water_prev : r.elec_prev) : (isWater ? prev.water : prev.elec);
+    const roll = r ? (isWater ? r.water_rollover : r.elec_rollover) || 0 : 0;
+    const n = value.trim() === "" ? null : parseFloat(value);
+    const curr = n === null || isNaN(n) ? null : n;
+    const currKey = isWater ? "water_curr" : "elec_curr";
 
-    const wUsed = wc === null || isNaN(wc) ? null : (wc + wroll) - wp;
-    const eUsed = ec === null || isNaN(ec) ? null : (ec + eroll) - ep;
-    const wBad = wUsed !== null && wUsed < 0;
-    const eBad = eUsed !== null && eUsed < 0;
+    // A meter counts up. Below last month is a typo, a replaced meter, or a
+    // dial that wrapped, and the three bill differently — so the number is not
+    // stored, and the screen asks which it was rather than guessing. The
+    // server refuses it too; not sending it is what lets the question be asked
+    // in Thai, beside the meter it is about.
+    const bad = curr !== null && (curr + roll) - p < 0;
 
-    const water_curr = (wc !== null && !isNaN(wc) && !wBad) ? wc : null;
-    const elec_curr  = (ec !== null && !isNaN(ec) && !eBad) ? ec : null;
+    try {
+      const id = rowIdFor(unitId);
+      // Writing null clears the figure, which is what an emptied box means and
+      // what a refused number leaves behind: the room goes back to outstanding.
+      const write = { [currKey]: bad ? null : curr };
+      if(id) await patchReading(id, write);
+      else {
+        const made = await createReading({ unit_id: unitId, period,
+          water_prev: r ? r.water_prev : prev.water,
+          elec_prev:  r ? r.elec_prev  : prev.elec,
+          ...write });
+        if(made && made.id) madeRows.current[unitId] = made.id;
+      }
+      setRow(unitId, { touched: true, error: null,
+        [isWater ? "wBad" : "eBad"]: bad });
+    } catch (e) {
+      setRow(unitId, { touched: true, error: messageOf(e),
+        [isWater ? "wBad" : "eBad"]: bad });
+    }
+  });
 
-    upsertReading(unitId, period, existing => existing
-      ? { water_curr, elec_curr }
-      : { water_prev: wp, water_curr, water_rollover: 0,
-          elec_prev: ep,  elec_curr,  elec_rollover: 0 });
-
-    setRowState(s => ({ ...s, [unitId]: { touched: true, wBad, eBad } }));
+  // The prototype wrote to memory on every keystroke. Over a network that
+  // would be a request per character, so the save follows shortly behind the
+  // typing and is flushed on the way out of the box.
+  const onType = (unitId, kind, value) => {
+    setDrafts(d => ({ ...d, [unitId]: { ...(d[unitId] || {}), [kind]: value } }));
+    const key = `${unitId}:${kind}`;
+    clearTimeout(timers.current[key]);
+    timers.current[key] = setTimeout(() => save(unitId, kind, value), 350);
+  };
+  const onBlur = (unitId, kind, value) => {
+    const key = `${unitId}:${kind}`;
+    if(timers.current[key]){ clearTimeout(timers.current[key]); delete timers.current[key];
+      save(unitId, kind, value); }
   };
 
   // The dial wrapped: usage is what it counted up to its last digit, plus the
-  // new number. The rollover amount is the meter's capacity, from its digits.
-  const applyRollover = (unitId, kind) => {
-    const prev = h.previousReading(unitId, period);
-    // The dial's capacity comes from how many digits it has, which is a property
-    // of the meter and is kept in settings. Counting the digits in the reading
-    // would get it wrong for any meter showing a number padded with zeros.
-    const digits = kind === "w" ? settings.water_meter_digits : settings.electricity_meter_digits;
-    const cap = Math.pow(10, digits);
+  // new number. The rollover amount is the meter's capacity, which comes from
+  // how many digits it has — a property of the meter, kept in settings.
+  // Counting the digits in the reading would get it wrong for any meter
+  // showing a number padded with zeros.
+  const applyRollover = (unitId, kind) => enqueue(unitId, async () => {
+    const prev = h.previousReading(unitId);
+    const isWater = kind === "w";
+    const cap = Math.pow(10, isWater ? settings.water_meter_digits : settings.electricity_meter_digits);
     const typed = parseFloat(displayed(unitId, kind)) || 0;
-
-    upsertReading(unitId, period, existing => existing
-      ? { [kind === "w" ? "water_rollover" : "elec_rollover"]: cap }
-      : { water_prev: prev.water, water_curr: kind==="w" ? typed : prev.water,
-          water_rollover: kind==="w" ? cap : 0,
-          elec_prev: prev.elec, elec_curr: kind==="e" ? typed : prev.elec,
-          elec_rollover: kind==="e" ? cap : 0 });
-    bumpMeter();
-  };
+    try {
+      const id = rowIdFor(unitId);
+      if(id) await patchReading(id, { [isWater ? "water_rollover" : "elec_rollover"]: cap });
+      else await createReading({ unit_id: unitId, period,
+        water_prev: prev.water, water_curr: isWater ? typed : prev.water,
+        water_rollover: isWater ? cap : 0,
+        elec_prev: prev.elec, elec_curr: isWater ? prev.elec : typed,
+        elec_rollover: isWater ? 0 : cap });
+      setRow(unitId, { error: null });
+      bumpMeter();
+    } catch (e) { setRow(unitId, { error: messageOf(e) }); }
+  });
 
   // The meter was replaced, so it starts from zero and usage is just the new
   // number. Same symptom as a rollover, different arithmetic.
-  const applyNewMeter = (unitId, kind) => {
-    const prev = h.previousReading(unitId, period);
-    upsertReading(unitId, period, existing => existing
-      ? { [kind === "w" ? "water_prev" : "elec_prev"]: 0 }
-      : { water_prev: kind==="w" ? 0 : prev.water, water_curr: kind==="w" ? 0 : prev.water,
-          water_rollover: 0,
-          elec_prev: kind==="e" ? 0 : prev.elec, elec_curr: kind==="e" ? 0 : prev.elec,
-          elec_rollover: 0 });
-    bumpMeter();
-  };
+  const applyNewMeter = (unitId, kind) => enqueue(unitId, async () => {
+    const prev = h.previousReading(unitId);
+    const isWater = kind === "w";
+    try {
+      const id = rowIdFor(unitId);
+      if(id) await patchReading(id, { [isWater ? "water_prev" : "elec_prev"]: 0 });
+      else await createReading({ unit_id: unitId, period,
+        water_prev: isWater ? 0 : prev.water, water_curr: isWater ? 0 : prev.water,
+        elec_prev:  isWater ? prev.elec : 0, elec_curr:  isWater ? prev.elec : 0 });
+      setRow(unitId, { error: null });
+      bumpMeter();
+    } catch (e) { setRow(unitId, { error: messageOf(e) }); }
+  });
 
   // Enter walks down the column of inputs, which is how the numbers arrive off
   // a clipboard: room by room, water then electricity.
@@ -181,7 +232,7 @@ function MeterRows({ rows }){
     out.push(<tr className="frow" key={`f${fl}`}><td colSpan={6}>ชั้น {fl}</td></tr>);
     rs.forEach(u => {
       const r = readingFor(u.id);
-      const prev = h.previousReading(u.id, period);
+      const prev = h.previousReading(u.id);
       const pl = h.leasesInPeriod(u.id, period);
       const who = pl.length ? h.tenantOf(pl[pl.length-1].id).full_name : "ว่าง";
       const st = rowState[u.id];
@@ -200,7 +251,8 @@ function MeterRows({ rows }){
           <td className="mcell">
             <input className={"num" + (bad ? " bad" : "")} {...attr} value={c} placeholder="—"
               inputMode="numeric" onKeyDown={onKeyDown}
-              onChange={e => commitMeter(u.id, { [kind]: e.target.value })} />
+              onChange={e => onType(u.id, kind, e.target.value)}
+              onBlur={e => onBlur(u.id, kind, e.target.value)} />
           </td>
           <td className="munit">
             {used !== null && used >= 0
@@ -224,7 +276,11 @@ function MeterRows({ rows }){
       );
 
       let statClass = "statcell mstat", statBody = null;
-      if(st && st.touched && (st.wBad || st.eBad)){
+      if(st && st.error){
+        statClass = "statcell mstat no";
+        statBody = <><span className="fixhead">ยังไม่ได้บันทึก</span>
+          <span style={{display:"block",whiteSpace:"normal",fontSize:"11px"}}>{st.error}</span></>;
+      } else if(st && st.touched && (st.wBad || st.eBad)){
         statClass = "statcell mstat no";
         statBody = <><span className="fixhead">เลขน้อยกว่าเดิม</span>
           {st.wBad ? fixFor("w","น้ำ") : null}{st.eBad ? fixFor("e","ไฟ") : null}</>;

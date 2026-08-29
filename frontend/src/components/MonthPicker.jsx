@@ -1,6 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { periodLabel, shiftPeriod } from '../lib/helpers.js';
-import { thisMonth } from '../state/DataContext.jsx';
+import { periodLabel, shiftPeriod, thisMonth } from '../lib/helpers.js';
 import { useUi } from '../state/UiContext.jsx';
 
 /* The month picker. Forward is capped at the current month; back is

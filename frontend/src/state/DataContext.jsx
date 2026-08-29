@@ -1,176 +1,256 @@
-/* DataContext — everything the prototype kept in module-level arrays.
+/* DataContext — everything the screens read, fetched from the API.
  *
- * The prototype held `units`, `tenants`, `leases`, `readings`, `bills`,
- * `leaseFees`, `charges`, `feeTypes`, `settings`, `periodSettings` and
- * `backups` as module-level `let` bindings and called render() after mutating
- * them. Once a save is in flight while the user changes month, deciding which
- * response still matters becomes manual — so the data lives here instead, and
- * every change goes through a named action.
+ * The prototype held eleven arrays in module scope. Each of them maps to an
+ * endpoint that returns the same shape, so the screens are unchanged; only
+ * where the data comes from is different.
  *
- * Phase 2 replaces the bodies of those actions with fetch calls and the
- * initial state with the endpoints that already return these shapes. The
- * screens do not change.
+ * Writes go to the server and then refetch what they affected, rather than
+ * patching a local copy. GET /units already works out is_occupied and
+ * leaving_on, GET /readings works out is_entered, and GET /leases joins the
+ * tenant's name — recomputing any of that on the client would be a second copy
+ * of a rule that has to agree with the first. On one machine over localhost a
+ * refetch costs nothing.
  */
 
-import { createContext, useContext, useMemo, useRef, useState } from 'react';
-import * as mock from '../data/mockData.js';
-import { buildBill } from '../lib/buildBill.js';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { ApiDown, del, get, post, put } from '../lib/api.js';
 import {
-  activeLease, appliesMinimum, billed, floors, leaseOn, leasesInPeriod,
-  leavingOn, metered, overlapping, previousReading, roomsOf, tenantOf,
+  floors, leaseOn, leasesInPeriod, metered, roomsOf, tenantOf, todayLocal,
 } from '../lib/helpers.js';
+import { useUi } from './UiContext.jsx';
 
 const DataContext = createContext(null);
 
-// Two bills already issued, so the list and the staleness check have something
-// to show without generating first. The prototype did this at the bottom of
-// its script; here it is the starting value of `bills`.
-function seedBills(){
-  const stamp = () => {
-    const now = new Date();
-    const p2 = n => String(n).padStart(2,"0");
-    return `${now.getFullYear()}-${p2(now.getMonth()+1)}-${p2(now.getDate())} ${p2(now.getHours())}:${p2(now.getMinutes())}`;
-  };
-  const period = mock.thisMonth();
-  const out = [];
-  [1, 5].forEach((lid, i) => {
-    const built = buildBill(mock, lid, period);
-    if(!built.error) out.push({ id: mock.nextId.bill + 1 + i, created_at: stamp(), ...built });
-  });
-  return out;
-}
+const EMPTY = {
+  units: [], tenants: [], leases: [], bills: [], readings: [],
+  previousReadings: {}, feeTypes: [], settings: null, applyMinimum: true,
+};
 
-export const TODAY = mock.TODAY;
-export const thisMonth = mock.thisMonth;
-export const BACKUP_KEEP = mock.BACKUP_KEEP;
+// GET /readings?period= returns one row per room, with nulls for the rooms not
+// yet entered — that is what makes it the checklist. The screens want the rows
+// that actually exist, shaped like the meter_readings table.
+const toReadingRows = (rows, period) => rows
+  .filter(r => r.reading_id !== null)
+  .map(r => ({
+    id: r.reading_id, unit_id: r.unit_id, period,
+    water_prev: r.water_prev, water_curr: r.water_curr, water_rollover: r.water_rollover,
+    elec_prev: r.elec_prev, elec_curr: r.elec_curr, elec_rollover: r.elec_rollover,
+  }));
 
 export function DataProvider({ children }){
-  const [units, setUnits] = useState(mock.units);
-  const [tenants, setTenants] = useState(mock.tenants);
-  const [leases, setLeases] = useState(mock.leases);
-  const [readings, setReadings] = useState(mock.readings);
-  const [bills, setBills] = useState(seedBills);
-  const [leaseFees, setLeaseFees] = useState(mock.leaseFees);
-  const [charges, setCharges] = useState(mock.charges);
-  const [feeTypes, setFeeTypes] = useState(mock.feeTypes);
-  const [settings, setSettings] = useState(mock.settings);
-  const [periodSettings, setPeriodSettings] = useState(mock.periodSettings);
-  const [backups, setBackups] = useState(mock.backups);
+  const { period } = useUi();
 
-  // Ids only have to be unique. A ref rather than state because bumping the
-  // counter is not something the screen should re-render for.
-  const nextId = useRef({ ...mock.nextId, bill: mock.nextId.bill + 2, reading: 1000 });
-  const newId = kind => ++nextId.current[kind];
+  const [state, setState] = useState(EMPTY);
+  const [loading, setLoading] = useState(true);
+  const [down, setDown] = useState(false);
+
+  // Which fetch is the current one. A response from an older period or an
+  // older reload is dropped rather than written over newer data.
+  const generation = useRef(0);
+
+  const load = useCallback(async (keys = null) => {
+    const mine = ++generation.current;
+    const want = k => !keys || keys.includes(k);
+
+    try {
+      const [units, tenants, leases, bills, readingRows, feeTypes, settings, periodRow] =
+        await Promise.all([
+          want('units')     ? get('/units')            : null,
+          want('tenants')   ? get('/tenants')          : null,
+          want('leases')    ? get('/leases')           : null,
+          want('bills')     ? get('/bills')            : null,
+          want('readings')  ? get(`/readings?period=${period}`) : null,
+          want('feeTypes')  ? get('/fees/types?all=true')       : null,
+          want('settings')  ? get('/settings')         : null,
+          want('period')    ? get(`/settings/period/${period}`) : null,
+        ]);
+
+      // The previous figures need the room list, and the rule for finding them
+      // — the most recent completed month, not simply last month — lives in
+      // the endpoint. One call per room, on localhost.
+      let previousReadings = null;
+      if(want('prev')){
+        const list = units || state.units;
+        const rows = await Promise.all(list.map(u =>
+          get(`/readings/previous/${u.id}/${period}`).then(r => [u.id, r])));
+        previousReadings = Object.fromEntries(rows.map(([id, r]) =>
+          [id, { water: r.water_prev, elec: r.elec_prev, from: r.from_period }]));
+      }
+
+      if(mine !== generation.current) return;
+
+      setState(s => ({
+        ...s,
+        ...(units          ? { units } : null),
+        ...(tenants        ? { tenants } : null),
+        ...(leases         ? { leases } : null),
+        ...(bills          ? { bills } : null),
+        ...(readingRows    ? { readings: toReadingRows(readingRows, period) } : null),
+        ...(previousReadings ? { previousReadings } : null),
+        ...(feeTypes       ? { feeTypes } : null),
+        ...(settings       ? { settings } : null),
+        ...(periodRow      ? { applyMinimum: periodRow.apply_minimum } : null),
+      }));
+      setDown(false);
+    } catch (e) {
+      if(mine !== generation.current) return;
+      // A read that fails may be retried; only the banner appears, and the
+      // last good data stays on screen rather than blanking the page.
+      if(e instanceof ApiDown) setDown(true);
+      throw e;
+    } finally {
+      if(mine === generation.current) setLoading(false);
+    }
+  }, [period, state.units]);
+
+  // Everything, on first mount and whenever the working month changes.
+  useEffect(() => {
+    setLoading(true);
+    load(['units','tenants','leases','bills','readings','feeTypes','settings','period','prev'])
+      .catch(() => {});
+  // load closes over state.units, which would re-fire this on every load.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [period]);
 
   const value = useMemo(() => {
-    const data = { units, tenants, leases, readings, bills, leaseFees, charges,
-                   feeTypes, settings, periodSettings, backups };
+    const TODAY = todayLocal();
+    const { units, tenants, leases, bills, readings, previousReadings, applyMinimum } = state;
 
-    // ---- rooms ----
-    const addUnit = u => setUnits(us => [...us, { id: newId('unit'), ...u }]);
-    const updateUnit = (id, patch) =>
-      setUnits(us => us.map(u => u.id === id ? { ...u, ...patch } : u));
-    const deleteUnit = id => setUnits(us => us.filter(u => u.id !== id));
+    // After a write, refetch what it touched. Anything that throws reaches the
+    // caller, which is the screen that has somewhere to show it — a write is
+    // never retried on its own, because repeating a POST after a timeout can
+    // produce two of something.
+    const after = (keys) => load(keys).catch(() => {});
 
-    // ---- tenants ----
-    // Returns the new id so ย้ายเข้า can create a tenant and a lease in one go.
-    const addTenant = t => { const id = newId('tenant');
-      setTenants(ts => [...ts, { id, ...t }]); return id; };
-    const updateTenant = (id, patch) =>
-      setTenants(ts => ts.map(t => t.id === id ? { ...t, ...patch } : t));
-    const deleteTenant = id => setTenants(ts => ts.filter(t => t.id !== id));
-
-    // ---- leases ----
-    const addLease = l => setLeases(ls => [...ls, { id: newId('lease'), ...l }]);
-    // end_date is passed explicitly, including as null to cancel a scheduled
-    // move-out. Anywhere that merges a patch has to keep null meaning "clear".
-    const updateLease = (id, patch) =>
-      setLeases(ls => ls.map(l => l.id === id ? { ...l, ...patch } : l));
-
-    // ---- meter readings ----
-    // One action covers every way a reading changes: typing a number, a
-    // rollover, a replaced meter, a corrected previous figure. `compute` is
-    // handed the existing row or null and returns the fields to write.
-    const upsertReading = (unitId, period, compute) => setReadings(rs => {
-      const i = rs.findIndex(r => r.unit_id === unitId && r.period === period);
-      const existing = i >= 0 ? rs[i] : null;
-      const next = compute(existing);
-      if(!next) return rs;
-      if(i >= 0){ const copy = rs.slice(); copy[i] = { ...existing, ...next }; return copy; }
-      return [...rs, { id: newId('reading'), unit_id: unitId, period, ...next }];
-    });
-
-    // ---- recurring fees ----
-    const addLeaseFee = f => setLeaseFees(fs => [...fs, { id: newId('fee'), ...f }]);
-    const updateLeaseFee = (id, patch) =>
-      setLeaseFees(fs => fs.map(f => f.id === id ? { ...f, ...patch } : f));
-    const deleteLeaseFee = id => setLeaseFees(fs => fs.filter(f => f.id !== id));
-
-    // ---- one-time charges ----
-    const addCharge = c => setCharges(cs => [...cs, { id: newId('charge'), ...c }]);
-    const deleteCharge = id => setCharges(cs => cs.filter(c => c.id !== id));
-
-    // ---- fee types ----
-    const addFeeType = f => setFeeTypes(fs => [...fs, { id: newId('fee'), is_active: 1, ...f }]);
-    const updateFeeType = (id, patch) =>
-      setFeeTypes(fs => fs.map(f => f.id === id ? { ...f, ...patch } : f));
-    const deleteFeeType = id => setFeeTypes(fs => fs.filter(f => f.id !== id));
-
-    // ---- bills ----
-    const saveBill = built => {
-      const now = new Date();
-      const p2 = n => String(n).padStart(2,"0");
-      const stamp = `${now.getFullYear()}-${p2(now.getMonth()+1)}-${p2(now.getDate())} ${p2(now.getHours())}:${p2(now.getMinutes())}`;
-      const bill = { id: newId('bill'), created_at: stamp, ...built };
-      setBills(bs => [...bs, bill]);
-      return bill;
+    // A write that fails because the server is not there is not a problem with
+    // that one field; nothing on the page can be saved. The banner says so
+    // once at the top, and the error still reaches the form that asked.
+    const guard = fn => async (...args) => {
+      try { return await fn(...args); }
+      catch (e) { if(e instanceof ApiDown) setDown(true); throw e; }
     };
-    const deleteBill = id => setBills(bs => bs.filter(b => b.id !== id));
 
-    // ---- settings ----
-    const patchSettings = patch => setSettings(s => ({ ...s, ...patch }));
-    const setApplyMinimum = (period, on) =>
-      setPeriodSettings(ps => ({ ...ps, [period]: on }));
+    const actions = {
+      // ---- rooms ----
+      addUnit: async u => { await post('/units', u); await after(['units']); },
+      updateUnit: async (id, patch) => { await put(`/units/${id}`, patch); await after(['units','leases']); },
+      deleteUnit: async id => { await del(`/units/${id}`); await after(['units']); },
 
-    const addBackup = () => {
-      const now = new Date();
-      const p2 = n => String(n).padStart(2,"0");
-      const stamp = `${now.getFullYear()}-${p2(now.getMonth()+1)}-${p2(now.getDate())} ${p2(now.getHours())}:${p2(now.getMinutes())}`;
-      setBackups(bs => [{ filename:`apartment-${stamp.replace(/[ :]/g,"-")}.db`, size_kb:96, created_at:stamp },
-        ...bs].slice(0, BACKUP_KEEP));
+      // ---- tenants ----
+      addTenant: async t => { const made = await post('/tenants', t); await after(['tenants']); return made; },
+      updateTenant: async (id, patch) => { await put(`/tenants/${id}`, patch); await after(['tenants','leases','bills']); },
+      deleteTenant: async id => { await del(`/tenants/${id}`); await after(['tenants']); },
+
+      // ---- leases ----
+      addLease: async l => { await post('/leases', l); await after(['units','leases']); },
+      // end_date is sent explicitly, including as null to cancel a scheduled
+      // move-out: PUT /leases/:id tests for the key with `in`, so a null
+      // clears it and an omitted key keeps the date.
+      updateLease: async (id, patch) => { await put(`/leases/${id}`, patch); await after(['units','leases']); },
+      endLease: async (id, end_date) => { await put(`/leases/${id}/end`, { end_date }); await after(['units','leases']); },
+
+      // ---- meter readings ----
+      // One row per room per month. POST creates it, PUT corrects it, and each
+      // meter is written on its own so a wrong water figure cannot discard a
+      // correct electricity figure beside it.
+      createReading: async row => { await post('/readings', row); await after(['readings']); },
+      patchReading: async (id, patch) => { await put(`/readings/${id}`, patch); await after(['readings']); },
+
+      // ---- fee types ----
+      addFeeType: async f => { await post('/fees/types', f); await after(['feeTypes']); },
+      updateFeeType: async (id, patch) => { await put(`/fees/types/${id}`, patch); await after(['feeTypes']); },
+      deleteFeeType: async id => { await del(`/fees/types/${id}`); await after(['feeTypes']); },
+
+      // ---- recurring fees and one-time charges ----
+      // Scoped to one lease, so the screen that shows them fetches them and
+      // reloads itself; nothing global changes except the bills they affect.
+      addLeaseFee: f => post('/fees/lease', f),
+      updateLeaseFee: (id, patch) => put(`/fees/lease/${id}`, patch),
+      deleteLeaseFee: id => del(`/fees/lease/${id}`),
+      addCharge: c => post('/fees/onetime', c),
+      deleteCharge: id => del(`/fees/onetime/${id}`),
+
+      // ---- bills ----
+      generateBills: async body => { const r = await post('/bills/batch', body); await after(['bills']); return r; },
+      generateBill: async body => { const r = await post('/bills', body); await after(['bills']); return r; },
+      deleteBill: async id => { await del(`/bills/${id}`); await after(['bills']); },
+
+      // ---- settings ----
+      patchSettings: async patch => { await put('/settings', patch); await after(['settings']); },
+      setApplyMinimum: async (p, on) => {
+        const r = await put(`/settings/period/${p}`, { apply_minimum: on });
+        await after(['period']);
+        return r;
+      },
+      makeBackup: () => post('/backups', {}),
     };
 
     // Helpers bound to the current data, so a screen reads
     // `h.activeLease(unitId)` the way the prototype did.
+    // Who is in a room today is the server's answer, not a second calculation
+    // here. GET /units decides it with date('now','localtime') and the same
+    // `end_date > date` rule POST /leases guards with — so a card can never
+    // show a room the move-in form would then refuse, or the other way round.
+    const unitById = id => units.find(u => u.id === id);
+
     const h = {
+      today: () => TODAY,
       floors: () => floors(units),
       leaseOn: (unitId, date) => leaseOn(leases, unitId, date),
-      activeLease: unitId => activeLease(leases, unitId, TODAY),
-      leavingOn: unitId => leavingOn(leases, unitId, TODAY),
+      activeLease: unitId => {
+        const u = unitById(unitId);
+        return u && u.lease_id ? leases.find(l => l.id === u.lease_id) : undefined;
+      },
+      // A move-out already entered for a future date. The room is still
+      // occupied, but it is about to come free and that is worth seeing.
+      leavingOn: unitId => { const u = unitById(unitId); return (u && u.leaving_on) || null; },
       tenantOf: leaseId => tenantOf(tenants, leases, leaseId),
-      overlapping: (unitId, start, end) => overlapping(leases, unitId, start, end),
-      previousReading: (unitId, period) => previousReading(readings, unitId, period),
-      leasesInPeriod: (unitId, period) => leasesInPeriod(leases, unitId, period),
-      metered: (unitId, period) => metered(readings, unitId, period),
-      billed: (unitId, period) => billed(bills, leases, unitId, period, TODAY),
-      appliesMinimum: period => appliesMinimum(periodSettings, period),
+      // The most recent completed month for this room, as the API works it out
+      // — the last month actually finished, not simply the month before.
+      previousReading: unitId => previousReadings[unitId] || { water: 0, elec: 0, from: null },
+      // No endpoint answers "which leases were in this room during a month",
+      // so the screens work it out from the lease list with the same rule
+      // POST /bills/batch uses when it actually bills them.
+      leasesInPeriod: (unitId, p) => leasesInPeriod(leases, unitId, p),
+      metered: (unitId, p) => metered(readings, unitId, p),
+      billed: (unitId, p) => {
+        const u = unitById(unitId);
+        return !!(u && u.lease_id && bills.some(b => b.lease_id === u.lease_id && b.period === p));
+      },
+      appliesMinimum: () => applyMinimum,
       roomsOf: tenantId => roomsOf(leases, units, tenantId, TODAY),
     };
 
-    return { ...data, data, h,
-      addUnit, updateUnit, deleteUnit,
-      addTenant, updateTenant, deleteTenant,
-      addLease, updateLease,
-      upsertReading,
-      addLeaseFee, updateLeaseFee, deleteLeaseFee,
-      addCharge, deleteCharge,
-      addFeeType, updateFeeType, deleteFeeType,
-      saveBill, deleteBill,
-      patchSettings, setApplyMinimum, addBackup };
-  }, [units, tenants, leases, readings, bills, leaseFees, charges,
-      feeTypes, settings, periodSettings, backups]);
+    const guarded = Object.fromEntries(
+      Object.entries(actions).map(([name, fn]) => [name, guard(fn)]));
+
+    return { ...state, loading, down, reload: () => load(), h, ...guarded };
+  }, [state, loading, down, load]);
+
+  // Nothing renders against a null settings object; the first load fills it.
+  if(!state.settings){
+    return (
+      <DataContext.Provider value={value}>
+        <FirstLoad down={down} onRetry={() => load()} />
+      </DataContext.Provider>
+    );
+  }
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;
+}
+
+function FirstLoad({ down, onRetry }){
+  return (
+    <div className="app">
+      <main className="main">
+        {down ? <>
+          <h1>ติดต่อเซิร์ฟเวอร์ไม่ได้</h1>
+          <p className="sub">โปรแกรมส่วนหลังยังไม่ได้เปิด เปิดแล้วกดลองใหม่</p>
+          <div className="actions"><button className="btn" onClick={onRetry}>ลองใหม่</button></div>
+        </> : <p className="sub">กำลังโหลด…</p>}
+      </main>
+    </div>
+  );
 }
 
 export function useData(){

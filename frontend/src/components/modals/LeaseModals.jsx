@@ -1,12 +1,15 @@
 import { useState } from 'react';
+import { useSubmit } from '../../lib/useSubmit.js';
 import ErrBox from '../ErrBox.jsx';
 import Modal from '../Modal.jsx';
-import { TODAY, useData } from '../../state/DataContext.jsx';
+import { useData } from '../../state/DataContext.jsx';
 import { useUi } from '../../state/UiContext.jsx';
 
 export function MoveInModal({ unitId }){
   const { units, tenants, h, addTenant, addLease } = useData();
   const { closeModal } = useUi();
+  const { error, busy, run } = useSubmit();
+  const TODAY = h.today();
   const u = units.find(x=>x.id===unitId);
 
   const [sel, setSel] = useState("");
@@ -17,40 +20,33 @@ export function MoveInModal({ unitId }){
   const [start, setStart] = useState(TODAY);
   const [rent, setRent] = useState(String(u.base_rent));
   const [dep, setDep] = useState(String(u.base_rent*2));
-  const [error, setError] = useState(null);
 
   const picked = sel && sel !== "new" ? tenants.find(x=>x.id===parseInt(sel,10)) : null;
   const missing = picked
     ? [!picked.phone?"เบอร์โทร":null, !picked.address?"ที่อยู่":null].filter(Boolean) : [];
 
-  const save = () => {
-    const r = parseFloat(rent);
-    const d = parseFloat(dep);
-    if(!sel)   return setError("เลือกผู้เช่าก่อน");
-    if(!start) return setError("ใส่วันเข้าอยู่");
+  // The double-booking check is POST /leases's, and only its. It compares
+  // dates rather than asking who is here today, and its message names the
+  // tenant and the date the room frees up. A second copy of that comparison
+  // here is exactly how a board comes to disagree with the form.
+  const save = () => run(
+    async () => {
+      let tid;
+      if(sel === "new"){
+        // Written into the shared tenant list, so the ผู้เช่า page shows this
+        // person immediately — no separate step to register them.
+        const made = await addTenant({ full_name:newName.trim(), phone:newPhone.trim(),
+          address:newAddr.trim(), id_card:newIdCard.trim() });
+        tid = made.id;
+      } else tid = parseInt(sel,10);
 
-    // The same overlap test the API runs. It compares dates, not "today".
-    const clash = h.overlapping(unitId, start, null);
-    if(clash){
-      const who = h.tenantOf(clash.id);
-      const until = clash.end_date ? ` (ถึง ${clash.end_date})` : "";
-      return setError(`ห้อง ${u.unit_number} มีผู้เช่าอยู่แล้ว — ${who.full_name}${until}`);
-    }
-
-    let tid;
-    if(sel === "new"){
-      const nm = newName.trim();
-      if(!nm) return setError("ใส่ชื่อผู้เช่าใหม่");
-      // Written straight into the shared tenants list, so the ผู้เช่า page shows
-      // this person immediately — no separate step to register them.
-      tid = addTenant({ full_name:nm, phone:newPhone.trim(),
-        address:newAddr.trim(), id_card:newIdCard.trim() });
-    } else tid = parseInt(sel,10);
-
-    addLease({tenant_id:tid, unit_id:unitId, start_date:start,
-      end_date:null, monthly_rent:r, deposit:d});
-    closeModal();
-  };
+      await addLease({tenant_id:tid, unit_id:unitId, start_date:start,
+        end_date:null, monthly_rent:parseFloat(rent), deposit:parseFloat(dep)});
+      closeModal();
+    },
+    () => !sel ? "เลือกผู้เช่าก่อน"
+      : !start ? "ใส่วันเข้าอยู่"
+      : (sel === "new" && !newName.trim()) ? "ใส่ชื่อผู้เช่าใหม่" : null);
 
   return (
     <Modal>
@@ -99,32 +95,32 @@ export function MoveInModal({ unitId }){
       </div>
       <div className="actions">
         <button className="btn ghost" onClick={closeModal}>ยกเลิก</button>
-        <button className="btn" onClick={save}>ย้ายเข้า</button>
+        <button className="btn" disabled={busy} onClick={save}>ย้ายเข้า</button>
       </div>
     </Modal>
   );
 }
 
 export function MoveOutModal({ unitId }){
-  const { units, h, updateLease } = useData();
+  const { units, h, endLease } = useData();
   const { closeModal } = useUi();
+  const { error, busy, run } = useSubmit();
+  const TODAY = h.today();
   const u = units.find(x=>x.id===unitId);
   const l = h.activeLease(unitId);
   const t = h.tenantOf(l.id);
   const [end, setEnd] = useState(TODAY);
-  const [error, setError] = useState(null);
 
   const monthEnd = () => {
     const d = new Date(TODAY);
     return new Date(d.getFullYear(), d.getMonth()+1, 1).toISOString().slice(0,10);
   };
 
-  const save = () => {
-    if(!end) return setError("ใส่วันย้ายออก");
-    if(end < l.start_date) return setError("วันย้ายออกต้องไม่ก่อนวันเข้าอยู่");
-    updateLease(l.id, {end_date:end});
-    closeModal();
-  };
+  // PUT /leases/:id/end is a named action rather than an edit, and it refuses
+  // an end date before the start date itself.
+  const save = () => run(
+    async () => { await endLease(l.id, end); closeModal(); },
+    () => !end ? "ใส่วันย้ายออก" : null);
 
   return (
     <Modal>
@@ -144,7 +140,7 @@ export function MoveOutModal({ unitId }){
       <div className="warn">สัญญาและบิลย้อนหลังยังอยู่ครบ ค่าใช้จ่ายที่ค้างของเดือนนี้ยังออกบิลให้ผู้เช่ารายนี้ได้</div>
       <div className="actions">
         <button className="btn ghost" onClick={closeModal}>ยกเลิก</button>
-        <button className="btn" onClick={save}>ย้ายออก</button>
+        <button className="btn" disabled={busy} onClick={save}>ย้ายออก</button>
       </div>
     </Modal>
   );
@@ -158,25 +154,29 @@ export function EditLeaseModal({ leaseId }){
   const [start, setStart] = useState(l.start_date);
   const [rent, setRent] = useState(String(l.monthly_rent));
   const [dep, setDep] = useState(String(l.deposit));
-  const [error, setError] = useState(null);
+  const { error, busy, run } = useSubmit();
 
-  const save = () => {
-    const r = parseFloat(rent), d = parseFloat(dep);
-    if(!start) return setError("ใส่วันเข้าอยู่");
-    if(isNaN(r) || r < 0) return setError("ค่าเช่าต้องเป็นตัวเลข");
-    if(isNaN(d) || d < 0) return setError("มัดจำต้องเป็นตัวเลข");
-    if(l.end_date && start >= l.end_date)
-      return setError("วันเข้าอยู่ต้องก่อนวันที่ห้องว่าง");
-
-    // Moving the start date can push this lease into someone else's stay.
+  // PUT /leases/:id checks the dates against each other but NOT against the
+  // other leases on this room — unlike POST /leases, which does. So the
+  // overlap test stays here: moving a start date backwards can push this lease
+  // into someone else's stay, and nothing else would stop it.
+  const clashWith = () => {
     const clash = leases.find(x => x.unit_id===l.unit_id && x.id!==leaseId
       && (!x.end_date || x.end_date > start)
       && (!l.end_date || x.start_date < l.end_date));
-    if(clash) return setError(`ช่วงวันที่ทับกับสัญญาของ ${h.tenantOf(clash.id).full_name}`);
-
-    updateLease(leaseId, {start_date:start, monthly_rent:r, deposit:d});
-    closeModal();
+    return clash ? `ช่วงวันที่ทับกับสัญญาของ ${h.tenantOf(clash.id).full_name}` : null;
   };
+
+  const save = () => run(
+    async () => {
+      await updateLease(leaseId, {start_date:start, monthly_rent:parseFloat(rent), deposit:parseFloat(dep)});
+      closeModal();
+    },
+    () => !start ? "ใส่วันเข้าอยู่"
+      : (isNaN(parseFloat(rent)) || parseFloat(rent) < 0) ? "ค่าเช่าต้องเป็นตัวเลข"
+      : (isNaN(parseFloat(dep)) || parseFloat(dep) < 0) ? "มัดจำต้องเป็นตัวเลข"
+      : (l.end_date && start >= l.end_date) ? "วันเข้าอยู่ต้องก่อนวันที่ห้องว่าง"
+      : clashWith());
 
   return (
     <Modal>
@@ -195,7 +195,7 @@ export function EditLeaseModal({ leaseId }){
         บิลเดือนก่อนที่ออกไปแล้วยังคงยอดเดิม</div>
       <div className="actions">
         <button className="btn ghost" onClick={closeModal}>ยกเลิก</button>
-        <button className="btn" onClick={save}>บันทึก</button>
+        <button className="btn" disabled={busy} onClick={save}>บันทึก</button>
       </div>
     </Modal>
   );

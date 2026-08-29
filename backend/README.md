@@ -52,7 +52,7 @@ The database file `apartment.db` is created automatically on first run.
 - `GET /readings/previous/:unitId/:period` — last month's numbers, for auto-fill
 - `GET /readings/history/:unitId` — every reading for one room
 - `POST /readings` — record a month (send `water_rollover`/`elec_rollover` when a dial wrapped)
-- `PUT /readings/:id` — correct a reading
+- `PUT /readings/:id` — correct a reading (send `water_curr: null` / `elec_curr: null` explicitly to clear one)
 - `DELETE /readings/:id`
 
 ### Fees
@@ -72,8 +72,10 @@ The database file `apartment.db` is created automatically on first run.
 ### Bills
 - `GET /bills?period=2026-08` — bills for a month, or all
 - `GET /bills/:id` — one bill with its printable line items
-- `GET /bills/preview/:leaseId/:period` — calculate without saving
+- `GET /bills/preview/:leaseId/:period` — calculate without saving (`?prorate=true&days=11`)
+- `GET /bills/example/:kind/:units` — what N units of water or electricity cost at today's rates, for the worked example on the settings screen
 - `POST /bills` — generate and save
+- `POST /bills/batch` — generate for several rooms at once, reporting each room it skipped and why
 - `DELETE /bills/:id`
 
 ### Settings

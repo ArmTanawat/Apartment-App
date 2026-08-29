@@ -181,11 +181,23 @@ router.put('/:id', (req, res) => {
   }
 
   const water_prev = req.body.water_prev ?? existing.water_prev;
-  const water_curr = req.body.water_curr ?? existing.water_curr;
   const elec_prev  = req.body.elec_prev  ?? existing.elec_prev;
-  const elec_curr  = req.body.elec_curr  ?? existing.elec_curr;
   const water_rollover = req.body.water_rollover ?? existing.water_rollover;
   const elec_rollover  = req.body.elec_rollover  ?? existing.elec_rollover;
+
+  // The current readings are checked with `in` rather than `??`, the same way
+  // end_date is on PUT /leases/:id, because clearing one is a real action.
+  //
+  // A row may hold a previous figure with no current one. That is the state
+  // left after the previous figure was corrected upward and the meter has to
+  // be read again — refusing the correction until the current number is
+  // inflated first is backwards. With `??`, sending null would be read as "not
+  // supplied" and the old number would stay, so there would be no way to get
+  // back to it.
+  const water_curr = 'water_curr' in req.body
+    ? (req.body.water_curr ?? null) : existing.water_curr;
+  const elec_curr = 'elec_curr' in req.body
+    ? (req.body.elec_curr ?? null) : existing.elec_curr;
 
   const wu = usage(water_prev, water_curr, water_rollover);
   const eu = usage(elec_prev, elec_curr, elec_rollover);

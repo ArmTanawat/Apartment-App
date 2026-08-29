@@ -1,8 +1,10 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import ErrBox from '../components/ErrBox.jsx';
 import MonthPicker from '../components/MonthPicker.jsx';
 import Switch from '../components/Switch.jsx';
+import { messageOf } from '../lib/api.js';
+import { previewOrReason } from '../lib/bills.js';
 import { baht, daysInPeriod } from '../lib/helpers.js';
-import { buildBill } from '../lib/buildBill.js';
 import { useData } from '../state/DataContext.jsx';
 import { useUi } from '../state/UiContext.jsx';
 
@@ -11,7 +13,7 @@ import { useUi } from '../state/UiContext.jsx';
  * Two switches live here rather than in settings, because both are decisions
  * about this month's bills: the minimum charge, and charging rent by the day. */
 export default function BillsPage(){
-  const { units, bills, data, h, saveBill, setApplyMinimum } = useData();
+  const { units, bills, h, generateBills, setApplyMinimum } = useData();
   const { period, go, picked, setPicked, prorateOn, setProrateOn,
           prorateDays, setProrateDays, lastResult, setLastResult } = useUi();
 
@@ -67,40 +69,67 @@ export default function BillsPage(){
     );
   });
 
-  // Preview is computed live from the current selection, using the same
-  // function that will write the bill.
-  const previews = [];
-  picked.forEach(uid => billableLeases(uid).forEach(l => {
-    if(billFor(l.id)){
-      previews.push({ unit: units.find(u=>u.id===uid).unit_number,
-        tenant: h.tenantOf(l.id).full_name, skip: "ออกบิลเดือนนี้ไปแล้ว" });
-      return;
-    }
-    const b = buildBill(data, l.id, period, {prorate: prorateOn, prorateDays});
-    previews.push(b.error
-      ? { unit: units.find(u=>u.id===uid).unit_number, tenant: h.tenantOf(l.id).full_name, skip: b.error }
-      : { unit: b.unit_number, tenant: b.tenant_name, built: b, lease_id: l.id });
-  }));
+  // Preview comes from GET /bills/preview — the same figures POST would store,
+  // calculated without writing anything. Nothing on this page works out a
+  // charge itself; there is only one copy of that arithmetic and it is on the
+  // server.
+  const [previews, setPreviews] = useState([]);
+  const [previewing, setPreviewing] = useState(false);
+  const [pageError, setPageError] = useState(null);
+  const pickedKey = [...picked].sort((a,b)=>a-b).join(",");
+
+  useEffect(() => {
+    if(!picked.size){ setPreviews([]); return; }
+    let alive = true;
+    setPreviewing(true);
+    // One request per lease. A room that cannot be billed answers 400 with the
+    // reason, which is a row in the table rather than a failure of the page.
+    const jobs = [];
+    picked.forEach(uid => billableLeases(uid).forEach(l => {
+      const unit = units.find(u => u.id === uid).unit_number;
+      const tenant = h.tenantOf(l.id).full_name;
+      if(billFor(l.id)){
+        jobs.push(Promise.resolve({ unit, tenant, skip: "ออกบิลเดือนนี้ไปแล้ว" }));
+        return;
+      }
+      jobs.push(previewOrReason(l.id, period, { prorate: prorateOn, days: prorateDays })
+        .then(r => r.built
+          ? { unit: r.built.unit_number, tenant: r.built.tenant_name, built: r.built, lease_id: l.id }
+          : { unit, tenant, skip: r.skip }));
+    }));
+    Promise.all(jobs)
+      .then(rows => { if(alive){ setPreviews(rows); setPageError(null); } })
+      .catch(e => { if(alive){ setPreviews([]); setPageError(messageOf(e)); } })
+      .finally(() => { if(alive) setPreviewing(false); });
+    return () => { alive = false; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pickedKey, period, prorateOn, prorateDays, bills]);
+
   const ready = previews.filter(p => p.built);
   const readyTotal = ready.reduce((s, p) => s + p.built.total, 0);
 
-  const generate = () => {
-    const made = [], skipped = [];
-    picked.forEach(uid => {
-      const unit = units.find(u => u.id === uid);
-      const ls = billableLeases(uid);
-      if(!ls.length){ skipped.push({unit:unit.unit_number, reason:"ไม่มีผู้เช่าเดือนนี้"}); return; }
-      // One failing room must not stop the rest, and both leases in a handover
-      // month are billed separately.
-      ls.forEach(l => {
-        if(billFor(l.id)){ skipped.push({unit:unit.unit_number, reason:"ออกบิลเดือนนี้ไปแล้ว"}); return; }
-        const built = buildBill(data, l.id, period, {prorate:prorateOn, prorateDays});
-        if(built.error){ skipped.push({unit:unit.unit_number, reason:built.error}); return; }
-        made.push(saveBill(built));
+  // POST /bills/batch. One failing room must not stop the rest, and both
+  // leases in a handover month are billed separately — the route does both,
+  // and reports what it skipped and why. A write is never retried on its own:
+  // repeating this after a timeout could produce two bills.
+  const [generating, setGenerating] = useState(false);
+  const generate = async () => {
+    setGenerating(true);
+    setPageError(null);
+    try {
+      const r = await generateBills({ period, unit_ids: [...picked],
+        prorate: prorateOn, prorate_days: prorateOn ? prorateDays : null });
+      setLastResult({
+        made: r.generated_count,
+        total: r.generated.reduce((s, g) => s + g.total, 0),
+        skipped: r.skipped.map(x => ({ unit: x.unit_number, reason: x.reason })),
       });
-    });
-    setLastResult({ made: made.length, skipped, total: made.reduce((s,b)=>s+b.total,0) });
-    setPicked(new Set());
+      setPicked(new Set());
+    } catch (e) {
+      setPageError(messageOf(e));
+    } finally {
+      setGenerating(false);
+    }
   };
 
   const applyRange = () => {
@@ -145,8 +174,12 @@ export default function BillsPage(){
         {picks}
 
         <div style={{display:"flex",gap:"22px",flexWrap:"wrap",marginTop:"6px"}}>
-          <Switch on={h.appliesMinimum(period)}
-            onClick={() => { setApplyMinimum(period, !h.appliesMinimum(period)); setLastResult(null); }}>
+          <Switch on={h.appliesMinimum()}
+            onClick={async () => {
+              setLastResult(null);
+              try { await setApplyMinimum(period, !h.appliesMinimum()); }
+              catch(e){ setPageError(messageOf(e)); }
+            }}>
             คิดขั้นต่ำค่าน้ำค่าไฟ</Switch>
           <Switch on={prorateOn}
             onClick={() => { setProrateOn(!prorateOn); if(prorateOn){ setProrateDays(null); setDaysText(null); } setLastResult(null); }}>
@@ -187,9 +220,10 @@ export default function BillsPage(){
         ) : <p className="none" style={{marginTop:"14px"}}>ยังไม่ได้เลือกห้อง</p>}
 
         <div className="actions">
-          <button className="btn" disabled={!ready.length} onClick={generate}>
+          <button className="btn" disabled={!ready.length || generating || previewing} onClick={generate}>
             ออกบิล {ready.length ? `${ready.length} ใบ` : ""}</button>
         </div>
+        <ErrBox>{pageError}</ErrBox>
 
         {lastResult && (
           <div className="result">
