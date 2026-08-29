@@ -1,0 +1,11 @@
+node_modules/
+
+# The database and its copies are this machine's data, not the program.
+backend/apartment.db
+backend/backups/
+
+# Build output.
+frontend/dist/
+frontend/smoke-dist/
+
+.DS_Store
