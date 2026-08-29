@@ -245,7 +245,7 @@ function FirstLoad({ down, onRetry }){
       <main className="main">
         {down ? <>
           <h1>ติดต่อเซิร์ฟเวอร์ไม่ได้</h1>
-          <p className="sub">โปรแกรมส่วนหลังยังไม่ได้เปิด เปิดแล้วกดลองใหม่</p>
+          <p className="sub">กรุณาลองใหม่</p>
           <div className="actions"><button className="btn" onClick={onRetry}>ลองใหม่</button></div>
         </> : <p className="sub">กำลังโหลด…</p>}
       </main>

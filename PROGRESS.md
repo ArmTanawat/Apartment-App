@@ -3,9 +3,10 @@
 Running notes on porting the prototype to React and wiring it to the backend.
 Written so a fresh session can continue from this file alone.
 
-**Status: Phase 1 (port) and Phase 2 (wire to the API) are both complete.**
-The React app in `frontend/` runs every screen against the real backend.
-`fetch` appears in exactly one file. Electron packaging is not started.
+**Status: Phase 1 (port) and Phase 2 (wire to the API) are both complete, and
+the seven questions they raised have been answered and acted on.** The React
+app in `frontend/` runs every screen against the real backend. `fetch` appears
+in exactly one file. Electron packaging is not started.
 
 ---
 
@@ -150,9 +151,6 @@ allow": there is now no second `>` that could drift.
 
 The exceptions, and why:
 
-- **`PUT /leases/:id` has no overlap check** (unlike `POST /leases`), so
-  แก้สัญญา keeps its client-side clash test. Nothing else would stop a start
-  date being dragged back into someone else's stay. **Question 5 below.**
 - **A reading below last month is detected on the client** — not to decide
   whether it is allowed, but to decide what to ask. The server refuses it
   either way, with one English message for both meters; the screen has to name
@@ -188,24 +186,17 @@ The policy from `HANDOFF.md`, applied in one place each rather than per screen:
 
 ### New Thai text
 
-The prototype had never had a request fail, so it has no words for any of this.
-Five strings were written, kept to its voice — **question 6 below**:
-
-| Where | Text |
-|---|---|
-| First load | `กำลังโหลด…` |
-| First load, no server | `ติดต่อเซิร์ฟเวอร์ไม่ได้` / `โปรแกรมส่วนหลังยังไม่ได้เปิด เปิดแล้วกดลองใหม่` / `ลองใหม่` |
-| Banner | `ติดต่อเซิร์ฟเวอร์ไม่ได้ — ตัวเลขที่เห็นอาจไม่ใช่ล่าสุด และยังบันทึกอะไรไม่ได้` |
-| Meter row | `ยังไม่ได้บันทึก` |
+The prototype had never had a request fail, so it had no words for any of it.
+Five strings were needed; the owner supplied the wording, and it is in the
+table under question 2 below.
 
 ---
 
 ## Backend changes
 
-Three, all proven necessary by Phase 2, all following the pattern of their
-neighbours, all recorded in `backend/README.md` and `REQUIREMENTS.md` in the
-same commit. **They are the only edits to `backend/`, and the owner should look
-at them first.**
+Six now. The first three were proven necessary by Phase 2; the last three came
+out of the answers to the questions below. All follow the pattern of their
+neighbours and all are recorded in `backend/README.md` and `REQUIREMENTS.md`.
 
 **1. `POST /bills/batch` accepts `prorate_days`.** `POST /bills` already did.
 Without it, a run asked on screen to charge 11 of 30 days silently billed a
@@ -229,6 +220,16 @@ either — explaining that formula is the whole point of the block it sits in.
 It lives in `routes/bills.js` beside `utilityCharge`, declared before `/:id` so
 `example` is not read as a bill id.
 
+**4. Every error message is Thai** (question 1). Wording only.
+
+**5. `PUT /leases/:id` checks for an overlap** (question 5), the way
+`POST /leases` does, against the dates the update would leave behind and
+excluding the lease being edited. Without it, correcting a start date backwards
+walked a lease into the previous tenant's stay and only the screen stopped it.
+
+**6. `GET /fees/lease` is new** (question 7) — every recurring fee on every
+lease, for ตั้งค่า.
+
 Nothing else in `backend/` was touched.
 
 ---
@@ -248,61 +249,88 @@ still block nothing:
 
 Three more turned up while wiring, all harmless:
 
-- `PUT /settings/period/:period` returns `bills_already_generated` and a `note`
-  saying those bills are unchanged. No screen shows it — **question 4**.
+- `PUT /settings/period/:period` returns `bills_already_generated` and a
+  `note`. บิล now says the same thing from its own bill list, so the field is
+  still unread — but the screen no longer stays silent.
 - `PUT /fees/onetime/:id` has no button; the prototype only adds and deletes
   one-time charges. Same as before the port.
 - `GET /units/vacant` and `GET /leases/active` are unused, because the board
   and the tenant list read the fuller lists. Not gaps.
 
-**One shape is missing rather than one route.** There is no endpoint for *all*
-lease fees, and ตั้งค่า needs one to know which fee types are in use — that is
-what decides whether a delete button is offered. It asks `/fees/lease/:id` once
-per lease instead. Correct, and cheap on the least-visited page with fifteen
-leases, but a `GET /fees/lease` would make it one request. Not added, because
-nothing today needs it — **question 7**.
+**`GET /fees/lease` was added** for ตั้งค่า, which needs to know which fee types
+are attached to somebody. It used to ask once per lease.
 
 ---
 
-## Questions for the owner
+## The seven questions, and what was done
 
-Found while working. Nothing was changed on account of any of them.
+All answered by the owner on 2026-08-30 and applied.
 
-1. **After ครบรอบ, the meter box goes blank.** You click the button, the number
-   you typed disappears, and you type it again. The rollover is saved correctly
-   and the second attempt bills right. Should the typed number be kept?
+**1. Every error message the backend returns is now Thai.** All 81 of them,
+across the eight route files, plus the skip reasons in the `POST /bills/batch`
+response and the 500 handler in `server.js`. Wording only — no rule, no status
+code and no shape changed, so nothing on the frontend needed touching. They
+keep the same specificity: `ห้อง 203 มีผู้เช่าอยู่แล้ว — สมชาย ใจดี (ถึง 2026-09-15)`,
+not `Conflict`. `backend/README.md` has a section saying so, because a new
+route added later has to be written the same way.
 
-2. **The backend's error messages are English; the screens are Thai.** The
-   policy in `HANDOFF.md` and `FRONTEND.md` is to show the message the API
-   returned, so `ห้อง 203 มีผู้เช่าอยู่แล้ว — สมชาย` is now
-   `Unit 203 is already rented to สมชาย (ถึง 2026-09-15)`, and a skipped room
-   on บิล reads `No meter reading entered for unit 106 in 2026-08`. The
-   messages are good ones and they name the right things, but they are in the
-   wrong language for the person using this daily. Should the backend's error
-   strings be translated? That is a backend change and a large one, so it is
-   recorded rather than made.
+**2. The five new strings** are the owner's wording:
 
-3. **The stale-bill banner has no border.** Its CSS asks for `var(--attention)`,
-   which is not defined in `:root`, so the yellow box has no outline. Copied
-   verbatim. Should there be a token for it, or is the yellow enough?
+| Where | Text |
+|---|---|
+| First load | `กำลังโหลด…` |
+| First load, no server | `ติดต่อเซิร์ฟเวอร์ไม่ได้` / `กรุณาลองใหม่` / `ลองใหม่` |
+| Banner | `ติดต่อเซิร์ฟเวอร์ไม่ได้ ตัวเลขที่เห็นอาจไม่ใช่ล่าสุด และยังบันทึกอะไรไม่ได้` |
+| Meter row | `ยังไม่ได้บันทึก` |
 
-4. **Switching the minimum charge off for a month that is already billed says
-   nothing.** The API replies that N bills exist and are unchanged. The screens
-   warn about this for a meter reading and a one-time charge but not for this
-   switch. Worth adding the same warning?
+**3. A meter fix keeps the number already in the box.** เปลี่ยนมิเตอร์ and
+ครบรอบ now write the fix and the figure together, so 151 → 5 on a four-digit
+dial reads 9854 units the moment the button is pressed. It turned out simpler
+than what it replaced rather than harder: `applyRollover` and `applyNewMeter`
+are one `applyFix` differing in two arguments, and the round trip where the
+user retyped the number is gone.
 
-5. **`PUT /leases/:id` does not check for an overlap, `POST /leases` does.**
-   Correcting a start date backwards into a previous tenant's stay is refused
-   only by the screen. Should the route check it too?
+The figure only goes along if the fix rescues it — if some combination still
+gave negative usage the server would refuse the whole write, and the fix is the
+part worth keeping. That cannot normally happen; it is guarded because losing
+both would be silent.
 
-6. **Five new Thai strings** had to be written for states the prototype never
-   had — loading, the server being unreachable, and a meter row whose save
-   failed. They are in the table above. Worth a read.
+**4. บิล warns when the month is already billed**, in the same words and the
+same place บันทึกมิเตอร์ does: `งวดนี้ออกบิลไปแล้ว N ใบ การเปลี่ยนสวิตช์ตรงนี้จะยังไม่
+เปลี่ยนบิลที่ออกไป ถ้าต้องการให้มีผล ต้องลบบิลเดิมแล้วออกใหม่`. It shows whenever
+bills exist for the working month, not only after a switch is flipped — the
+same rule the meter page uses.
 
-7. **`GET /fees/lease` (all of them) would save ตั้งค่า about fifteen requests.**
-   Not added because nothing is slow. Say if it should be.
+**5. `PUT /leases/:id` runs the overlap check `POST /leases` runs.** Same
+comparison, same `end_date >` meaning, excluding the lease being edited. The
+client-side copy in แก้สัญญา is deleted: the point of moving it was to stop
+having two of it.
 
----
+**6. `--attention` and `--attention-soft` are tokens now**, and `.stale` reads
+both — the yellow was hardcoded beside the undefined border. Added to the
+colour table in `FRONTEND.md` with a note that they are not a third room state:
+colour still answers one question about a room, and this banner is about a
+bill.
+
+**7. `GET /fees/lease` returns every recurring fee on every lease.** ตั้งค่า
+asks once instead of once per lease. Until the answer is in, no delete button
+is offered — offering to delete a fee type that turns out to be in use is worse
+than not offering.
+
+### Still open
+
+Nothing from the seven. The two gaps from `HANDOFF.md` are unchanged and still
+block nothing:
+
+| Endpoint | What is missing |
+|---|---|
+| `GET /readings/history/:unitId` | No way to look at a room's readings over time, which is the natural thing to want when a number looks wrong. |
+| `DELETE /leases/:id` | A lease created by mistake can only be ended, leaving a record of a tenancy that never happened. |
+
+`PUT /fees/onetime/:id` still has no button — the screens add and delete
+one-time charges but do not edit one, exactly as the prototype did.
+
+Electron is the remaining piece of work.
 
 ## Log
 
@@ -338,3 +366,16 @@ What broke and how it was fixed:
   *+ เพิ่ม* instead of ค่าใช้จ่ายครั้งเดียว's, and it typed into the building's
   phone box thinking it was the water threshold — the first `.rateline
   input.num` on the page belongs to อพาร์ตเมนต์. The app was right both times.
+
+**The seven questions.** All answered and applied on 2026-08-30. The
+translation was the bulk of it — 81 messages, mechanical, no logic touched.
+
+Two of the others turned out smaller than expected. Keeping the typed number
+through a meter fix (3) replaced two near-identical functions with one, because
+writing the fix and the figure in the same request is what removes the retype.
+Moving the overlap check onto `PUT /leases/:id` (5) deleted more frontend code
+than it added backend code.
+
+Two checks were added to the walk that would have caught the thing each change
+was about: that no Latin text reaches a dialog, and that the box still holds
+its number after ครบรอบ.

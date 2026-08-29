@@ -6,6 +6,11 @@
 :root{
   --paper:#FCFCFC; --surface:#FFFFFF; --ink:#1A1A1A; --muted:#8C8C8C;
   --line:#E4E4E4; --occupied:#2E7D46; --vacant:#B3382C; --soft:#F0F0F0;
+  /* Not a third room state — colour still answers only "is anyone living
+     here". This is the banner that says a saved bill no longer matches its
+     data, which needs to be noticed and is not about a room at all. .stale
+     already asked for --attention and the yellow was hardcoded beside it. */
+  --attention:#C9A227; --attention-soft:#FFF8E6;
 }
 *{box-sizing:border-box}
 body{
@@ -329,7 +334,7 @@ h1{font-size:32px; font-weight:700; margin:0; line-height:1.4}
   font-size:13px; color:var(--muted); line-height:1.8}
 .pfoot b{color:var(--ink); font-weight:500}
 .papers .paper{margin-bottom:20px}
-.stale{background:#FFF8E6; border:1px solid var(--attention); border-radius:8px;
+.stale{background:var(--attention-soft); border:1px solid var(--attention); border-radius:8px;
   padding:14px 16px; margin-bottom:16px; font-size:14px; line-height:1.7; max-width:640px}
 .diff{font-size:13px; margin:8px 0 0; padding-left:0; list-style:none}
 .diff li{padding:3px 0; color:var(--muted)}

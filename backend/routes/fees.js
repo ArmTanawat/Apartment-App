@@ -31,10 +31,10 @@ router.post('/types', (req, res) => {
   const { name, default_amount } = req.body;
 
   if (!name || name.trim() === '') {
-    return res.status(400).json({ error: 'Fee name is required' });
+    return res.status(400).json({ error: 'ต้องใส่ชื่อรายการ' });
   }
   if (default_amount === undefined || default_amount === null || default_amount < 0) {
-    return res.status(400).json({ error: 'Default amount must be a positive number' });
+    return res.status(400).json({ error: 'ค่าตั้งต้นต้องเป็นตัวเลขตั้งแต่ 0 ขึ้นไป' });
   }
 
   try {
@@ -45,7 +45,7 @@ router.post('/types', (req, res) => {
     res.status(201).json(db.prepare('SELECT * FROM fee_types WHERE id = ?').get(result.lastInsertRowid));
   } catch (err) {
     if (err.message.includes('UNIQUE')) {
-      return res.status(400).json({ error: `A fee called "${name}" already exists` });
+      return res.status(400).json({ error: `มีรายการชื่อ "${name}" อยู่แล้ว` });
     }
     throw err;
   }
@@ -58,7 +58,7 @@ router.post('/types', (req, res) => {
 router.put('/types/:id', (req, res) => {
   const existing = db.prepare('SELECT * FROM fee_types WHERE id = ?').get(req.params.id);
   if (!existing) {
-    return res.status(404).json({ error: 'Fee type not found' });
+    return res.status(404).json({ error: 'ไม่พบประเภทค่าธรรมเนียมนี้' });
   }
 
   const name = req.body.name ?? existing.name;
@@ -82,13 +82,13 @@ router.delete('/types/:id', (req, res) => {
 
   if (inUse > 0) {
     return res.status(400).json({
-      error: 'This fee is in use. Set it to inactive instead of deleting it.'
+      error: 'รายการนี้มีผู้เช่าใช้อยู่ ลบไม่ได้ ให้ปิดใช้งานแทน'
     });
   }
 
   const result = db.prepare('DELETE FROM fee_types WHERE id = ?').run(req.params.id);
   if (result.changes === 0) {
-    return res.status(404).json({ error: 'Fee type not found' });
+    return res.status(404).json({ error: 'ไม่พบประเภทค่าธรรมเนียมนี้' });
   }
 
   res.status(204).send();
@@ -99,6 +99,24 @@ router.delete('/types/:id', (req, res) => {
 // ---------------------------------------------------------------------------
 
 // GET /fees/lease/7 — what this tenant pays every month
+// GET /fees/lease — every recurring fee on every lease.
+//
+// The settings screen needs to know which fee types are attached to somebody,
+// because that is what decides whether a delete button is offered. Asking
+// /fees/lease/:id once per lease answers the same question in as many
+// requests.
+//
+// Declared before '/lease/:leaseId' so the bare path is not read as a lease id.
+router.get('/lease', (req, res) => {
+  const fees = db.prepare(`
+    SELECT lf.id, lf.lease_id, lf.amount, lf.fee_type_id, ft.name
+    FROM lease_fees lf
+    JOIN fee_types ft ON ft.id = lf.fee_type_id
+    ORDER BY lf.lease_id, ft.name
+  `).all();
+  res.json(fees);
+});
+
 router.get('/lease/:leaseId', (req, res) => {
   const fees = db.prepare(`
     SELECT lf.id, lf.amount, lf.fee_type_id, ft.name
@@ -116,17 +134,17 @@ router.post('/lease', (req, res) => {
   const { lease_id, fee_type_id, amount } = req.body;
 
   if (!lease_id || !fee_type_id) {
-    return res.status(400).json({ error: 'Lease and fee type are required' });
+    return res.status(400).json({ error: 'ต้องระบุสัญญาเช่าและประเภทค่าธรรมเนียม' });
   }
 
   const lease = db.prepare('SELECT * FROM leases WHERE id = ?').get(lease_id);
   if (!lease) {
-    return res.status(400).json({ error: 'That lease does not exist' });
+    return res.status(400).json({ error: 'ไม่พบสัญญาเช่านี้' });
   }
 
   const feeType = db.prepare('SELECT * FROM fee_types WHERE id = ?').get(fee_type_id);
   if (!feeType) {
-    return res.status(400).json({ error: 'That fee type does not exist' });
+    return res.status(400).json({ error: 'ไม่พบประเภทค่าธรรมเนียมนี้' });
   }
 
   // Amount is copied from the catalogue when not given, and stored on the row.
@@ -147,7 +165,7 @@ router.post('/lease', (req, res) => {
     res.status(201).json(created);
   } catch (err) {
     if (err.message.includes('UNIQUE')) {
-      return res.status(400).json({ error: `This tenant already has "${feeType.name}"` });
+      return res.status(400).json({ error: `ผู้เช่ารายนี้มี "${feeType.name}" อยู่แล้ว` });
     }
     throw err;
   }
@@ -157,12 +175,12 @@ router.post('/lease', (req, res) => {
 router.put('/lease/:id', (req, res) => {
   const existing = db.prepare('SELECT * FROM lease_fees WHERE id = ?').get(req.params.id);
   if (!existing) {
-    return res.status(404).json({ error: 'Fee not found' });
+    return res.status(404).json({ error: 'ไม่พบค่าธรรมเนียมนี้' });
   }
 
   const amount = req.body.amount ?? existing.amount;
   if (amount < 0) {
-    return res.status(400).json({ error: 'Amount cannot be negative' });
+    return res.status(400).json({ error: 'ยอดต้องไม่ติดลบ' });
   }
 
   db.prepare('UPDATE lease_fees SET amount = ? WHERE id = ?').run(amount, req.params.id);
@@ -179,7 +197,7 @@ router.put('/lease/:id', (req, res) => {
 router.delete('/lease/:id', (req, res) => {
   const result = db.prepare('DELETE FROM lease_fees WHERE id = ?').run(req.params.id);
   if (result.changes === 0) {
-    return res.status(404).json({ error: 'Fee not found' });
+    return res.status(404).json({ error: 'ไม่พบค่าธรรมเนียมนี้' });
   }
   res.status(204).send();
 });
@@ -206,18 +224,18 @@ router.post('/onetime', (req, res) => {
   const { lease_id, period, description, amount } = req.body;
 
   if (!lease_id || !period || !description || description.trim() === '') {
-    return res.status(400).json({ error: 'Lease, period, and description are required' });
+    return res.status(400).json({ error: 'ต้องระบุสัญญาเช่า งวด และชื่อรายการ' });
   }
   if (!/^\d{4}-\d{2}$/.test(period)) {
-    return res.status(400).json({ error: 'Period must look like 2026-08' });
+    return res.status(400).json({ error: 'งวดต้องอยู่ในรูปแบบ 2026-08' });
   }
   if (amount === undefined || amount === null || isNaN(amount)) {
-    return res.status(400).json({ error: 'Amount must be a number' });
+    return res.status(400).json({ error: 'จำนวนเงินต้องเป็นตัวเลข' });
   }
 
   const lease = db.prepare('SELECT * FROM leases WHERE id = ?').get(lease_id);
   if (!lease) {
-    return res.status(400).json({ error: 'That lease does not exist' });
+    return res.status(400).json({ error: 'ไม่พบสัญญาเช่านี้' });
   }
 
   // Deliberately no UNIQUE constraint here. Two separate repairs in the same
@@ -234,7 +252,7 @@ router.post('/onetime', (req, res) => {
 router.put('/onetime/:id', (req, res) => {
   const existing = db.prepare('SELECT * FROM one_time_charges WHERE id = ?').get(req.params.id);
   if (!existing) {
-    return res.status(404).json({ error: 'Charge not found' });
+    return res.status(404).json({ error: 'ไม่พบค่าใช้จ่ายนี้' });
   }
 
   const description = req.body.description ?? existing.description;
@@ -252,7 +270,7 @@ router.put('/onetime/:id', (req, res) => {
 router.delete('/onetime/:id', (req, res) => {
   const result = db.prepare('DELETE FROM one_time_charges WHERE id = ?').run(req.params.id);
   if (result.changes === 0) {
-    return res.status(404).json({ error: 'Charge not found' });
+    return res.status(404).json({ error: 'ไม่พบค่าใช้จ่ายนี้' });
   }
   res.status(204).send();
 });

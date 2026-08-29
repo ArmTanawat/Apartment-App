@@ -47,7 +47,7 @@ app.get('/health', (req, res) => {
 // Four arguments is what marks this as an error handler in Express.
 app.use((err, req, res, next) => {
   console.error(err);
-  res.status(500).json({ error: 'Something went wrong on the server' });
+  res.status(500).json({ error: 'เกิดข้อผิดพลาดที่เซิร์ฟเวอร์' });
 });
 
 const PORT = 3001;

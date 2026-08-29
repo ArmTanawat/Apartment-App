@@ -44,7 +44,7 @@ The database file `apartment.db` is created automatically on first run.
 - `GET /leases/:id` — one lease, with its fees
 - `POST /leases` — move a tenant in (blocks double-booking)
 - `PUT /leases/:id/end` — move a tenant out
-- `PUT /leases/:id` — correct lease details (send `end_date: null` to cancel a scheduled move-out)
+- `PUT /leases/:id` — correct lease details (send `end_date: null` to cancel a scheduled move-out); refuses a change that would overlap another lease on the same room
 - `DELETE /leases/:id` — delete (blocked if it has bills)
 
 ### Meter readings
@@ -60,6 +60,7 @@ The database file `apartment.db` is created automatically on first run.
 - `POST /fees/types` — add a new kind of fee
 - `PUT /fees/types/:id` — rename, reprice, or retire
 - `DELETE /fees/types/:id` — only if never used
+- `GET /fees/lease` — every recurring fee on every lease
 - `GET /fees/lease/:leaseId` — recurring fees for a tenant
 - `POST /fees/lease` — attach a recurring fee
 - `PUT /fees/lease/:id` — change the amount
@@ -121,6 +122,15 @@ the most recent 30. To restore, stop the server, copy a backup file over
 The database is a single file, so a backup is a plain file copy. Copy the folder
 to a USB drive or cloud folder occasionally — a backup on the same failed disk is
 not a backup.
+
+## Errors are in Thai
+
+Every message a `400` or `404` carries is written in Thai, because it is shown
+to the user as it arrives. They name the specific thing —
+`ห้อง 203 มีผู้เช่าอยู่แล้ว — สมชาย ใจดี (ถึง 2026-09-15)`, not `Conflict`.
+
+The skip reasons in the `POST /bills/batch` response are read on screen the
+same way, so they are Thai too.
 
 ## Bills are bilingual
 

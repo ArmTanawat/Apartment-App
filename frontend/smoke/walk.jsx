@@ -65,9 +65,20 @@ await select(sel2, [...sel2.options].find(o => o.textContent.includes('วิช
 await click(byText('.modal .btn', 'ย้ายเข้า'));
 check('re-lettable the same day', !$('.modal') && text('.tag') === 'มีผู้เช่า', text('.tag'));
 
+section('the server refuses a start date that walks into another stay');
+await click(byText('.btn', 'แก้สัญญา'));
+const startBox = $('.modal input[type="date"]');
+await type(startBox, '2000-01-01');
+await click(byText('.modal .btn', 'บันทึก'), 300);
+check('refused', !!$('.modal .err'), 'no error shown');
+check('and says whose stay it hits, in Thai',
+  $('.modal .err').textContent.includes('ทับกับสัญญาของ'), $('.modal .err').textContent);
+await click(byText('.modal .btn', 'ยกเลิก'));
+
 section('a refused delete is a reason, not an error state');
 await click(byText('.btn', 'ลบห้อง'));
 check('says it cannot be deleted', $('.modal .err') && $('.modal .err').textContent.includes('ลบไม่ได้'));
+check('no English reached the screen', !/[A-Za-z]{4}/.test($('.modal').textContent), $('.modal').textContent);
 check('offers the alternative', $('.modal').textContent.includes('ปล่อยว่างไว้แทน'));
 await click(byText('.modal .btn', 'ปิด'));
 
@@ -102,10 +113,12 @@ await typeAndSave(eIn, '1');
 check('both, labelled separately', $$('.fixrow', stat()).length === 2, stat().textContent);
 
 section('a wrap counts to the dial capacity from settings, not the digits typed');
-await click($$('.fixrow', stat())[0].querySelectorAll('button')[1]);   // น้ำ ครบรอบ
-await typeAndSave($(`[data-w="${wIn.dataset.w}"]`), '5');
-const used = $(`[data-w="${wIn.dataset.w}"]`).closest('tr').querySelector('.munit');
+await click($$('.fixrow', stat())[0].querySelectorAll('button')[1], 400);   // น้ำ ครบรอบ
+const wAfter = $(`[data-w="${wIn.dataset.w}"]`);
+check('the number typed before the fix is still there', wAfter.value === '5', `"${wAfter.value}"`);
+const used = wAfter.closest('tr').querySelector('.munit');
 check('151 -> 5 on a four-digit dial is 9854 units', used.textContent.includes('9854'), used.textContent);
+check('the row is no longer flagged', !wAfter.className.includes('bad'));
 
 section('a good reading saves on its own');
 const row202 = $$('.mno').find(e => e.textContent === '203').closest('tr');
@@ -126,6 +139,10 @@ await click(byText('.floorpicklab button', 'เลือกทั้งชั้
 check('preview table from GET /bills/preview', !!$('.pvtable'));
 const skips = $$('.pvtable td.bad').map(td => td.textContent);
 check('the server names each room it cannot bill', skips.length > 0, skips.join(' | '));
+check('in Thai', skips.every(s => s.includes('ห้อง') || s.includes('งวด') || s.includes('บิล')),
+  skips.join(' | '));
+check('a month with bills warns that the switches will not reach them',
+  body().includes('การเปลี่ยนสวิตช์ตรงนี้จะยังไม่เปลี่ยนบิลที่ออกไป'));
 check('and names one already billed', skips.some(s => s.includes('ออกบิลเดือนนี้ไปแล้ว')), skips.join(' | '));
 const gen = byText('.actions .btn', 'ออกบิล');
 check('generate enabled', !gen.disabled);
@@ -133,6 +150,8 @@ await click(gen, 400);
 check('reports both sides', body().includes('ออกบิลแล้ว') && body().includes('ข้าม'),
   text('.result h4'));
 check('skipped rooms named with a reason', $('.result .skip') && $('.result .skip').textContent.includes('ห้อง'));
+check('the reasons are Thai', !/[A-Za-z]{4}/.test($('.result .skip').textContent),
+  $('.result .skip').textContent);
 
 section('open a saved bill');
 await click($('.blist tbody tr'), 400);
@@ -194,7 +213,7 @@ check('the change reached the server',
   (await (await fetch('http://localhost:3001/settings')).json()).water_min_units === 7);
 await type(rate, '5'); await settle(1500);
 check('fee types from GET /fees/types', $$('.ftable tbody tr').length === 3);
-check('fee types in use offer no delete button',
+check('fee types in use offer no delete button, from one GET /fees/lease',
   $$('.ftable tbody tr').filter(r => r.textContent.includes('ลบ')).length === 0);
 check('backups listed from GET /backups', $$('.bkrow').length > 0);
 const before = $$('.bkrow').length;

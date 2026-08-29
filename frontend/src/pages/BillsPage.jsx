@@ -197,6 +197,17 @@ export default function BillsPage(){
         <p className="lead" style={{margin:"8px 0 0"}}>สวิตช์ขั้นต่ำเป็นของทั้งตึกสำหรับเดือนนี้
           ส่วนคิดรายวันใช้กับรอบที่กำลังจะออกนี้เท่านั้น</p>
 
+        {/* The same thing บันทึกมิเตอร์ says when a month is already billed.
+            PUT /settings/period/:period reports the count too — a bill stores
+            what it charged, so flipping this switch cannot reach one that has
+            already been written, and saying nothing leaves the user waiting
+            for a total to move that never will. */}
+        {monthBills.length > 0 && (
+          <div className="warn" style={{margin:"12px 0 0"}}>งวดนี้ออกบิลไปแล้ว{" "}
+            <b className="num">{monthBills.length}</b> ใบ การเปลี่ยนสวิตช์ตรงนี้จะยังไม่เปลี่ยนบิลที่ออกไป
+            ถ้าต้องการให้มีผล ต้องลบบิลเดิมแล้วออกใหม่</div>
+        )}
+
         {picked.size ? (
           <table className="pvtable">
             <thead><tr><th>ห้อง</th><th>ผู้เช่า</th><th className="r">ค่าเช่า</th>

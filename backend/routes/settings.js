@@ -56,27 +56,27 @@ router.put('/', (req, res) => {
   const updates = req.body;
 
   if (!updates || typeof updates !== 'object' || Object.keys(updates).length === 0) {
-    return res.status(400).json({ error: 'Send at least one setting to change' });
+    return res.status(400).json({ error: 'ต้องส่งอย่างน้อยหนึ่งค่ามาแก้' });
   }
 
   for (const [key, value] of Object.entries(updates)) {
     if (!ALLOWED_KEYS.includes(key)) {
-      return res.status(400).json({ error: `"${key}" is not a known setting` });
+      return res.status(400).json({ error: `ไม่รู้จักการตั้งค่าชื่อ "${key}"` });
     }
     if (TEXT_KEYS.includes(key)) {
       if (typeof value !== 'string') {
-        return res.status(400).json({ error: `${key} must be text` });
+        return res.status(400).json({ error: `${key} ต้องเป็นข้อความ` });
       }
       if (REQUIRED_TEXT_KEYS.includes(key) && value.trim() === '') {
-        return res.status(400).json({ error: `${key} cannot be empty` });
+        return res.status(400).json({ error: `${key} เว้นว่างไม่ได้` });
       }
       continue;
     }
     if (value === null || value === undefined || isNaN(value) || value < 0) {
-      return res.status(400).json({ error: `${key} must be a number of 0 or more` });
+      return res.status(400).json({ error: `${key} ต้องเป็นตัวเลขตั้งแต่ 0 ขึ้นไป` });
     }
     if (key.endsWith('_meter_digits') && (value < 3 || value > 8 || value % 1 !== 0)) {
-      return res.status(400).json({ error: `${key} must be a whole number between 3 and 8` });
+      return res.status(400).json({ error: `${key} ต้องเป็นจำนวนเต็มระหว่าง 3 ถึง 8` });
     }
   }
 
@@ -118,10 +118,10 @@ router.put('/period/:period', (req, res) => {
   const { apply_minimum } = req.body;
 
   if (!/^\d{4}-\d{2}$/.test(period)) {
-    return res.status(400).json({ error: 'Period must look like 2026-09' });
+    return res.status(400).json({ error: 'งวดต้องอยู่ในรูปแบบ 2026-09' });
   }
   if (apply_minimum === undefined || apply_minimum === null) {
-    return res.status(400).json({ error: 'apply_minimum is required' });
+    return res.status(400).json({ error: 'ต้องระบุ apply_minimum' });
   }
 
   const value = apply_minimum ? 1 : 0;
@@ -141,7 +141,7 @@ router.put('/period/:period', (req, res) => {
     apply_minimum: value === 1,
     bills_already_generated: billCount,
     note: billCount > 0
-      ? `${billCount} bill(s) for ${period} already exist and are unchanged. Delete and regenerate them if this should apply.`
+      ? `งวด ${period} ออกบิลไปแล้ว ${billCount} ใบ บิลเหล่านั้นเก็บตัวเลขเดิมไว้ ถ้าต้องการให้มีผลต้องลบแล้วออกใหม่`
       : undefined
   });
 });

@@ -156,17 +156,10 @@ export function EditLeaseModal({ leaseId }){
   const [dep, setDep] = useState(String(l.deposit));
   const { error, busy, run } = useSubmit();
 
-  // PUT /leases/:id checks the dates against each other but NOT against the
-  // other leases on this room — unlike POST /leases, which does. So the
-  // overlap test stays here: moving a start date backwards can push this lease
-  // into someone else's stay, and nothing else would stop it.
-  const clashWith = () => {
-    const clash = leases.find(x => x.unit_id===l.unit_id && x.id!==leaseId
-      && (!x.end_date || x.end_date > start)
-      && (!l.end_date || x.start_date < l.end_date));
-    return clash ? `ช่วงวันที่ทับกับสัญญาของ ${h.tenantOf(clash.id).full_name}` : null;
-  };
-
+  // PUT /leases/:id now runs the same overlap test POST /leases does, so
+  // moving a start date backwards into someone else's stay is refused there
+  // and named there. There is no copy of that comparison here — two of them,
+  // in two places, is how a board comes to disagree with a form.
   const save = () => run(
     async () => {
       await updateLease(leaseId, {start_date:start, monthly_rent:parseFloat(rent), deposit:parseFloat(dep)});
@@ -175,8 +168,7 @@ export function EditLeaseModal({ leaseId }){
     () => !start ? "ใส่วันเข้าอยู่"
       : (isNaN(parseFloat(rent)) || parseFloat(rent) < 0) ? "ค่าเช่าต้องเป็นตัวเลข"
       : (isNaN(parseFloat(dep)) || parseFloat(dep) < 0) ? "มัดจำต้องเป็นตัวเลข"
-      : (l.end_date && start >= l.end_date) ? "วันเข้าอยู่ต้องก่อนวันที่ห้องว่าง"
-      : clashWith());
+      : (l.end_date && start >= l.end_date) ? "วันเข้าอยู่ต้องก่อนวันที่ห้องว่าง" : null);
 
   return (
     <Modal>

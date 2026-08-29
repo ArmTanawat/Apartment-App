@@ -50,14 +50,12 @@ export default function SettingsPage(){
     schedule(key, s);
   };
 
-  // Which fee types are attached to somebody. There is no endpoint for all
-  // lease fees, so this asks per lease — the least-visited page, and the
-  // answer decides only whether a delete button is offered.
-  const leaseIds = leases.map(l => l.id);
+  // Which fee types are attached to somebody — that is what decides whether a
+  // delete button is offered. Until the answer is in, none is: offering to
+  // delete something that turns out to be in use is worse than not offering.
   const usage = useApi(
-    () => Promise.all(leaseIds.map(id => get(`/fees/lease/${id}`)))
-      .then(all => new Set(all.flat().map(f => f.fee_type_id))),
-    [leaseIds.join(","), feeTypes.length]);
+    () => get('/fees/lease').then(all => new Set(all.map(f => f.fee_type_id))),
+    [leases.length, feeTypes.length]);
   const inUse = id => !usage.data || usage.data.has(id);
 
   const backups = useApi(() => get('/backups'), []);

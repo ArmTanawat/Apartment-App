@@ -29,6 +29,13 @@ Black and white carries the interface. Exactly two colours carry meaning, and no
 | `--line` | `#E4E4E4` | Borders, dividers |
 | `--occupied` | `#2E7D46` | Room has a tenant |
 | `--vacant` | `#B3382C` | Room is empty |
+| `--attention` | `#C9A227` | Border of the banner saying a saved bill no longer matches its data |
+| `--attention-soft` | `#FFF8E6` | That banner's background |
+
+The last two are not a third room state. Colour still answers one question
+about a room and only that one. The banner they belong to is about a bill that
+was issued before its data changed — it has to be noticed, and it says nothing
+about whether anyone is living anywhere. It appears at most a few times a month.
 
 Earlier drafts gave three separate meanings to colour — occupied, vacant, and not-yet-metered — and the board became a code to decode rather than a thing to read. Colour now answers one question only: is anyone living here.
 

@@ -19,7 +19,7 @@ export class ApiError extends Error {
   constructor(message, status){ super(message); this.name = 'ApiError'; this.status = status; }
 }
 export class ApiDown extends Error {
-  constructor(cause){ super('ติดต่อเซิร์ฟเวอร์ไม่ได้'); this.name = 'ApiDown'; this.cause = cause; }
+  constructor(cause){ super('ติดต่อเซิร์ฟเวอร์ไม่ได้ กรุณาลองใหม่'); this.name = 'ApiDown'; this.cause = cause; }
 }
 
 async function request(path, options){
@@ -54,5 +54,5 @@ export const del  = path        => request(path, { method: 'DELETE' });
 
 // A message to show, whatever went wrong.
 export const messageOf = e =>
-  e instanceof ApiDown ? 'ติดต่อเซิร์ฟเวอร์ไม่ได้ — โปรแกรมส่วนหลังยังไม่ได้เปิด'
+  e instanceof ApiDown ? 'ติดต่อเซิร์ฟเวอร์ไม่ได้ กรุณาลองใหม่'
   : (e && e.message) || 'เกิดข้อผิดพลาด';

@@ -99,7 +99,7 @@ router.get('/:id', (req, res) => {
   `).get(req.params.id);
 
   if (!bill) {
-    return res.status(404).json({ error: 'Bill not found' });
+    return res.status(404).json({ error: 'ไม่พบบิล' });
   }
 
   // The printable line items, exactly as they were when generated.
@@ -133,7 +133,7 @@ router.post('/', (req, res) => {
   const { lease_id, period } = req.body;
 
   if (!lease_id || !period) {
-    return res.status(400).json({ error: 'Lease and period are required' });
+    return res.status(400).json({ error: 'ต้องระบุสัญญาเช่าและงวด' });
   }
 
   const built = buildBill(lease_id, period, {
@@ -178,7 +178,7 @@ router.post('/', (req, res) => {
     res.status(201).json(bill);
   } catch (err) {
     if (err.message.includes('UNIQUE')) {
-      return res.status(400).json({ error: `A bill for ${period} already exists for this tenant` });
+      return res.status(400).json({ error: `ผู้เช่ารายนี้ออกบิลงวด ${period} ไปแล้ว` });
     }
     throw err;
   }
@@ -201,10 +201,10 @@ router.post('/batch', (req, res) => {
   const prorateDays = req.body.prorate_days ?? null;
 
   if (!period || !/^\d{4}-\d{2}$/.test(period)) {
-    return res.status(400).json({ error: 'Period must look like 2026-09' });
+    return res.status(400).json({ error: 'งวดต้องอยู่ในรูปแบบ 2026-09' });
   }
   if (!Array.isArray(unit_ids) || unit_ids.length === 0) {
-    return res.status(400).json({ error: 'Choose at least one room' });
+    return res.status(400).json({ error: 'เลือกห้องอย่างน้อยหนึ่งห้อง' });
   }
 
   const generated = [];
@@ -219,7 +219,7 @@ router.post('/batch', (req, res) => {
   for (const unitId of unit_ids) {
     const unit = db.prepare('SELECT * FROM units WHERE id = ?').get(unitId);
     if (!unit) {
-      skipped.push({ unit_id: unitId, unit_number: null, reason: 'Room not found' });
+      skipped.push({ unit_id: unitId, unit_number: null, reason: 'ไม่พบห้องนี้' });
       continue;
     }
 
@@ -238,7 +238,7 @@ router.post('/batch', (req, res) => {
     `).all(unitId, periodEnd, periodStart);
 
     if (leases.length === 0) {
-      skipped.push({ unit_id: unitId, unit_number: unit.unit_number, reason: 'No tenant' });
+      skipped.push({ unit_id: unitId, unit_number: unit.unit_number, reason: 'ไม่มีผู้เช่าเดือนนี้' });
       continue;
     }
 
@@ -254,7 +254,7 @@ router.post('/batch', (req, res) => {
           unit_id: unitId,
           unit_number: unit.unit_number,
           tenant_name: who ? who.full_name : null,
-          reason: `Already billed for ${period}`,
+          reason: `ออกบิลงวด ${period} ไปแล้ว`,
           bill_id: existing.id
         });
         continue;
@@ -328,10 +328,10 @@ router.get('/example/:kind/:units', (req, res) => {
   const used = Number(req.params.units);
 
   if (kind !== 'water' && kind !== 'electricity') {
-    return res.status(400).json({ error: 'Kind must be water or electricity' });
+    return res.status(400).json({ error: 'ต้องเป็น water หรือ electricity' });
   }
   if (!isFinite(used) || used < 0) {
-    return res.status(400).json({ error: 'Units must be a number of 0 or more' });
+    return res.status(400).json({ error: 'จำนวนหน่วยต้องเป็นตัวเลขตั้งแต่ 0 ขึ้นไป' });
   }
 
   const rates = {};
@@ -354,7 +354,7 @@ router.get('/example/:kind/:units', (req, res) => {
 router.delete('/:id', (req, res) => {
   const result = db.prepare('DELETE FROM bills WHERE id = ?').run(req.params.id);
   if (result.changes === 0) {
-    return res.status(404).json({ error: 'Bill not found' });
+    return res.status(404).json({ error: 'ไม่พบบิล' });
   }
   res.status(204).send();
 });
@@ -370,7 +370,7 @@ function buildBill(leaseId, period, options = {}) {
   const { prorate = false, prorateDays = null } = options;
 
   if (!/^\d{4}-\d{2}$/.test(period)) {
-    return { error: 'Period must look like 2026-08' };
+    return { error: 'งวดต้องอยู่ในรูปแบบ 2026-08' };
   }
 
   const lease = db.prepare(`
@@ -382,7 +382,7 @@ function buildBill(leaseId, period, options = {}) {
   `).get(leaseId);
 
   if (!lease) {
-    return { error: 'That lease does not exist' };
+    return { error: 'ไม่พบสัญญาเช่านี้' };
   }
 
   const reading = db.prepare(`
@@ -390,7 +390,7 @@ function buildBill(leaseId, period, options = {}) {
   `).get(lease.unit_id, period);
 
   if (!reading) {
-    return { error: `No meter reading entered for unit ${lease.unit_number} in ${period}` };
+    return { error: `ห้อง ${lease.unit_number} ยังไม่ได้จดมิเตอร์งวด ${period}` };
   }
 
   // Rates are read now and their result frozen onto the bill. A later rate
@@ -437,7 +437,7 @@ function buildBill(leaseId, period, options = {}) {
     const days = prorateDays ?? totalDays;
 
     if (days < 1 || days > totalDays) {
-      return { error: `Days must be between 1 and ${totalDays} for ${period}` };
+      return { error: `จำนวนวันต้องอยู่ระหว่าง 1 ถึง ${totalDays} สำหรับงวด ${period}` };
     }
 
     rent_amount = money(lease.monthly_rent / totalDays * days);

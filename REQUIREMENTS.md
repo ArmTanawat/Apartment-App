@@ -23,6 +23,7 @@ Status column: **Done** means built and tested. **To build** means agreed but no
 | 1.5 | Move a tenant out by setting an end date | Done |
 | 1.6 | One tenant may rent several rooms at once | Done |
 | 1.7 | A room may not have two active leases at the same time | Done |
+| 1.16 | Correcting a lease may not move it into another tenant's stay | Done |
 | 1.8 | See every room with its current tenant, or empty | Done |
 | 1.9 | See only the empty rooms | Done |
 
@@ -66,6 +67,7 @@ Damage is charged as a normal one-time charge on a monthly bill, so the deposit 
 | 4.4 | Cancel a recurring fee, affecting future bills only | Done |
 | 4.5 | Add a one-time charge that appears on one month only | Done |
 | 4.6 | Edit or delete any fee or charge | Done |
+| 4.7 | See which fee types are attached to somebody, so an unused one can be deleted | Done |
 
 Recurring and one-time are separate. The question when adding a charge is always: does this happen again next month?
 

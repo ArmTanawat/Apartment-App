@@ -61,7 +61,7 @@ function Shell(){
         {down && (
           <div className="err noprint" style={{maxWidth:"640px",display:"flex",
             alignItems:"center",justifyContent:"space-between",gap:"12px"}}>
-            <span>ติดต่อเซิร์ฟเวอร์ไม่ได้ — ตัวเลขที่เห็นอาจไม่ใช่ล่าสุด และยังบันทึกอะไรไม่ได้</span>
+            <span>ติดต่อเซิร์ฟเวอร์ไม่ได้ ตัวเลขที่เห็นอาจไม่ใช่ล่าสุด และยังบันทึกอะไรไม่ได้</span>
             <button className="btn quiet" style={{padding:"5px 12px",fontSize:"13px"}}
               onClick={reload}>ลองใหม่</button>
           </div>

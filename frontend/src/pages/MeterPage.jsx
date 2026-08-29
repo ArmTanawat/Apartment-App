@@ -173,44 +173,63 @@ function MeterRows({ rows }){
       save(unitId, kind, value); }
   };
 
-  // The dial wrapped: usage is what it counted up to its last digit, plus the
-  // new number. The rollover amount is the meter's capacity, which comes from
-  // how many digits it has — a property of the meter, kept in settings.
-  // Counting the digits in the reading would get it wrong for any meter
-  // showing a number padded with zeros.
-  const applyRollover = (unitId, kind) => enqueue(unitId, async () => {
+  /* The two fixes for a reading below last month.
+   *
+   * Both keep the number that is already in the box. It was refused a moment
+   * ago because it made usage negative, and the whole point of the fix is that
+   * it no longer does — so the fix and the figure are written together and the
+   * user is not asked to type it a second time. The prototype cleared the box
+   * here, which was an artefact of redrawing the page rather than a decision.
+   *
+   * The figure only goes along if the fix actually rescues it. It cannot
+   * normally fail to, but sending a number the server would refuse would lose
+   * the fix as well as the figure, and the fix is the part worth keeping.
+   */
+  const applyFix = (unitId, kind, computePrev, computeRoll) => enqueue(unitId, async () => {
+    const r = readingFor(unitId);
     const prev = h.previousReading(unitId);
     const isWater = kind === "w";
-    const cap = Math.pow(10, isWater ? settings.water_meter_digits : settings.electricity_meter_digits);
-    const typed = parseFloat(displayed(unitId, kind)) || 0;
+    const currentPrev = r ? (isWater ? r.water_prev : r.elec_prev) : (isWater ? prev.water : prev.elec);
+
+    const newPrev = computePrev(currentPrev);
+    const newRoll = computeRoll();
+    const typed = displayed(unitId, kind).trim();
+    const n = typed === "" ? null : parseFloat(typed);
+    const keep = n !== null && !isNaN(n) && (n + newRoll) - newPrev >= 0;
+
+    const write = {
+      [isWater ? "water_prev" : "elec_prev"]: newPrev,
+      [isWater ? "water_rollover" : "elec_rollover"]: newRoll,
+      ...(keep ? { [isWater ? "water_curr" : "elec_curr"]: n } : null),
+    };
+
     try {
       const id = rowIdFor(unitId);
-      if(id) await patchReading(id, { [isWater ? "water_rollover" : "elec_rollover"]: cap });
-      else await createReading({ unit_id: unitId, period,
-        water_prev: prev.water, water_curr: isWater ? typed : prev.water,
-        water_rollover: isWater ? cap : 0,
-        elec_prev: prev.elec, elec_curr: isWater ? prev.elec : typed,
-        elec_rollover: isWater ? 0 : cap });
-      setRow(unitId, { error: null });
+      if(id) await patchReading(id, write);
+      else {
+        const made = await createReading({ unit_id: unitId, period,
+          water_prev: prev.water, elec_prev: prev.elec, ...write });
+        if(made && made.id) madeRows.current[unitId] = made.id;
+      }
+      setRow(unitId, { error: null, [isWater ? "wBad" : "eBad"]: false });
       bumpMeter();
     } catch (e) { setRow(unitId, { error: messageOf(e) }); }
   });
 
+  // The dial wrapped: usage is what it counted up to its last digit, plus the
+  // new number. The rollover amount is the meter's capacity, which comes from
+  // how many digits it has — a property of the meter, kept in settings.
+  // Counting the digits in the reading would get it wrong for any meter
+  // showing a number padded with zeros. The previous figure is untouched: the
+  // dial kept counting from where it was.
+  const applyRollover = (unitId, kind) => applyFix(unitId, kind,
+    p => p,
+    () => Math.pow(10, kind === "w" ? settings.water_meter_digits : settings.electricity_meter_digits));
+
   // The meter was replaced, so it starts from zero and usage is just the new
-  // number. Same symptom as a rollover, different arithmetic.
-  const applyNewMeter = (unitId, kind) => enqueue(unitId, async () => {
-    const prev = h.previousReading(unitId);
-    const isWater = kind === "w";
-    try {
-      const id = rowIdFor(unitId);
-      if(id) await patchReading(id, { [isWater ? "water_prev" : "elec_prev"]: 0 });
-      else await createReading({ unit_id: unitId, period,
-        water_prev: isWater ? 0 : prev.water, water_curr: isWater ? 0 : prev.water,
-        elec_prev:  isWater ? prev.elec : 0, elec_curr:  isWater ? prev.elec : 0 });
-      setRow(unitId, { error: null });
-      bumpMeter();
-    } catch (e) { setRow(unitId, { error: messageOf(e) }); }
-  });
+  // number. Same symptom as a rollover, different arithmetic: the previous
+  // figure becomes 0 and there is no rollover.
+  const applyNewMeter = (unitId, kind) => applyFix(unitId, kind, () => 0, () => 0);
 
   // Enter walks down the column of inputs, which is how the numbers arrive off
   // a clipboard: room by room, water then electricity.
