@@ -56,6 +56,7 @@ The database file `apartment.db` is created automatically on first run.
 - `DELETE /readings/:id`
 
 ### Fees
+- `GET /fees/basis` — what a percentage fee can be a percentage of, with its Thai labels
 - `GET /fees/types` — the fee catalogue (`?all=true` includes retired)
 - `POST /fees/types` — add a new kind of fee
 - `PUT /fees/types/:id` — rename, reprice, or retire
@@ -99,6 +100,28 @@ The database file `apartment.db` is created automatically on first run.
 3. Add any one-time charges via `POST /fees/onetime`
 4. Set whether the minimum applies: `PUT /settings/period/2026-09`
 5. `POST /bills/batch` with the chosen rooms
+
+## Fees that are a share of the bill
+
+A fee type is either a fixed amount or a share of something else on the same
+bill — a service charge that moves with the electricity, say. Set `percent_of`
+and `percent` on the fee type and `default_amount` is ignored; send
+`percent_of: null` to turn it back into a fixed fee.
+
+`percent_of` is one of `water`, `electricity`, `rent`, `utilities` (the two
+together) or `subtotal`. Both are copied onto `lease_fees` when the fee is
+attached, exactly as `amount` is, so repricing the catalogue never rewrites
+what an existing tenant agreed to.
+
+`subtotal` is rent, both utilities, the fixed recurring fees and that month's
+one-time charges — and never another share. That exclusion is what makes it
+well defined: two shares on one bill are both a share of the same figure, so
+neither depends on which was worked out first.
+
+`fee-basis.js` holds the list and the labels, because `routes/fees.js` needs it
+to refuse a basis it does not know and `routes/bills.js` needs it to work the
+amount out. Two copies would drift, and the one that drifted would be pricing
+a bill.
 
 ## How the minimum charge works
 

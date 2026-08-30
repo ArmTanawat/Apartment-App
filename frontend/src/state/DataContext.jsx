@@ -23,7 +23,7 @@ const DataContext = createContext(null);
 
 const EMPTY = {
   units: [], tenants: [], leases: [], bills: [], readings: [],
-  previousReadings: {}, feeTypes: [], settings: null, applyMinimum: true,
+  previousReadings: {}, feeTypes: [], feeBasis: {}, settings: null, applyMinimum: true,
 };
 
 // GET /readings?period= returns one row per room, with nulls for the rooms not
@@ -53,7 +53,7 @@ export function DataProvider({ children }){
     const want = k => !keys || keys.includes(k);
 
     try {
-      const [units, tenants, leases, bills, readingRows, feeTypes, settings, periodRow] =
+      const [units, tenants, leases, bills, readingRows, feeTypes, feeBasis, settings, periodRow] =
         await Promise.all([
           want('units')     ? get('/units')            : null,
           want('tenants')   ? get('/tenants')          : null,
@@ -61,6 +61,10 @@ export function DataProvider({ children }){
           want('bills')     ? get('/bills')            : null,
           want('readings')  ? get(`/readings?period=${period}`) : null,
           want('feeTypes')  ? get('/fees/types?all=true')       : null,
+          // What a percentage fee can be a percentage of, with its labels.
+          // Fetched rather than written out here, so the dropdown can never
+          // offer a basis the server would refuse.
+          want('feeTypes')  ? get('/fees/basis')       : null,
           want('settings')  ? get('/settings')         : null,
           want('period')    ? get(`/settings/period/${period}`) : null,
         ]);
@@ -88,6 +92,7 @@ export function DataProvider({ children }){
         ...(readingRows    ? { readings: toReadingRows(readingRows, period) } : null),
         ...(previousReadings ? { previousReadings } : null),
         ...(feeTypes       ? { feeTypes } : null),
+        ...(feeBasis       ? { feeBasis } : null),
         ...(settings       ? { settings } : null),
         ...(periodRow      ? { applyMinimum: periodRow.apply_minimum } : null),
       }));

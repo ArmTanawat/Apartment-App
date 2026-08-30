@@ -56,7 +56,13 @@ db.exec(`
     id             INTEGER PRIMARY KEY AUTOINCREMENT,
     name           TEXT NOT NULL UNIQUE,
     default_amount REAL NOT NULL DEFAULT 0,
-    is_active      INTEGER NOT NULL DEFAULT 1
+    is_active      INTEGER NOT NULL DEFAULT 1,
+    -- A fee type is either a fixed amount or a share of something else on the
+    -- same bill. percent_of names what it is a share of (see fee-basis.js) and
+    -- is NULL for the ordinary fixed kind, which is what nearly every fee is.
+    -- default_amount is ignored when percent_of is set.
+    percent_of     TEXT,
+    percent        REAL
   );
 
   CREATE TABLE IF NOT EXISTS lease_fees (
@@ -64,6 +70,12 @@ db.exec(`
     lease_id    INTEGER NOT NULL REFERENCES leases(id) ON DELETE CASCADE,
     fee_type_id INTEGER NOT NULL REFERENCES fee_types(id),
     amount      REAL NOT NULL,
+    -- Copied from the fee type at attach time, exactly as amount is, and for
+    -- the same reason: changing the catalogue must never rewrite what an
+    -- existing tenant agreed to. Both NULL for a fixed fee, and then amount is
+    -- what counts.
+    percent_of  TEXT,
+    percent     REAL,
     UNIQUE (lease_id, fee_type_id)
   );
 
@@ -107,6 +119,24 @@ db.exec(`
     apply_minimum INTEGER NOT NULL DEFAULT 1
   );
 `);
+
+// Columns added after a database was already in use.
+//
+// CREATE TABLE IF NOT EXISTS does nothing to a table that exists, so a new
+// column has to be added on its own. Guarded by what the table actually has,
+// so this is a no-op on the second start and on a database created fresh.
+function addColumn(table, column, declaration) {
+  const exists = db.prepare(`PRAGMA table_info(${table})`).all()
+    .some(c => c.name === column);
+  if (!exists) {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${declaration}`);
+  }
+}
+
+addColumn('fee_types', 'percent_of', 'TEXT');
+addColumn('fee_types', 'percent', 'REAL');
+addColumn('lease_fees', 'percent_of', 'TEXT');
+addColumn('lease_fees', 'percent', 'REAL');
 
 // Seed the utility rates only if missing. INSERT OR IGNORE does nothing when
 // the key already exists, so edited rates are never reset on restart.

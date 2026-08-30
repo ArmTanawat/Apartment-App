@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import ErrBox from '../components/ErrBox.jsx';
 import Switch from '../components/Switch.jsx';
 import { get, messageOf } from '../lib/api.js';
-import { baht } from '../lib/helpers.js';
+import { baht, shareLabel } from '../lib/helpers.js';
 import { useApi } from '../lib/useApi.js';
 import { useData } from '../state/DataContext.jsx';
 import { useUi } from '../state/UiContext.jsx';
@@ -11,7 +11,7 @@ import { useUi } from '../state/UiContext.jsx';
    details with a preview of the footer, the two utility rates shown as a
    worked example, meter digit counts, fee types, and backups. */
 export default function SettingsPage(){
-  const { settings, feeTypes, leases, patchSettings, updateFeeType, makeBackup } = useData();
+  const { settings, feeTypes, feeBasis, leases, patchSettings, updateFeeType, makeBackup } = useData();
   const { openModal, exampleUnits, setExampleUnits } = useUi();
 
   // Every box holds its own text. A figure being retyped passes through states
@@ -172,7 +172,7 @@ export default function SettingsPage(){
             {feeTypes.map(f => (
               <tr key={f.id} className={f.is_active ? "" : "retired"}>
                 <td><span className="fname">{f.name}</span></td>
-                <td className="r num">{baht(f.default_amount)}</td>
+                <td className="r num">{f.percent_of ? shareLabel(f, feeBasis) : baht(f.default_amount)}</td>
                 <td className="r">
                   <Switch on={!!f.is_active} style={{padding:"2px"}}
                     onClick={async () => {

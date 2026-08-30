@@ -6,6 +6,7 @@
 
 const express = require('express');
 const db = require('../db.js');
+const { FEE_BASIS } = require('../fee-basis.js');
 
 const router = express.Router();
 
@@ -444,13 +445,16 @@ function buildBill(leaseId, period, options = {}) {
     rentDetail = `ห้อง ${lease.unit_number} — คิด ${days} จาก ${totalDays} วัน`;
   }
 
-  const recurringFees = db.prepare(`
-    SELECT lf.amount, ft.name
+  const allRecurring = db.prepare(`
+    SELECT lf.amount, lf.percent_of, lf.percent, ft.name
     FROM lease_fees lf
     JOIN fee_types ft ON ft.id = lf.fee_type_id
     WHERE lf.lease_id = ?
     ORDER BY ft.name
   `).all(leaseId);
+
+  const recurringFees = allRecurring.filter(f => !f.percent_of);
+  const shareFees = allRecurring.filter(f => f.percent_of);
 
   // Only charges filed under THIS period. Last month's repair does not reappear.
   const oneTimeCharges = db.prepare(`
@@ -459,9 +463,41 @@ function buildBill(leaseId, period, options = {}) {
     ORDER BY id
   `).all(leaseId, period);
 
-  const fees_amount = money(
+  const fixed_amount = money(
     recurringFees.reduce((sum, f) => sum + f.amount, 0) +
     oneTimeCharges.reduce((sum, c) => sum + c.amount, 0)
+  );
+
+  // A fee can be a share of something else on this bill rather than a fixed
+  // amount — a service charge that moves with the electricity, say.
+  //
+  // Every basis here is a figure already worked out above, and `subtotal`
+  // deliberately excludes the shares themselves. That is what keeps this well
+  // defined: two shares on one bill are both a share of the same figure, and
+  // neither depends on which was worked out first. Letting one share count
+  // another would make the answer depend on the order, and on a bill nobody
+  // would be able to tell which order it had been.
+  const basisAmount = {
+    water: water_amount,
+    electricity: elec_amount,
+    rent: rent_amount,
+    utilities: money(water_amount + elec_amount),
+    subtotal: money(rent_amount + water_amount + elec_amount + fixed_amount),
+  };
+
+  const shareItems = shareFees.map(f => {
+    const from = basisAmount[f.percent_of] ?? 0;
+    return {
+      label: f.name,
+      // The working, so the tenant can see the figure it came off rather than
+      // being handed a number with no way to check it.
+      detail: `รายเดือน Monthly — ${f.percent}% ของ${FEE_BASIS[f.percent_of]} ${from} บาท`,
+      amount: money(from * f.percent / 100),
+    };
+  });
+
+  const fees_amount = money(
+    fixed_amount + shareItems.reduce((sum, i) => sum + i.amount, 0)
   );
 
   const total = money(rent_amount + water_amount + elec_amount + fees_amount);
@@ -479,7 +515,10 @@ function buildBill(leaseId, period, options = {}) {
     { label: 'ค่าน้ำ Water', detail: water.detail, amount: water_amount },
     { label: 'ค่าไฟ Electricity', detail: elec.detail, amount: elec_amount },
     ...recurringFees.map(f => ({ label: f.name, detail: 'รายเดือน Monthly', amount: money(f.amount) })),
-    ...oneTimeCharges.map(c => ({ label: c.description, detail: 'ครั้งเดียว One-time', amount: money(c.amount) }))
+    ...oneTimeCharges.map(c => ({ label: c.description, detail: 'ครั้งเดียว One-time', amount: money(c.amount) })),
+    // Last, after everything they are a share of, so the working above each
+    // one is on the page before the line that uses it.
+    ...shareItems
   ];
 
   return {

@@ -10,14 +10,43 @@
 
 const express = require('express');
 const db = require('../db.js');
+const { FEE_BASIS, FEE_BASIS_KEYS } = require('../fee-basis.js');
 
 const router = express.Router();
+
+// A fee is either a fixed amount or a share of something else on the bill.
+// Returns a message when the pair does not make sense, or null when it does.
+//
+// percent_of is read with `in` rather than `??` wherever it is updated,
+// because clearing it is a real action — turning a share back into a fixed
+// fee. The same trap end_date has on PUT /leases/:id.
+function checkPercent(percent_of, percent) {
+  if (percent_of === null || percent_of === undefined) {
+    return null;
+  }
+  if (!FEE_BASIS_KEYS.includes(percent_of)) {
+    return `คิดตามเปอร์เซ็นต์ของ "${percent_of}" ไม่ได้`;
+  }
+  if (percent === null || percent === undefined || isNaN(percent) || percent < 0) {
+    return 'เปอร์เซ็นต์ต้องเป็นตัวเลขตั้งแต่ 0 ขึ้นไป';
+  }
+  return null;
+}
 
 // ---------------------------------------------------------------------------
 // Fee types — the catalogue
 // ---------------------------------------------------------------------------
 
 // GET /fees/types — active types by default, ?all=true to include retired ones
+// GET /fees/basis — what a percentage fee can be a percentage of.
+//
+// Served rather than written out again on the client, so the dropdown can
+// never offer a basis the server would refuse. The labels come with it,
+// because they are the same words that end up on the bill.
+router.get('/basis', (req, res) => {
+  res.json(FEE_BASIS);
+});
+
 router.get('/types', (req, res) => {
   const sql = req.query.all === 'true'
     ? 'SELECT * FROM fee_types ORDER BY name'
@@ -28,19 +57,29 @@ router.get('/types', (req, res) => {
 
 // POST /fees/types — add a new kind of fee
 router.post('/types', (req, res) => {
-  const { name, default_amount } = req.body;
+  const { name } = req.body;
+  const percent_of = req.body.percent_of ?? null;
+  const percent = req.body.percent ?? null;
 
   if (!name || name.trim() === '') {
     return res.status(400).json({ error: 'ต้องใส่ชื่อรายการ' });
   }
+
+  const complaint = checkPercent(percent_of, percent);
+  if (complaint) {
+    return res.status(400).json({ error: complaint });
+  }
+
+  // A share has no fixed amount, so one is not asked for.
+  const default_amount = percent_of ? 0 : req.body.default_amount;
   if (default_amount === undefined || default_amount === null || default_amount < 0) {
     return res.status(400).json({ error: 'ค่าตั้งต้นต้องเป็นตัวเลขตั้งแต่ 0 ขึ้นไป' });
   }
 
   try {
     const result = db.prepare(`
-      INSERT INTO fee_types (name, default_amount) VALUES (?, ?)
-    `).run(name.trim(), default_amount);
+      INSERT INTO fee_types (name, default_amount, percent_of, percent) VALUES (?, ?, ?, ?)
+    `).run(name.trim(), default_amount, percent_of, percent_of ? percent : null);
 
     res.status(201).json(db.prepare('SELECT * FROM fee_types WHERE id = ?').get(result.lastInsertRowid));
   } catch (err) {
@@ -62,12 +101,27 @@ router.put('/types/:id', (req, res) => {
   }
 
   const name = req.body.name ?? existing.name;
-  const default_amount = req.body.default_amount ?? existing.default_amount;
   const is_active = req.body.is_active ?? existing.is_active;
 
+  // Sending percent_of: null turns a share back into a fixed fee.
+  const percent_of = 'percent_of' in req.body
+    ? (req.body.percent_of || null) : existing.percent_of;
+  const percent = 'percent' in req.body ? req.body.percent : existing.percent;
+
+  const complaint = checkPercent(percent_of, percent);
+  if (complaint) {
+    return res.status(400).json({ error: complaint });
+  }
+
+  const default_amount = percent_of
+    ? 0 : (req.body.default_amount ?? existing.default_amount);
+
   db.prepare(`
-    UPDATE fee_types SET name = ?, default_amount = ?, is_active = ? WHERE id = ?
-  `).run(name.trim(), default_amount, is_active ? 1 : 0, req.params.id);
+    UPDATE fee_types
+    SET name = ?, default_amount = ?, is_active = ?, percent_of = ?, percent = ?
+    WHERE id = ?
+  `).run(name.trim(), default_amount, is_active ? 1 : 0,
+         percent_of, percent_of ? percent : null, req.params.id);
 
   res.json(db.prepare('SELECT * FROM fee_types WHERE id = ?').get(req.params.id));
 });
@@ -109,7 +163,7 @@ router.delete('/types/:id', (req, res) => {
 // Declared before '/lease/:leaseId' so the bare path is not read as a lease id.
 router.get('/lease', (req, res) => {
   const fees = db.prepare(`
-    SELECT lf.id, lf.lease_id, lf.amount, lf.fee_type_id, ft.name
+    SELECT lf.id, lf.lease_id, lf.amount, lf.fee_type_id, lf.percent_of, lf.percent, ft.name
     FROM lease_fees lf
     JOIN fee_types ft ON ft.id = lf.fee_type_id
     ORDER BY lf.lease_id, ft.name
@@ -119,7 +173,7 @@ router.get('/lease', (req, res) => {
 
 router.get('/lease/:leaseId', (req, res) => {
   const fees = db.prepare(`
-    SELECT lf.id, lf.amount, lf.fee_type_id, ft.name
+    SELECT lf.id, lf.amount, lf.fee_type_id, lf.percent_of, lf.percent, ft.name
     FROM lease_fees lf
     JOIN fee_types ft ON ft.id = lf.fee_type_id
     WHERE lf.lease_id = ?
@@ -149,15 +203,30 @@ router.post('/lease', (req, res) => {
 
   // Amount is copied from the catalogue when not given, and stored on the row.
   // That is what allows a per-tenant discount without affecting anyone else.
-  const finalAmount = amount ?? feeType.default_amount;
+  //
+  // The percentage is copied for the same reason. Repricing a fee type must
+  // not silently reprice every tenant already on it.
+  const percent_of = 'percent_of' in req.body
+    ? (req.body.percent_of || null) : feeType.percent_of;
+  const percent = 'percent' in req.body ? req.body.percent : feeType.percent;
+
+  const complaint = checkPercent(percent_of, percent);
+  if (complaint) {
+    return res.status(400).json({ error: complaint });
+  }
+
+  // A share works its amount out afresh each month, so the stored one is
+  // not used and is kept at zero rather than left to look meaningful.
+  const finalAmount = percent_of ? 0 : (amount ?? feeType.default_amount);
 
   try {
     const result = db.prepare(`
-      INSERT INTO lease_fees (lease_id, fee_type_id, amount) VALUES (?, ?, ?)
-    `).run(lease_id, fee_type_id, finalAmount);
+      INSERT INTO lease_fees (lease_id, fee_type_id, amount, percent_of, percent)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(lease_id, fee_type_id, finalAmount, percent_of, percent_of ? percent : null);
 
     const created = db.prepare(`
-      SELECT lf.id, lf.amount, lf.fee_type_id, ft.name
+      SELECT lf.id, lf.amount, lf.fee_type_id, lf.percent_of, lf.percent, ft.name
       FROM lease_fees lf JOIN fee_types ft ON ft.id = lf.fee_type_id
       WHERE lf.id = ?
     `).get(result.lastInsertRowid);
@@ -178,15 +247,25 @@ router.put('/lease/:id', (req, res) => {
     return res.status(404).json({ error: 'ไม่พบค่าธรรมเนียมนี้' });
   }
 
-  const amount = req.body.amount ?? existing.amount;
+  const percent_of = 'percent_of' in req.body
+    ? (req.body.percent_of || null) : existing.percent_of;
+  const percent = 'percent' in req.body ? req.body.percent : existing.percent;
+
+  const complaint = checkPercent(percent_of, percent);
+  if (complaint) {
+    return res.status(400).json({ error: complaint });
+  }
+
+  const amount = percent_of ? 0 : (req.body.amount ?? existing.amount);
   if (amount < 0) {
     return res.status(400).json({ error: 'ยอดต้องไม่ติดลบ' });
   }
 
-  db.prepare('UPDATE lease_fees SET amount = ? WHERE id = ?').run(amount, req.params.id);
+  db.prepare('UPDATE lease_fees SET amount = ?, percent_of = ?, percent = ? WHERE id = ?')
+    .run(amount, percent_of, percent_of ? percent : null, req.params.id);
 
   res.json(db.prepare(`
-    SELECT lf.id, lf.amount, lf.fee_type_id, ft.name
+    SELECT lf.id, lf.amount, lf.fee_type_id, lf.percent_of, lf.percent, ft.name
     FROM lease_fees lf JOIN fee_types ft ON ft.id = lf.fee_type_id
     WHERE lf.id = ?
   `).get(req.params.id));

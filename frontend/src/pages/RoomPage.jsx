@@ -14,7 +14,7 @@ import { useUi } from '../state/UiContext.jsx';
  * still gets a bill for that month, and a repair found afterwards is theirs to
  * pay. Filtering by "who is here now" makes that impossible, silently. */
 export default function RoomPage({ id }){
-  const { units, leases, bills, readings, h, updateLease, deleteCharge } = useData();
+  const { units, leases, bills, readings, feeBasis, h, updateLease, deleteCharge } = useData();
   const { period, go, openModal, detailRevision, bumpDetail } = useUi();
 
   const u = units.find(x=>x.id===id);
@@ -135,8 +135,11 @@ export default function RoomPage({ id }){
           : fees.length ? (
             <div className="rowlist">{fees.map(f => (
               <div className="rowitem" key={f.id}>
-                <span>{f.name}<small>เก็บทุกเดือน</small></span>
-                <span><span className="num">{baht(f.amount)}</span>
+                {/* A share has no agreed baht figure — it is worked out from
+                    this room's own bill each month — so the rule is shown in
+                    place of a number that would only ever be a guess. */}
+                <span>{f.name}<small>เก็บทุกเดือน{f.percent_of ? ` · คิดตาม${feeBasis[f.percent_of] || f.percent_of}` : ""}</small></span>
+                <span><span className="num">{f.percent_of ? `${f.percent}%` : baht(f.amount)}</span>
                   <button className="linkbtn" style={{marginLeft:"10px"}}
                     onClick={() => openModal({kind:"fee", leaseId:f.lease_id, feeId:f.id})}>แก้</button>
                   <button className="linkbtn danger" style={{marginLeft:"6px"}}

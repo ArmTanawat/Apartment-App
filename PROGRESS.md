@@ -31,13 +31,14 @@ cd frontend
 npm run smoke            # the paths from the brief's verification list
 npm run smoke:offline    # what the screens do when the server is not there
 npm run smoke:stale      # what they do when the data changed underneath them
+npm run smoke:share      # fees that are a percentage of something else
 ```
 
 `smoke/harness.jsx` renders the real app into jsdom and drives it with real
 clicks and keystrokes against the running backend. `smoke/walk.jsx` re-seeds
 first, so it starts from the same building however many times it has been run.
 It prints `all passed` or names what broke. Not a test framework and there is
-no watcher — run it after a change. All three suites pass.
+no watcher — run it after a change. All four suites pass.
 
 `smoke/walk.jsx` writes to the database. Re-seed before using the app by hand.
 
@@ -399,6 +400,55 @@ that has bills — still shows its real reason rather than a "gone" card.
 until something reloads it. There is no polling, and for a single-user local
 app there should not be.
 
+### Fees that are a share of the bill
+
+Asked for as "a fee that moves with the room's water or electricity" — a
+service charge of 100% of the electricity, say. The owner's first question was
+whether it was frontend-only. It is not, and it is the clearest example so far
+of why: it prices a bill, so it belongs in `buildBill()` and nowhere else.
+Putting the arithmetic on the client would have rebuilt the exact duplication
+Phase 2 existed to delete.
+
+**Schema.** `fee_types.percent_of` and `.percent`, both nullable, plus the same
+two on `lease_fees`. `CLAUDE.md` warns that a change to how a charge is
+calculated should not need a column, and that still holds for the bill tables —
+the computed baht lands in `bill_items.amount` and the working in
+`bill_items.detail`, as it always has. What is new is a *kind* of fee type, and
+`fee_types` is explicitly "data, not code", so that is where it belongs.
+
+The pair is copied onto `lease_fees` at attach time for the same reason
+`lease_fees.amount` and `leases.monthly_rent` are copied: repricing the
+catalogue must not rewrite what an existing tenant agreed to.
+
+**`db.js` gained a migration.** `CREATE TABLE IF NOT EXISTS` does nothing to a
+table that already exists, so four columns had to be added with a guarded
+`ALTER TABLE`. There was no mechanism for that before; `addColumn(table,
+column, declaration)` is a no-op on a fresh database and on every start after
+the first. Any future column needs it too.
+
+**`subtotal` excludes other shares.** Two shares on one bill would otherwise
+each depend on the other, and the answer would come out differently depending
+on which was worked out first — invisible on a printed bill. Excluding them
+means every share is a share of the same figure, whatever order they are in.
+The bill line carries that figure, so it can be checked.
+
+**`fee-basis.js`** holds the five bases and their Thai labels. `routes/fees.js`
+needs them to refuse a basis it does not know and `routes/bills.js` to price
+one; two copies would drift, and the drifting one would be pricing a bill.
+`GET /fees/basis` serves the same map to the screens, so the dropdown cannot
+offer something the server would refuse.
+
+**On screen.** A disclosure — `การตั้งค่าขั้นสูง` — under ค่าตั้งต้น in the fee
+type dialog, holding a switch and `คิดตาม __ % ของ [dropdown]`. It opens
+already showing when the fee being edited is one. Three other places had to
+stop assuming a fee has a fixed baht amount: the fee catalogue on ตั้งค่า, the
+recurring list on ห้อง, and the dialog that attaches one to a tenant, which
+asks for the percentage instead of an amount.
+
+**A share cannot be billed without a meter reading** — but that was already
+true of every bill, since `buildBill` refuses without one. The "treat it as
+zero" case the owner offered for is not reachable on a real bill.
+
 ### Still open
 
 `PUT /fees/onetime/:id` has no button — the screens add and delete one-time
@@ -474,3 +524,13 @@ app's back reproduced it exactly.
 
 Worth remembering that the second crash — the room page itself, not the dialog
 — was found by pointing the new check at a page rather than by reading code.
+
+**Percentage fees.** The owner asked whether this was frontend-only before
+asking for it to be built, which was the right question — the answer changed
+the shape of the work from one dialog to a schema change, a migration, a rule
+in `buildBill()`, and four screens that had been assuming every fee has a baht
+amount.
+
+The part worth thinking about was not the arithmetic but `subtotal`: two shares
+on one bill are only well defined if neither counts the other, and that is a
+decision that cannot be seen on the printed page afterwards.

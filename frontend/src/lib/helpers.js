@@ -127,3 +127,8 @@ export const roomsOf = (leases, units, tenantId, today) =>
     .map(l => ({ lease:l, unit: units.find(u => u.id === l.unit_id),
                  current: !l.end_date || l.end_date > today }))
     .sort((a,b) => (b.current - a.current) || a.unit.unit_number.localeCompare(b.unit.unit_number));
+
+// How a percentage fee reads in a list: "10% ของค่าไฟ". The label comes from
+// GET /fees/basis, so it is the same wording that lands on the bill.
+export const shareLabel = (fee, feeBasis) =>
+  `${fee.percent}% ของ${feeBasis[fee.percent_of] || fee.percent_of}`;

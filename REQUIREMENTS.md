@@ -69,8 +69,12 @@ Damage is charged as a normal one-time charge on a monthly bill, so the deposit 
 | 4.5 | Add a one-time charge that appears on one month only | Done |
 | 4.6 | Edit or delete any fee or charge | Done |
 | 4.7 | See which fee types are attached to somebody, so an unused one can be deleted | Done |
+| 4.8 | A fee type may be a percentage of water, electricity, rent, both utilities, or the rest of the bill | Done |
+| 4.9 | The percentage is copied onto the lease, so repricing the catalogue leaves existing tenants alone | Done |
 
 Recurring and one-time are separate. The question when adding a charge is always: does this happen again next month?
+
+A recurring fee is either a fixed amount or a share of something else on the same bill. A share is worked out afresh each month from that room's own figures, so it has no agreed baht amount — only the percentage, and the line on the bill carries the working. `subtotal` deliberately excludes other shares, so two of them on one bill do not depend on which was calculated first.
 
 ## Utility rates
 
