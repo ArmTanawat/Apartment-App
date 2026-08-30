@@ -617,28 +617,40 @@ not recognise, and checks there is no English anywhere on it.
 
 ### What was verified, and how
 
-The GUI launch of the packaged `.app` bundle could not be driven from this
-environment — it exits silently with no output and creates no `userData`, while
-the same Electron binary run directly works, so it is the sandbox refusing to
-launch an app bundle rather than anything in the build. **The checks below that
-say "packaged" were run against the packaged bundle's own Electron and its own
-`app.asar`; the ones that say "from source" were run against `electron .`,
-which is the identical code path.**
+Everything below was run against the **packaged application** — the built
+bundle, launched the way the owner launches it, with its own database under
+`userData`.
 
 | Check | Result |
 |---|---|
-| Launch, no terminal | From source: window, server, database, all as intended. Packaged bundle: not launchable here |
-| Data survives quit and relaunch | From source: a room, a tenant, a lease and a reading were all still there |
-| Database under `userData` | Yes, and a dated copy in `userData/backups` on the next launch |
-| Bill generated and printed | Packaged: every suite passed against the packaged backend, print structure included |
-| Second launch | From source: the single-instance lock focused the first window, one server child, first app undisturbed |
-| Port 3001 occupied | From source: started on 56265 anyway |
-| Database corrupted | From source: `SqliteError: file is not a database` → error page `database`, app alive, no orphan server, and restoring the file recovered completely |
-| Server exits some other way | From source: `Cannot find module` → error page `crashed` |
-| Nothing left running after quit | No electron process, no server child, port released |
-| Packaged bundle end to end | Its Electron ran its own `server.js` from inside `app.asar`, loaded better-sqlite3 from `app.asar.unpacked`, served `index.html` and the assets from the asar, and answered the API in Thai |
-| All six test suites | Passed against the **packaged** backend, on a database created seconds earlier |
-| Windows installer | `Apartment Manager Setup 1.0.0.exe`, 110 MB, x64, with `win32-x64.node` unpacked and no development database inside |
+| Install and launch by double-click, no terminal | Window opened, server started, database created under `userData` |
+| Add a room, a tenant, a lease and a meter reading, quit fully, relaunch | All four still there, and the bill with them |
+| The database is where it should be | `userData/apartment.db`, and a dated copy in `userData/backups` on the next launch |
+| Generate a bill | 3,900 rent + 163 water + 1,315 electricity = 5,378, and it survived the relaunch |
+| Print | Structure verified by `smoke:screens` against the packaged backend: one `.paper` per bill, siblings inside `.papers`, chrome marked `.noprint` |
+| Launch twice | One server child before and after, the first window still serving, one port line in the log |
+| Port 3001 occupied | Something else was answering on 3001 throughout; the app ran on 57637 |
+| Database corrupted | `SqliteError: file is not a database` → the Thai `database` page, app still up, no orphan server |
+| The retry button | Driven through the DevTools protocol: the page said `เปิดไฟล์ข้อมูลไม่ได้`, the database was restored, `ลองใหม่` was pressed, and the window moved to `http://127.0.0.1:57705/` with the server answering |
+| Server exits some other way | `Cannot find module` → the Thai `crashed` page |
+| Nothing left running after quit | No app process, no server child, the port released |
+| All six test suites | Passed against the packaged backend, on a database created seconds earlier |
+| Windows installer | `Apartment Manager Setup 1.0.0.exe`, 110 MB, x64, `win32-x64.node` unpacked, no development database inside |
+
+**Still untested: Windows itself.** The installer was built but not installed —
+there is no Windows machine here. Everything above was verified on macOS, on
+the same code and the same asar. What that leaves unproven is the installer
+flow, the Start-menu shortcut, and `%APPDATA%` as the data directory.
+
+**A correction to what this file said an hour ago.** It claimed the packaged
+bundle could not be launched here and blamed the sandbox. That was wrong. The
+cause was `ELECTRON_RUN_AS_NODE=1` left set in my own shell from the Node-API
+tests: it makes any Electron binary run as Node, and with no script to run it
+reads stdin, finds nothing and exits 0 in silence. Every "packaged app will not
+start" result was that variable. Clearing it, the app starts and everything
+above passes. The lesson is the one the app already tries to teach — an empty
+exit code with no output is not evidence of anything, and I treated it as
+evidence of the sandbox.
 
 **The one intermittent failure, chased down.** The first run of `npm run smoke`
 against the packaged backend failed once and then passed five times. It turned
@@ -774,8 +786,13 @@ the module needs 10, and the result is a segfault with no message rather than
 the clean "compiled against a different Node.js version" error anyone would
 recognise. `npm run check-runtime` exists so that cannot ship.
 
-The GUI launch of the packaged bundle could not be driven from this
-environment. Everything reachable was checked against the packaged artifact
-instead — its own Electron, its own asar, its own database — and the six suites
-pass against the packaged backend. What remains untested is the double-click
-itself, on Windows, by someone with a mouse.
+I then spent a while concluding the packaged app could not be launched here,
+and wrote that down as a sandbox restriction. It was `ELECTRON_RUN_AS_NODE=1`
+still set in my own shell from those same Node-API tests. An Electron binary
+with that set runs as Node, and with nothing to run it exits 0 without a word —
+which I read as the environment refusing rather than as my own doing. Once
+cleared, every check on the list passed, including pressing ลองใหม่ on the error
+page and watching the window come back.
+
+What remains untested is Windows: the installer was built but there is no
+Windows machine here to install it on.
