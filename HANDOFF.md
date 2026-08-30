@@ -8,17 +8,17 @@ Read `CLAUDE.md` first — it holds the rules that must not be broken. This file
 
 ## Where the project stands
 
-The backend is finished and tested. The frontend is a working prototype that has never spoken to it. Those two sentences are the whole situation.
+*Written when the frontend was a prototype that had never made a request. It has since been ported to React in `frontend/` and wired to the API — see `PROGRESS.md` for where things actually stand. Everything below about why the app is shaped this way still holds, and the rules it points at have not moved.*
 
 | Part | State |
 |---|---|
 | Database — 11 tables | Done |
-| Backend — 48 endpoints across 8 route files | Done, curl-tested |
-| Frontend — 6 screens, 8 views | Done as a prototype |
-| **Frontend wired to the API** | **Not started. `fetch` appears zero times.** |
+| Backend — 50 endpoints across 8 route files | Done, curl-tested |
+| Frontend — 6 screens, 9 views | Done as a prototype, then ported to React |
+| Frontend wired to the API | Done |
 | Electron packaging | Not started |
 
-69 functional requirements are marked Done in `REQUIREMENTS.md`. All of them are satisfied by the backend; the frontend satisfies them against mock data held in memory.
+The requirements in `REQUIREMENTS.md` are marked Done against the backend; the React app now satisfies them against it rather than against mock data.
 
 ---
 
