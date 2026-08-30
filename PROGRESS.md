@@ -32,13 +32,20 @@ npm run smoke            # the paths from the brief's verification list
 npm run smoke:offline    # what the screens do when the server is not there
 npm run smoke:stale      # what they do when the data changed underneath them
 npm run smoke:share      # fees that are a percentage of something else
+npm run smoke:screens    # the filter counts, the month picker, printing, previews
+npm run smoke:rules      # the rules in CLAUDE.md, attacked at their boundaries
 ```
+
+`smoke/coldstart.jsx` is the seventh, and needs a server started on a database
+with no rooms in it — the first day of using the program. Move `apartment.db`
+aside, start the server, then
+`npx vite build --ssr smoke/coldstart.jsx --outDir smoke-dist && node smoke-dist/coldstart.js`.
 
 `smoke/harness.jsx` renders the real app into jsdom and drives it with real
 clicks and keystrokes against the running backend. `smoke/walk.jsx` re-seeds
 first, so it starts from the same building however many times it has been run.
 It prints `all passed` or names what broke. Not a test framework and there is
-no watcher — run it after a change. All four suites pass.
+no watcher — run it after a change. All of them pass: 254 checks.
 
 `smoke/walk.jsx` writes to the database. Re-seed before using the app by hand.
 
@@ -458,6 +465,63 @@ asks for the percentage instead of an amount.
 true of every bill, since `buildBill` refuses without one. The "treat it as
 zero" case the owner offered for is not reachable on a real bill.
 
+### A round of product testing
+
+Asked for on 2026-08-30. Two suites were written for it —
+`smoke/rules.mjs`, which goes after the rules in `CLAUDE.md` at their
+boundaries rather than down the middle, and `smoke/screens.jsx`, which covers
+the parts of the screens the main walk goes past. Plus `smoke/coldstart.jsx`,
+run once by hand against an empty database.
+
+**One real bug, and it was a money bug.**
+
+A reading row can hold a previous figure with no current one — that is the
+state left when the box is emptied, or when a previous figure is corrected
+upward. The checklist counted it correctly as still to do. `buildBill` did not
+check for it, and `null` went through the arithmetic as zero:
+
+```
+100 → null   billed as -100 units
+  minimum on : ค่าน้ำ 100 บาท    "-100 หน่วย — ขั้นต่ำ 100 บาท (100 → null)"
+  minimum off: ค่าน้ำ -900 บาท   a negative line on the invoice
+```
+
+A 4,100 baht bill came out as 3,695 with the minimum on and 2,640 with it off,
+with visible nonsense printed on the page the tenant is handed. `buildBill` now
+refuses, with the wording the prototype used for exactly this case
+(`ยังจดมิเตอร์งวด ... ไม่ครบ`), and all three ways in — preview, `POST /bills`
+and the batch — agree.
+
+It had been noted as a question at the end of Phase 1 and never answered. Worth
+recording that it got *more* reachable afterwards, not less: making
+`PUT /readings/:id` able to clear a current reading is what turned "hard to
+produce" into "empty the box on บันทึกมิเตอร์".
+
+**The cold start works.** An empty database through to a printed bill — add a
+floor, add the first room, move a tenant in creating them on the way, take the
+first meter reading with no previous month to draw on, generate, print. Nothing
+crashed and nothing divided by zero. This had never been run before.
+
+**Everything else held.** The `end_date` boundary in all six places including
+the new check on `PUT /leases/:id`; the minimum charge at, either side of, and
+switched off; rounding to two decimals on an awkward rate; a bill never
+overwritten; a batch that keeps going; a handover month billing both tenants;
+rent by the day at 1, at the month's length, and refused outside; a wrapped
+dial billing 17 units rather than 12; every deletion guard; the cascade;
+percentage fees including 0% and one share never counting another; and twelve
+kinds of input the routes should refuse.
+
+**Two of the failures were the tests, not the app.** A fee type created inline
+was not registered for cleanup, so the second run tripped over its own UNIQUE
+name — the cleanup now goes by name. And `className.includes('on')` matched the
+word `gone`, which is what `classList.contains` is for.
+
+**Not covered.** The print layout is asserted structurally — one `.paper` per
+bill, siblings inside `.papers`, chrome marked `.noprint` — but nobody has
+looked at a printed page. The `date('now','localtime')` rule cannot be tested
+without moving the machine clock past midnight UTC. Neither can be reached
+from here.
+
 ### Still open
 
 `PUT /fees/onetime/:id` has no button — the screens add and delete one-time
@@ -543,3 +607,12 @@ amount.
 The part worth thinking about was not the arithmetic but `subtotal`: two shares
 on one bill are only well defined if neither counts the other, and that is a
 decision that cannot be seen on the printed page afterwards.
+
+**Product testing.** Six suites, 254 checks, one real bug: a half-entered meter
+reading billed as negative usage. Found by asking what happens in the state the
+checklist already knew about but the calculation did not.
+
+The two suites that found nothing are still the ones worth keeping — the cold
+start, because it is the only path a new building takes and it had never once
+been run, and the chip counts, because a count that disagrees with the list
+under it is the kind of thing nobody notices until they are relying on it.

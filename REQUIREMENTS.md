@@ -54,6 +54,7 @@ Damage is charged as a normal one-time charge on a monthly bill, so the deposit 
 | 3.9 | Handle a meter that was replaced and restarted at zero | Done |
 | 3.10 | Correct a previous reading upward without first inflating the current one | Done |
 | 3.12 | Clear a current reading, leaving the room outstanding on the checklist | Done |
+| 3.13 | A room with only half its meters entered cannot be billed | Done |
 | 3.11 | Fix water and electricity independently when both read low | Done |
 | 3.6 | One reading per room per month, no duplicates | Done |
 | 3.7 | View a room's readings for any past month | Done — the room page's month picker |
