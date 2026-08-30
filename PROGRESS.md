@@ -66,6 +66,10 @@ npm run smoke:rules      # the rules in CLAUDE.md, attacked at their boundaries
 They need a server on 3001 and they re-seed it. `npm run seed` puts the sample
 building back afterwards.
 
+`npm run check-revive` is separate because it is slow: it launches the real app
+and kills the server underneath it several times. Run it after touching
+`electron/main.js`.
+
 `smoke/coldstart.jsx` is the seventh, and needs a server started on a database
 with no rooms in it — the first day of using the program. Move `apartment.db`
 aside, start the server, then
@@ -690,13 +694,66 @@ arm64 — an installer that would simply not run on the building's PC.
   anywhere. macOS is built unsigned; Windows is built unsigned and Windows will
   warn on first run until it is signed.
 
-### Question for the owner
+### If the server dies while the app is open
 
-**If the server stops while the app is open, there is no way back except
-quitting.** The screens already show `ติดต่อเซิร์ฟเวอร์ไม่ได้` with a retry, but
-that retry re-reads — it cannot restart a child process that has died. Making
-the main process notice and start it again is a change to how the app behaves
-rather than to how it starts, so it is recorded here rather than made.
+Asked about, decided, and built. The main process supervises the server child
+and starts it again when it dies on its own.
+
+**On the same port.** This is the part that is easy to get wrong. The window is
+loaded at `http://127.0.0.1:<port>/` and the page asks for relative paths, so a
+server that comes back on a different port leaves the window talking to
+nothing. Reloading the window would fix the address and throw away whatever was
+half-typed into a form, which is the one thing worth protecting here. Taking
+the old port back means the page never knew: its own banner is showing, its
+`ลองใหม่` now works because there is something to answer it, and nothing the
+user was doing is lost.
+
+A fresh port and a reload is the fallback, for the unlikely case that something
+grabbed the old one in the seconds it was free.
+
+**With a cap.** Restarts are counted over a minute, with a longer wait each
+time. After three, it stops and shows the error page. A server that will not
+stay up is a problem for somebody to look at, not one to paper over for ever,
+and a crash loop that never surfaces is worse than a message.
+
+`npm run check-revive` covers all four paths. It launches the real app with its
+own `--user-data-dir`, kills the server underneath it, and checks with the
+DevTools protocol what the window is showing. It is slow, so it is not part of
+`npm test`; run it after touching `electron/main.js`.
+
+**It found a real bug on its first honest run.** `revive()` returned early
+while `boot()` still held its guard — and that guard was held across
+`win.loadURL`, which is exactly the window the check was killing in. A server
+that died while the page was still loading was never recovered, silently. The
+guard now covers only starting the server, and is released before the window is
+told to load anything. Three consecutive clean runs since.
+
+The route there is worth remembering: the check failed intermittently, and my
+first two explanations were both about the check rather than the app — a stale
+`pkill` pattern that also matched the development server, and a sleep that was
+too short. Both were true and neither was the cause. Reading what the app
+actually logged took a minute and pointed straight at it.
+
+### Changing the name and the icon
+
+Both are one line or one file, and both were tested rather than assumed.
+
+**The name** is `build.productName` in `package.json`. It becomes the installer,
+the executable, the app bundle and the Start-menu shortcut. **Thai works** — a
+build with `บ้านสวนพลู` produced `บ้านสวนพลู Setup 1.0.0.exe` and
+`บ้านสวนพลู.exe`, and the macOS bundle ran normally.
+
+Changing it does **not** move the data. The folder under `userData` is keyed on
+`name` in `package.json` (`apartment-app`), which is why that one should be
+left alone — renaming it would orphan an existing database.
+
+The title in the window's own bar is separate again: it comes from `<title>` in
+`frontend/index.html`.
+
+**The icon** goes in `build/icon.png`, 512×512 or larger, square.
+`electron-builder` converts it for both platforms. There is no icon today, so
+the default Electron one is used. `build/README.md` says the same thing in Thai
+for whoever looks there first.
 
 ### Still open
 
@@ -812,3 +869,15 @@ page and watching the window come back.
 
 What remains untested is Windows: the installer was built but there is no
 Windows machine here to install it on.
+
+**The supervisor.** The owner chose the full version — restart on the same
+port, capped, error page when it will not stay up — over the five-line one that
+just shows the error page. The right call: the same port is what keeps a
+half-typed form on screen, and that is the whole reason to prefer restarting
+over reloading.
+
+The check written for it caught a bug in it within minutes, in a window I had
+not thought about: the server dying while the first page was still loading. My
+first two theories were both about the check being wrong. They were both true
+and neither was the cause, and reading the app's own log would have got there
+sooner than either.
