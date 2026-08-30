@@ -394,6 +394,18 @@ function buildBill(leaseId, period, options = {}) {
     return { error: `ห้อง ${lease.unit_number} ยังไม่ได้จดมิเตอร์งวด ${period}` };
   }
 
+  // A row can exist with a previous figure and no current one. That is the
+  // state left after a previous figure was corrected upward, or after the box
+  // was simply emptied, and it is what the checklist counts as still to do.
+  //
+  // It is NOT a reading. Without this, null went through the arithmetic as
+  // zero: 100 → null billed as -100 units, which came out as the minimum
+  // charge with the minimum on and as a NEGATIVE line with it off, and printed
+  // "-100 หน่วย (100 → null)" on a bill handed to a tenant.
+  if (reading.water_curr == null || reading.elec_curr == null) {
+    return { error: `ห้อง ${lease.unit_number} ยังจดมิเตอร์งวด ${period} ไม่ครบ` };
+  }
+
   // Rates are read now and their result frozen onto the bill. A later rate
   // change will not touch this bill.
   // Settings are stored as text so the table can also hold the building's name.
