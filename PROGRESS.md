@@ -30,13 +30,14 @@ comparison against `prototype/rooms.html` mean anything.
 cd frontend
 npm run smoke            # the paths from the brief's verification list
 npm run smoke:offline    # what the screens do when the server is not there
+npm run smoke:stale      # what they do when the data changed underneath them
 ```
 
 `smoke/harness.jsx` renders the real app into jsdom and drives it with real
 clicks and keystrokes against the running backend. `smoke/walk.jsx` re-seeds
 first, so it starts from the same building however many times it has been run.
 It prints `all passed` or names what broke. Not a test framework and there is
-no watcher — run it after a change. Both suites pass.
+no watcher — run it after a change. All three suites pass.
 
 `smoke/walk.jsx` writes to the database. Re-seed before using the app by hand.
 
@@ -360,6 +361,44 @@ Because the room page now has a picker, it also says which figures follow it:
 move. Two frames on one page is the thing `CLAUDE.md` says must never be left
 silent, and it is why the board still has no picker at all.
 
+### When the screen is holding ids the server no longer has
+
+Found by the owner, reproduced, and fixed. The report was "ไม่พบสัญญาเช่านี้ when
+I press เพิ่มค่าใช้จ่ายครั้งเดียว", and the cause was mine: `npm run seed` deletes
+every lease and recreates it with a new id, and it had been run twice with the
+app open in a browser. Every id on that screen was stale.
+
+A reload cured it, but the app said nothing that would suggest one. Worse, the
+guess "the ids are stale" turned out to expose two crashes rather than one:
+
+- **Every dialog looks its subject up by id and reads fields off it.** Thirteen
+  of them would have thrown on a subject that had gone.
+- **So do the two detail pages.** `RoomPage` does `units.find(...)` then
+  `u.id`; deleting the room from elsewhere took the page down with a
+  `TypeError`, not a message. This one only turned up because the check written
+  for the dialogs was pointed at a page as well.
+
+Three changes, none of them large:
+
+- `DataContext.guard` re-reads the collections when a write is **refused** —
+  the server answered, so it is reachable, and the refusal may be because the
+  screen is pointing at something that is gone. It is skipped when the server
+  is simply unreachable, where re-reading would fail too.
+- `ModalHost` maps each dialog to the record it is about, and shows
+  `ข้อมูลนี้ไม่มีอยู่แล้ว` instead of opening one whose subject has gone. One
+  table in one file rather than a guard in thirteen dialogs.
+- `App.jsx` does the same for ห้อง and ผู้เช่า, the two pages reached by id.
+
+The two together mean a stale screen now corrects itself: the write is
+refused, the collections re-read, the dialog swaps to a card explaining it,
+and the page behind it is right by the time it is closed. `npm run smoke:stale`
+holds all of it, including a check that an ordinary refusal — deleting a lease
+that has bills — still shows its real reason rather than a "gone" card.
+
+**Not covered:** a screen that is stale and is not written to just stays stale
+until something reloads it. There is no polling, and for a single-user local
+app there should not be.
+
 ### Still open
 
 `PUT /fees/onetime/:id` has no button — the screens add and delete one-time
@@ -425,3 +464,13 @@ They were also right to ask what deleting a lease even means, given แก้ส
 exists. The answer was worth checking against the server rather than asserting:
 a mis-clicked ย้ายเข้า "fixed" with ย้ายออก bills a full month to someone who
 never moved in, and after that the lease cannot be deleted at all.
+
+**"ไม่พบสัญญาเช่านี้".** Reported by the owner while adding a one-time charge.
+Not reproducible on seeded data, nor through any sequence of the features that
+had just changed — two repro passes found nothing. It only appeared once the
+guess was stated properly: the screen is holding ids the server no longer has,
+which is what a reseed under an open tab does. Deleting one lease behind the
+app's back reproduced it exactly.
+
+Worth remembering that the second crash — the room page itself, not the dialog
+— was found by pointing the new check at a page rather than by reading code.

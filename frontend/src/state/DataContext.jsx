@@ -125,9 +125,22 @@ export function DataProvider({ children }){
     // A write that fails because the server is not there is not a problem with
     // that one field; nothing on the page can be saved. The banner says so
     // once at the top, and the error still reaches the form that asked.
+    //
+    // A write the server ANSWERED with a refusal gets the collections read
+    // again before the error is passed on. Usually nothing has changed and the
+    // refusal was a rule being enforced. But the other reason a write is
+    // refused is that the screen is pointing at something that no longer
+    // exists — a lease deleted in another window, a database restored from a
+    // backup — and then the stale picture is the cause, not a symptom.
+    // Re-reading costs one request on localhost and is the only way back:
+    // otherwise the same dead button sits there offering the same failure.
     const guard = fn => async (...args) => {
       try { return await fn(...args); }
-      catch (e) { if(e instanceof ApiDown) setDown(true); throw e; }
+      catch (e) {
+        if(e instanceof ApiDown) setDown(true);
+        else await load().catch(() => {});
+        throw e;
+      }
     };
 
     const actions = {

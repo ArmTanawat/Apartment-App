@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "seed": "node smoke/seed.mjs",
     "smoke": "vite build --ssr smoke/walk.jsx --outDir smoke-dist && node smoke-dist/walk.js",
-    "smoke:offline": "vite build --ssr smoke/offline.jsx --outDir smoke-dist && node smoke-dist/offline.js"
+    "smoke:offline": "vite build --ssr smoke/offline.jsx --outDir smoke-dist && node smoke-dist/offline.js",
+    "smoke:stale": "vite build --ssr smoke/stale.jsx --outDir smoke-dist && node smoke-dist/stale.js"
   },
   "dependencies": {
     "react": "^19.2.8",

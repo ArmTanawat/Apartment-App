@@ -19,8 +19,17 @@ const NAV = [
   {k:"settings", l:"ตั้งค่า"},
 ];
 
+// A detail page is reached by id, and its record can be gone by the time it
+// renders — deleted from another window, or a database restored underneath.
+// Both pages read fields off the record straight away, so this is checked here
+// rather than in each of them, the same way ModalHost checks its dialogs.
+const PAGE_SUBJECT = {
+  room:   ['units',   'ห้องนี้ไม่มีอยู่แล้ว',       'board',   '← ห้องพัก'],
+  tenant: ['tenants', 'ผู้เช่ารายนี้ไม่มีอยู่แล้ว', 'tenants', '← ผู้เช่า'],
+};
+
 function Shell(){
-  const { units, settings, down, reload } = useData();
+  const { units, tenants, settings, down, reload } = useData();
   const { view, go } = useUi();
 
   // Detail pages are reached from their list, so they keep the list highlighted.
@@ -30,8 +39,11 @@ function Shell(){
     : ["bills","bill","printall"].includes(view.name) ? "bills"
     : "board";
 
-  const page =
-      view.name === "meter"    ? <MeterPage />
+  const subject = PAGE_SUBJECT[view.name];
+  const gone = subject && !{ units, tenants }[subject[0]].some(x => x.id === view.id);
+
+  const page = gone ? <Gone subject={subject} onBack={() => go({name: subject[2]})} />
+    : view.name === "meter"    ? <MeterPage />
     : view.name === "room"     ? <RoomPage id={view.id} />
     : view.name === "tenants"  ? <TenantsPage />
     : view.name === "tenant"   ? <TenantPage id={view.id} />
@@ -70,6 +82,16 @@ function Shell(){
       </main>
     </div>
     <ModalHost />
+  </>;
+}
+
+function Gone({ subject, onBack }){
+  const [, title, , backLabel] = subject;
+  return <>
+    <button className="back" onClick={onBack}>{backLabel}</button>
+    <div className="head"><h1>{title}</h1></div>
+    <p className="sub">มีการเปลี่ยนแปลงจากที่อื่นหลังจากเปิดหน้านี้
+      หน้าจอดึงข้อมูลล่าสุดมาให้แล้ว</p>
   </>;
 }
 
