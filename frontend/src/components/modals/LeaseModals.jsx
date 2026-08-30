@@ -148,7 +148,7 @@ export function MoveOutModal({ unitId }){
 
 export function EditLeaseModal({ leaseId }){
   const { leases, h, updateLease } = useData();
-  const { closeModal } = useUi();
+  const { closeModal, openModal } = useUi();
   const l = leases.find(x=>x.id===leaseId);
   const t = h.tenantOf(leaseId);
   const [start, setStart] = useState(l.start_date);
@@ -185,10 +185,70 @@ export function EditLeaseModal({ leaseId }){
       </div>
       <div className="warn">แก้ค่าเช่าที่นี่มีผลกับบิลที่ออกหลังจากนี้เท่านั้น
         บิลเดือนก่อนที่ออกไปแล้วยังคงยอดเดิม</div>
-      <div className="actions">
-        <button className="btn ghost" onClick={closeModal}>ยกเลิก</button>
-        <button className="btn" disabled={busy} onClick={save}>บันทึก</button>
+      {/* Only three things can be corrected here — วันเข้าอยู่, ค่าเช่า, มัดจำ.
+          The tenant and the room cannot, so a ย้ายเข้า on the wrong person or
+          the wrong room has nowhere else to go. */}
+      <div className="actions" style={{justifyContent:"space-between"}}>
+        <button className="btn danger" disabled={busy}
+          onClick={() => openModal({kind:"deleteLease", leaseId})}>ลบสัญญานี้</button>
+        <span style={{display:"flex", gap:"8px"}}>
+          <button className="btn ghost" onClick={closeModal}>ยกเลิก</button>
+          <button className="btn" disabled={busy} onClick={save}>บันทึก</button>
+        </span>
       </div>
+    </Modal>
+  );
+}
+
+/* ลบสัญญา is not ย้ายออก, and the difference is what this dialog is for.
+ *
+ * ย้ายออก records that someone lived here and left — the room frees up and the
+ * tenancy stays in the history, which is right, because it happened. ลบสัญญา
+ * says it never happened, which is right for a ย้ายเข้า on the wrong person or
+ * the wrong room.
+ *
+ * "Fixing" a mis-click with ย้ายออก instead leaves a tenancy of nought days on
+ * the tenant's page for good, blocks ever deleting that room or that tenant,
+ * and — because a lease that starts and ends inside a month still counts as
+ * having been there — gets a full month's rent billed to someone who never
+ * moved in.
+ */
+export function DeleteLeaseModal({ leaseId }){
+  const { leases, units, bills, h, deleteLease } = useData();
+  const { closeModal, openModal, bumpDetail } = useUi();
+  const { error, busy, run } = useSubmit();
+
+  const l = leases.find(x => x.id === leaseId);
+  const t = h.tenantOf(leaseId);
+  const u = units.find(x => x.id === l.unit_id);
+  // The route refuses this too. Saying it before the button is pressed is what
+  // lets the way out be offered instead of an error.
+  const held = bills.filter(b => b.lease_id === leaseId);
+
+  const back = () => openModal({kind:"editLease", leaseId});
+
+  return (
+    <Modal>
+      <h3>ลบสัญญาเช่า</h3>
+      <p className="lead">{t.full_name} · ห้อง {u.unit_number} · เข้าอยู่{" "}
+        <span className="num">{l.start_date}</span></p>
+      {held.length ? <>
+        <ErrBox>ลบไม่ได้ เพราะสัญญานี้มีบิลอยู่ <span className="num">{held.length}</span> ใบ</ErrBox>
+        <p className="lead">ถ้าออกบิลผิด ให้ลบบิลนั้นที่หน้าบิลก่อน แล้วค่อยกลับมาลบสัญญา</p>
+        <div className="actions"><button className="btn ghost" onClick={closeModal}>ปิด</button></div>
+      </> : <>
+        <div className="warn">ใช้เมื่อกดย้ายเข้าผิดคนหรือผิดห้องเท่านั้น
+          สัญญานี้จะหายไปเหมือนไม่เคยมี พร้อมกับค่าธรรมเนียมและค่าใช้จ่ายที่ผูกไว้กับมัน</div>
+        <div className="warn">ถ้าผู้เช่าเคยอยู่จริงแล้วย้ายออก ให้ใช้ปุ่มย้ายออกแทน
+          ห้องจะว่างเหมือนกัน แต่ประวัติยังอยู่ครบ</div>
+        <ErrBox>{error}</ErrBox>
+        <div className="actions">
+          <button className="btn ghost" onClick={back}>ยกเลิก</button>
+          <button className="btn danger" disabled={busy}
+            onClick={() => run(async () => { await deleteLease(leaseId); bumpDetail(); closeModal(); })}>
+            ลบสัญญา</button>
+        </div>
+      </>}
     </Modal>
   );
 }

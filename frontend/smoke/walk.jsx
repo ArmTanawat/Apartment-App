@@ -65,6 +65,55 @@ await select(sel2, [...sel2.options].find(o => o.textContent.includes('วิช
 await click(byText('.modal .btn', 'ย้ายเข้า'));
 check('re-lettable the same day', !$('.modal') && text('.tag') === 'มีผู้เช่า', text('.tag'));
 
+section('the room page names its month and can change it');
+const cardTitles = () => $$('.card h2').map(h => h.textContent.trim()).join(' | ');
+check('the meter card names the งวด, not "เดือนนี้"',
+  cardTitles().includes(`มิเตอร์ งวด ${period}`) && !cardTitles().includes('มิเตอร์เดือนนี้'),
+  cardTitles());
+check('it says which figures are today\'s', body().includes('ผู้เช่าและสัญญาเป็นสถานะวันนี้'));
+check('there is a month picker on the room page', !!$('.roomhead .monthwrap'));
+await click($('.roomhead .month button'), 400);   // back one month
+const backMonth = `${period.slice(0,4)}-${String(Number(period.slice(5))-1).padStart(2,'0')}`;
+check('the card follows it', cardTitles().includes(`มิเตอร์ งวด ${backMonth}`), cardTitles());
+check('the tenant card still shows today', body().includes('ผู้เช่าปัจจุบัน'));
+await click($$('.roomhead .month button')[2], 400);   // forward again
+
+section('deleting a lease is not the same as moving out');
+const leaseOf104 = (await (await fetch('http://localhost:3001/units')).json())
+  .find(u => u.unit_number === '104').lease_id;
+await click(byText('.btn', 'แก้สัญญา'));
+check('the edit dialog offers it', !!byText('.modal .btn', 'ลบสัญญานี้'));
+await click(byText('.modal .btn', 'ลบสัญญานี้'));
+check('and explains the difference', $('.modal').textContent.includes('ใช้เมื่อกดย้ายเข้าผิดคนหรือผิดห้อง'),
+  $('.modal').textContent.slice(0,160));
+check('and points at ย้ายออก for a real move-out', $('.modal').textContent.includes('ให้ใช้ปุ่มย้ายออกแทน'));
+await click(byText('.modal .btn', 'ยกเลิก'));
+check('ยกเลิก goes back to แก้สัญญา', $('.modal h3').textContent === 'แก้สัญญาเช่า',
+  $('.modal h3').textContent);
+await click(byText('.modal .btn', 'ลบสัญญานี้'));
+await click(byText('.modal .btn', 'ลบสัญญา'), 400);
+check('the lease is gone and the room is vacant', !$('.modal') && text('.tag') === 'ว่าง',
+  text('.tag'));
+check('the lease row is gone from the server',
+  (await fetch(`http://localhost:3001/leases/${leaseOf104}`)).status === 404);
+// put the tenant back for the rest of the walk
+await click(byText('.btn', 'ย้ายเข้า'));
+const sel3 = $('.modal select');
+await select(sel3, [...sel3.options].find(o => o.textContent.includes('วิชัย')).value);
+await click(byText('.modal .btn', 'ย้ายเข้า'));
+
+section('a lease with a bill on it cannot be deleted');
+await click(byText('.back', 'ห้องพัก'));
+await click(byText('.room', '101'));
+await click(byText('.btn', 'แก้สัญญา'));
+await click(byText('.modal .btn', 'ลบสัญญานี้'));
+check('refused, with the count', $('.modal .err') && $('.modal .err').textContent.includes('มีบิลอยู่'),
+  $('.modal .err') && $('.modal .err').textContent);
+check('and says to delete the bill first', $('.modal').textContent.includes('ให้ลบบิลนั้นที่หน้าบิลก่อน'));
+await click(byText('.modal .btn', 'ปิด'));
+await click(byText('.back', 'ห้องพัก'));
+await click(byText('.room', '104'));
+
 section('the server refuses a start date that walks into another stay');
 await click(byText('.btn', 'แก้สัญญา'));
 const startBox = $('.modal input[type="date"]');

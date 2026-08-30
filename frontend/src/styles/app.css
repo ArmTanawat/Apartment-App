@@ -135,6 +135,9 @@ h1{font-size:32px; font-weight:700; margin:0; line-height:1.4}
 .card{background:var(--surface); border:1px solid var(--line); border-radius:8px; padding:18px 20px}
 .card h2{font-size:15px; font-weight:500; margin:0 0 14px; display:flex;
   align-items:center; justify-content:space-between; gap:10px}
+/* A heading that names its งวด keeps the label against the title and pushes
+   only the action to the right. */
+.card h2 .period{margin-right:auto; color:var(--muted); font-weight:400}
 .card h2 button{font-size:13px}
 .kv{display:grid; grid-template-columns:auto 1fr; gap:6px 16px; font-size:14px}
 .kv dt{color:var(--muted)}

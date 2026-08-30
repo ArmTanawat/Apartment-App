@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import ErrBox from '../components/ErrBox.jsx';
+import MonthPicker from '../components/MonthPicker.jsx';
 import { get, messageOf } from '../lib/api.js';
 import { baht } from '../lib/helpers.js';
 import { useApi } from '../lib/useApi.js';
@@ -55,10 +56,18 @@ export default function RoomPage({ id }){
         <span className={"tag " + (l ? "occ" : "vac")}>
           {l ? (l.end_date ? "จะว่าง "+l.end_date : "มีผู้เช่า") : "ว่าง"}</span>
       </div>
-      <button className="btn danger" title="ลบห้องนี้"
-        onClick={() => openModal({kind:"deleteRoom", id:u.id})}>ลบห้อง</button>
+      <div className="tools">
+        <MonthPicker />
+        <button className="btn danger" title="ลบห้องนี้"
+          onClick={() => openModal({kind:"deleteRoom", id:u.id})}>ลบห้อง</button>
+      </div>
     </div>
-    <p className="sub">ชั้น {u.floor} · ค่าเช่ามาตรฐาน <span className="num">{baht(u.base_rent)}</span> บาท</p>
+    {/* Two frames on one page, so the page says which is which. Who is in the
+        room is a live fact and does not follow the picker; the meter and the
+        one-time charges do, and each of those cards names its งวด. Mixing the
+        two silently is how a reader ends up trusting the wrong number. */}
+    <p className="sub">ชั้น {u.floor} · ค่าเช่ามาตรฐาน <span className="num">{baht(u.base_rent)}</span> บาท
+      <span style={{color:"var(--muted)"}}> — ผู้เช่าและสัญญาเป็นสถานะวันนี้</span></p>
     {/* A refused action is not an error state — the message names the reason
         and, where there is one, the alternative. */}
     <ErrBox>{actionError}</ErrBox>
@@ -139,8 +148,9 @@ export default function RoomPage({ id }){
       </div>
 
       <div className="card">
-        <h2>มิเตอร์เดือนนี้ {r && <button className="linkbtn"
-          onClick={() => openModal({kind:"meter", unitId:u.id})}>แก้ไข</button>}</h2>
+        <h2>มิเตอร์ <span className="period">งวด {period}</span>
+          {r && <button className="linkbtn"
+            onClick={() => openModal({kind:"meter", unitId:u.id})}>แก้ไข</button>}</h2>
         {r ? (
           <dl className="kv">
             <dt>น้ำ</dt><dd className="num">{r.water_prev} → {r.water_curr ?? "—"}
@@ -157,7 +167,7 @@ export default function RoomPage({ id }){
       </div>
 
       <div className="card">
-        <h2>ค่าใช้จ่ายครั้งเดียว <span style={{color:"var(--muted)",fontWeight:400}}>งวด {period}</span></h2>
+        <h2>ค่าใช้จ่ายครั้งเดียว <span className="period">งวด {period}</span></h2>
         {periodLeases.length === 0
           ? <p className="none">เดือนนี้ไม่มีผู้เช่าอยู่</p>
           : periodLeases.map(pl => {

@@ -1,6 +1,6 @@
 import { useUi } from '../../state/UiContext.jsx';
 import { AddRoomModal, DeleteRoomModal, EditRoomModal } from './RoomModals.jsx';
-import { EditLeaseModal, MoveInModal, MoveOutModal } from './LeaseModals.jsx';
+import { DeleteLeaseModal, EditLeaseModal, MoveInModal, MoveOutModal } from './LeaseModals.jsx';
 import { EditPrevModal, MeterModal } from './MeterModals.jsx';
 import { ChargeModal, DeleteFeeModal, DeleteFeeTypeModal, FeeModal, FeeTypeModal } from './FeeModals.jsx';
 import { AddTenantModal, DeleteTenantModal, EditTenantModal } from './TenantModals.jsx';
@@ -20,6 +20,7 @@ export default function ModalHost(){
     case "moveIn":        return <MoveInModal unitId={modal.unitId} />;
     case "moveOut":       return <MoveOutModal unitId={modal.unitId} />;
     case "editLease":     return <EditLeaseModal leaseId={modal.leaseId} />;
+    case "deleteLease":   return <DeleteLeaseModal leaseId={modal.leaseId} />;
     case "meter":         return <MeterModal unitId={modal.unitId} />;
     case "editPrev":      return <EditPrevModal unitId={modal.unitId} />;
     case "fee":           return <FeeModal leaseId={modal.leaseId} feeId={modal.feeId} />;

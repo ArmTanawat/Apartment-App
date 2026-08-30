@@ -24,6 +24,7 @@ Status column: **Done** means built and tested. **To build** means agreed but no
 | 1.6 | One tenant may rent several rooms at once | Done |
 | 1.7 | A room may not have two active leases at the same time | Done |
 | 1.16 | Correcting a lease may not move it into another tenant's stay | Done |
+| 1.17 | Delete a lease created by mistake, blocked once it has bills | Done |
 | 1.8 | See every room with its current tenant, or empty | Done |
 | 1.9 | See only the empty rooms | Done |
 
@@ -55,7 +56,7 @@ Damage is charged as a normal one-time charge on a monthly bill, so the deposit 
 | 3.12 | Clear a current reading, leaving the room outstanding on the checklist | Done |
 | 3.11 | Fix water and electricity independently when both read low | Done |
 | 3.6 | One reading per room per month, no duplicates | Done |
-| 3.7 | View reading history for a room | Backend done, no UI |
+| 3.7 | View a room's readings for any past month | Done — the room page's month picker |
 
 ## Fees
 
@@ -124,6 +125,7 @@ Rates in force are read at bill generation and the resulting baht amount is froz
 | 9.1 | One working month shared by the meter and bill pages | Done |
 | 9.2 | Open on the current month; never navigate past it | Done |
 | 9.3 | Look back at any earlier month's readings and bills | Done |
+| 9.4 | The room page names the month its meter and charges belong to, and can change it there | Done |
 | 6.11 | Printable bill | Done |
 
 ### Generating for several rooms

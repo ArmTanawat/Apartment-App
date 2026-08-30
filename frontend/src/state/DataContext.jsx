@@ -148,6 +148,10 @@ export function DataProvider({ children }){
       // clears it and an omitted key keeps the date.
       updateLease: async (id, patch) => { await put(`/leases/${id}`, patch); await after(['units','leases']); },
       endLease: async (id, end_date) => { await put(`/leases/${id}/end`, { end_date }); await after(['units','leases']); },
+      // For a lease created by mistake, not for a tenant who moved out.
+      // Its fees and charges go with it through ON DELETE CASCADE; the route
+      // refuses once it has bills.
+      deleteLease: async id => { await del(`/leases/${id}`); await after(['units','leases','bills']); },
 
       // ---- meter readings ----
       // One row per room per month. POST creates it, PUT corrects it, and each

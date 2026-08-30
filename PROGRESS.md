@@ -317,18 +317,53 @@ asks once instead of once per lease. Until the answer is in, no delete button
 is offered — offering to delete a fee type that turns out to be in use is worse
 than not offering.
 
+### The two gaps from HANDOFF.md, closed differently
+
+**`DELETE /leases/:id` now has a button.** แก้สัญญา offers ลบสัญญานี้, which
+opens a dialog that says what deleting is for and what to use instead.
+
+The two are not alternatives. ย้ายออก records that someone lived here and left,
+which is true and belongs in the history. ลบสัญญา says it never happened, which
+is what a ย้ายเข้า on the wrong person or the wrong room needs — and แก้สัญญา
+cannot help, because it changes only วันเข้าอยู่, ค่าเช่า and มัดจำ, never the
+tenant or the room.
+
+Using ย้ายออก to clean up a mis-click was measured against the running server
+rather than reasoned about. A lease created and ended on the same day still
+counts as having been in the room that month, so:
+
+```
+batch for that room -> [{"unit_number":"104","tenant_name":"ปรีชา ดวงแก้ว","total":4550}]
+```
+
+A full month's rent, billed to someone who never moved in. And once that bill
+exists the lease can no longer be deleted at all — so the button is worth
+having and worth reaching for early. It also leaves a nought-day tenancy on the
+tenant's page for good and blocks ever deleting that room or that tenant.
+
+The dialog refuses up front when the lease has bills, naming the count, the way
+ลบห้อง and ลบผู้เช่า do — the route refuses too, but saying it before the button
+is pressed is what lets the way out be offered instead of an error.
+
+**`GET /readings/history/:unitId` stays unused, deliberately.** The room page
+now names the month its meter and charges belong to — `มิเตอร์ งวด 2026-07`,
+matching the ค่าใช้จ่ายครั้งเดียว card beside it — and carries a month picker, so
+any past month is one click away instead of a trip to บันทึกมิเตอร์ and back.
+The card used to say `มิเตอร์เดือนนี้` whatever month was being shown.
+
+That answers "what did this room read in July". It does not answer "is 9854
+units unusual for this room", which needs several months at once and is the
+screen the endpoint is for. Stepping the picker is enough for now.
+
+Because the room page now has a picker, it also says which figures follow it:
+`ผู้เช่าและสัญญาเป็นสถานะวันนี้` in the subtitle, and งวด on the two cards that
+move. Two frames on one page is the thing `CLAUDE.md` says must never be left
+silent, and it is why the board still has no picker at all.
+
 ### Still open
 
-Nothing from the seven. The two gaps from `HANDOFF.md` are unchanged and still
-block nothing:
-
-| Endpoint | What is missing |
-|---|---|
-| `GET /readings/history/:unitId` | No way to look at a room's readings over time, which is the natural thing to want when a number looks wrong. |
-| `DELETE /leases/:id` | A lease created by mistake can only be ended, leaving a record of a tenancy that never happened. |
-
-`PUT /fees/onetime/:id` still has no button — the screens add and delete
-one-time charges but do not edit one, exactly as the prototype did.
+`PUT /fees/onetime/:id` has no button — the screens add and delete one-time
+charges but do not edit one, exactly as the prototype did.
 
 Electron is the remaining piece of work.
 
@@ -379,3 +414,14 @@ than it added backend code.
 Two checks were added to the walk that would have caught the thing each change
 was about: that no Latin text reaches a dialog, and that the box still holds
 its number after ครบรอบ.
+
+**The two gaps.** Closed on 2026-08-30 after the owner pushed back on both.
+They were right that a past month's meter was already reachable — but only by
+changing the month on another page and coming back, to a card that then
+mislabelled itself. A picker on the room page and a งวด on the card is the
+whole fix.
+
+They were also right to ask what deleting a lease even means, given แก้สัญญา
+exists. The answer was worth checking against the server rather than asserting:
+a mis-clicked ย้ายเข้า "fixed" with ย้ายออก bills a full month to someone who
+never moved in, and after that the lease cannot be deleted at all.
