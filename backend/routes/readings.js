@@ -25,7 +25,7 @@ router.get('/', (req, res) => {
   const period = req.query.period;
 
   if (!period) {
-    return res.status(400).json({ error: 'A period is required, for example ?period=2026-08' });
+    return res.status(400).json({ error: 'ต้องระบุงวด เช่น ?period=2026-08' });
   }
 
   const rows = db.prepare(`
@@ -111,16 +111,16 @@ router.post('/', (req, res) => {
   const elec_rollover  = req.body.elec_rollover  || 0;
 
   if (!unit_id || !period) {
-    return res.status(400).json({ error: 'Unit and period are required' });
+    return res.status(400).json({ error: 'ต้องระบุห้องและงวด' });
   }
 
   if (!/^\d{4}-\d{2}$/.test(period)) {
-    return res.status(400).json({ error: 'Period must look like 2026-08' });
+    return res.status(400).json({ error: 'งวดต้องอยู่ในรูปแบบ 2026-08' });
   }
 
   const unit = db.prepare('SELECT * FROM units WHERE id = ?').get(unit_id);
   if (!unit) {
-    return res.status(400).json({ error: 'That unit does not exist' });
+    return res.status(400).json({ error: 'ไม่พบห้องนี้' });
   }
 
   // The previous readings must be numbers. The current ones may be left out:
@@ -128,12 +128,12 @@ router.post('/', (req, res) => {
   // to be read again, and it is what the checklist shows as still outstanding.
   for (const [name, value] of Object.entries({ water_prev, elec_prev })) {
     if (value === undefined || value === null || isNaN(value)) {
-      return res.status(400).json({ error: `${name} must be a number` });
+      return res.status(400).json({ error: `${name} ต้องเป็นตัวเลข` });
     }
   }
   for (const [name, value] of Object.entries({ water_curr, elec_curr })) {
     if (value !== undefined && value !== null && isNaN(value)) {
-      return res.status(400).json({ error: `${name} must be a number` });
+      return res.status(400).json({ error: `${name} ต้องเป็นตัวเลข` });
     }
   }
 
@@ -143,12 +143,12 @@ router.post('/', (req, res) => {
   // reading is refused rather than billed as a negative.
   if (water_curr != null && usage(water_prev, water_curr, water_rollover) < 0) {
     return res.status(400).json({
-      error: 'Water reading is lower than last month. A typo, a replaced meter, or a full dial — say which.'
+      error: 'เลขน้ำน้อยกว่างวดก่อน เป็นการพิมพ์ผิด มิเตอร์ถูกเปลี่ยนใหม่ หรือมิเตอร์ครบรอบ ต้องระบุว่าอย่างไหน'
     });
   }
   if (elec_curr != null && usage(elec_prev, elec_curr, elec_rollover) < 0) {
     return res.status(400).json({
-      error: 'Electricity reading is lower than last month. A typo, a replaced meter, or a full dial — say which.'
+      error: 'เลขไฟน้อยกว่างวดก่อน เป็นการพิมพ์ผิด มิเตอร์ถูกเปลี่ยนใหม่ หรือมิเตอร์ครบรอบ ต้องระบุว่าอย่างไหน'
     });
   }
 
@@ -166,7 +166,7 @@ router.post('/', (req, res) => {
     // UNIQUE (unit_id, period) from the schema catches a double entry.
     if (err.message.includes('UNIQUE')) {
       return res.status(400).json({
-        error: `Unit ${unit.unit_number} already has a reading for ${period}. Edit it instead.`
+        error: `ห้อง ${unit.unit_number} มีบันทึกมิเตอร์งวด ${period} อยู่แล้ว ให้แก้ไขแทน`
       });
     }
     throw err;
@@ -177,20 +177,32 @@ router.post('/', (req, res) => {
 router.put('/:id', (req, res) => {
   const existing = db.prepare('SELECT * FROM meter_readings WHERE id = ?').get(req.params.id);
   if (!existing) {
-    return res.status(404).json({ error: 'Reading not found' });
+    return res.status(404).json({ error: 'ไม่พบบันทึกมิเตอร์' });
   }
 
   const water_prev = req.body.water_prev ?? existing.water_prev;
-  const water_curr = req.body.water_curr ?? existing.water_curr;
   const elec_prev  = req.body.elec_prev  ?? existing.elec_prev;
-  const elec_curr  = req.body.elec_curr  ?? existing.elec_curr;
   const water_rollover = req.body.water_rollover ?? existing.water_rollover;
   const elec_rollover  = req.body.elec_rollover  ?? existing.elec_rollover;
+
+  // The current readings are checked with `in` rather than `??`, the same way
+  // end_date is on PUT /leases/:id, because clearing one is a real action.
+  //
+  // A row may hold a previous figure with no current one. That is the state
+  // left after the previous figure was corrected upward and the meter has to
+  // be read again — refusing the correction until the current number is
+  // inflated first is backwards. With `??`, sending null would be read as "not
+  // supplied" and the old number would stay, so there would be no way to get
+  // back to it.
+  const water_curr = 'water_curr' in req.body
+    ? (req.body.water_curr ?? null) : existing.water_curr;
+  const elec_curr = 'elec_curr' in req.body
+    ? (req.body.elec_curr ?? null) : existing.elec_curr;
 
   const wu = usage(water_prev, water_curr, water_rollover);
   const eu = usage(elec_prev, elec_curr, elec_rollover);
   if ((wu !== null && wu < 0) || (eu !== null && eu < 0)) {
-    return res.status(400).json({ error: 'That gives negative usage. Check the numbers, or set a rollover.' });
+    return res.status(400).json({ error: 'ค่านี้ทำให้จำนวนหน่วยติดลบ ตรวจเลขอีกครั้ง หรือตั้งว่ามิเตอร์ครบรอบ' });
   }
 
   db.prepare(`
@@ -209,7 +221,7 @@ router.delete('/:id', (req, res) => {
   const result = db.prepare('DELETE FROM meter_readings WHERE id = ?').run(req.params.id);
 
   if (result.changes === 0) {
-    return res.status(404).json({ error: 'Reading not found' });
+    return res.status(404).json({ error: 'ไม่พบบันทึกมิเตอร์' });
   }
 
   res.status(204).send();

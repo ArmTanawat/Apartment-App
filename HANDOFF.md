@@ -8,17 +8,17 @@ Read `CLAUDE.md` first — it holds the rules that must not be broken. This file
 
 ## Where the project stands
 
-The backend is finished and tested. The frontend is a working prototype that has never spoken to it. Those two sentences are the whole situation.
+*Written when the frontend was a prototype that had never made a request. It has since been ported to React in `frontend/` and wired to the API — see `PROGRESS.md` for where things actually stand. Everything below about why the app is shaped this way still holds, and the rules it points at have not moved.*
 
 | Part | State |
 |---|---|
 | Database — 11 tables | Done |
-| Backend — 48 endpoints across 8 route files | Done, curl-tested |
-| Frontend — 6 screens, 8 views | Done as a prototype |
-| **Frontend wired to the API** | **Not started. `fetch` appears zero times.** |
+| Backend — 50 endpoints across 8 route files | Done, curl-tested |
+| Frontend — 6 screens, 9 views | Done as a prototype, then ported to React |
+| Frontend wired to the API | Done |
 | Electron packaging | Not started |
 
-69 functional requirements are marked Done in `REQUIREMENTS.md`. All of them are satisfied by the backend; the frontend satisfies them against mock data held in memory.
+The requirements in `REQUIREMENTS.md` are marked Done against the backend; the React app now satisfies them against it rather than against mock data.
 
 ---
 
@@ -140,14 +140,14 @@ Wiring will surface places where a button has no endpoint, or an endpoint has no
 - Purely local — `data-pickfloor`, `data-printall`, `data-addfloor`, the month picker. These are selection, printing, and navigation. They need no endpoint and never will.
 - Genuinely missing — add the route, following the pattern in the neighbouring file, and add it to `backend/README.md` and `REQUIREMENTS.md` in the same commit. Do not fake it on the client.
 
-**An endpoint with no button** is usually a gap in the screens, not dead code. Two exist today and both are real:
+**An endpoint with no button** is usually a gap in the screens, not dead code. Two existed when this was written. Both were settled on 2026-08-30, and the note is kept because they were settled differently:
 
-| Endpoint | What is missing |
+| Endpoint | What was missing, and what happened |
 |---|---|
-| `GET /readings/history/:unitId` | The room page shows only the current month's meter. There is no way to look at a room's readings over time, which is the natural thing to want when a number looks wrong. |
-| `DELETE /leases/:id` | A lease created by mistake can only be ended, which leaves a record of a tenancy that never happened. Ending is right for a real move-out; deleting is right for a typo. |
+| `GET /readings/history/:unitId` | The room page showed only the working month's meter and called it "มิเตอร์เดือนนี้" whatever month that was. It now names its งวด and carries a month picker, so any past month is one click away. The endpoint stays unused: one room across many months is a different screen, and stepping the picker turned out to be enough. |
+| `DELETE /leases/:id` | A lease created by mistake could only be ended, which leaves a record of a tenancy that never happened — and bills a full month to someone who never moved in, since a lease that starts and ends inside a month still counts as having been in the room. แก้สัญญา now offers ลบสัญญานี้. Ending is right for a real move-out; deleting is right for a typo. |
 
-Neither blocks the wiring. Add them when the screens they belong to are being touched.
+Neither blocked the wiring.
 
 ### Failures
 

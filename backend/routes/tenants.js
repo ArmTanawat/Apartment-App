@@ -21,7 +21,7 @@ router.get('/:id', (req, res) => {
   // .get() returns undefined when nothing matches. Without this check the
   // response would be an empty body with a 200 status, which looks like success.
   if (!tenant) {
-    return res.status(404).json({ error: 'Tenant not found' });
+    return res.status(404).json({ error: 'ไม่พบผู้เช่า' });
   }
 
   res.json(tenant);
@@ -32,7 +32,7 @@ router.post('/', (req, res) => {
   const { full_name, phone, id_card, address, note } = req.body;
 
   if (!full_name || full_name.trim() === '') {
-    return res.status(400).json({ error: 'Full name is required' });
+    return res.status(400).json({ error: 'ต้องใส่ชื่อ' });
   }
 
   const result = db.prepare(`
@@ -48,13 +48,13 @@ router.post('/', (req, res) => {
 router.put('/:id', (req, res) => {
   const existing = db.prepare('SELECT * FROM tenants WHERE id = ?').get(req.params.id);
   if (!existing) {
-    return res.status(404).json({ error: 'Tenant not found' });
+    return res.status(404).json({ error: 'ไม่พบผู้เช่า' });
   }
 
   const { full_name, phone, id_card, address, note } = req.body;
 
   if (!full_name || full_name.trim() === '') {
-    return res.status(400).json({ error: 'Full name is required' });
+    return res.status(400).json({ error: 'ต้องใส่ชื่อ' });
   }
 
   db.prepare(`
@@ -77,14 +77,14 @@ router.delete('/:id', (req, res) => {
 
   if (leaseCount > 0) {
     return res.status(400).json({
-      error: 'Cannot delete a tenant who has leases. End the lease instead.'
+      error: 'ลบผู้เช่ารายนี้ไม่ได้ เพราะมีสัญญาเช่าอยู่ในระบบ ถ้าย้ายออกไปแล้วให้ใช้ปุ่มย้ายออกแทน'
     });
   }
 
   const result = db.prepare('DELETE FROM tenants WHERE id = ?').run(req.params.id);
 
   if (result.changes === 0) {
-    return res.status(404).json({ error: 'Tenant not found' });
+    return res.status(404).json({ error: 'ไม่พบผู้เช่า' });
   }
 
   res.status(204).send();

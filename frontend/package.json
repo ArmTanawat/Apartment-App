@@ -1,0 +1,29 @@
+{
+  "name": "frontend",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "lint": "oxlint",
+    "preview": "vite preview",
+    "seed": "node smoke/seed.mjs",
+    "smoke": "vite build --ssr smoke/walk.jsx --outDir smoke-dist && node smoke-dist/walk.js",
+    "smoke:offline": "vite build --ssr smoke/offline.jsx --outDir smoke-dist && node smoke-dist/offline.js",
+    "smoke:stale": "vite build --ssr smoke/stale.jsx --outDir smoke-dist && node smoke-dist/stale.js",
+    "smoke:share": "vite build --ssr smoke/share.jsx --outDir smoke-dist && node smoke-dist/share.js"
+  },
+  "dependencies": {
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "@vitejs/plugin-react": "^6.1.0",
+    "jsdom": "^30.0.1",
+    "oxlint": "^1.79.0",
+    "vite": "^8.2.2"
+  }
+}

@@ -67,7 +67,7 @@ router.get('/vacant', (req, res) => {
 router.get('/:id', (req, res) => {
   const unit = db.prepare('SELECT * FROM units WHERE id = ?').get(req.params.id);
   if (!unit) {
-    return res.status(404).json({ error: 'Unit not found' });
+    return res.status(404).json({ error: 'ไม่พบห้อง' });
   }
   res.json(unit);
 });
@@ -77,10 +77,10 @@ router.post('/', (req, res) => {
   const { unit_number, floor, base_rent } = req.body;
 
   if (!unit_number || unit_number.trim() === '') {
-    return res.status(400).json({ error: 'Unit number is required' });
+    return res.status(400).json({ error: 'ต้องใส่เลขห้อง' });
   }
   if (base_rent === undefined || base_rent === null || base_rent < 0) {
-    return res.status(400).json({ error: 'Base rent must be a positive number' });
+    return res.status(400).json({ error: 'ค่าเช่ามาตรฐานต้องเป็นตัวเลขตั้งแต่ 0 ขึ้นไป' });
   }
 
   // unit_number is UNIQUE in the schema, so a duplicate throws. Catching it
@@ -94,7 +94,7 @@ router.post('/', (req, res) => {
     res.status(201).json(created);
   } catch (err) {
     if (err.message.includes('UNIQUE')) {
-      return res.status(400).json({ error: `Unit ${unit_number} already exists` });
+      return res.status(400).json({ error: `ห้อง ${unit_number} มีอยู่แล้ว` });
     }
     throw err;
   }
@@ -104,16 +104,16 @@ router.post('/', (req, res) => {
 router.put('/:id', (req, res) => {
   const existing = db.prepare('SELECT * FROM units WHERE id = ?').get(req.params.id);
   if (!existing) {
-    return res.status(404).json({ error: 'Unit not found' });
+    return res.status(404).json({ error: 'ไม่พบห้อง' });
   }
 
   const { unit_number, floor, base_rent } = req.body;
 
   if (!unit_number || unit_number.trim() === '') {
-    return res.status(400).json({ error: 'Unit number is required' });
+    return res.status(400).json({ error: 'ต้องใส่เลขห้อง' });
   }
   if (base_rent === undefined || base_rent === null || base_rent < 0) {
-    return res.status(400).json({ error: 'Base rent must be a positive number' });
+    return res.status(400).json({ error: 'ค่าเช่ามาตรฐานต้องเป็นตัวเลขตั้งแต่ 0 ขึ้นไป' });
   }
 
   // Changing base_rent here affects only NEW leases. Existing leases keep the
@@ -127,7 +127,7 @@ router.put('/:id', (req, res) => {
     res.json(updated);
   } catch (err) {
     if (err.message.includes('UNIQUE')) {
-      return res.status(400).json({ error: `Unit ${unit_number} already exists` });
+      return res.status(400).json({ error: `ห้อง ${unit_number} มีอยู่แล้ว` });
     }
     throw err;
   }
@@ -140,14 +140,14 @@ router.delete('/:id', (req, res) => {
 
   if (leaseCount > 0) {
     return res.status(400).json({
-      error: 'Cannot delete a unit that has leases on record.'
+      error: 'ลบห้องนี้ไม่ได้ เพราะมีประวัติสัญญาเช่าอยู่ ถ้าไม่ใช้ห้องนี้แล้วให้ปล่อยว่างไว้แทน'
     });
   }
 
   const result = db.prepare('DELETE FROM units WHERE id = ?').run(req.params.id);
 
   if (result.changes === 0) {
-    return res.status(404).json({ error: 'Unit not found' });
+    return res.status(404).json({ error: 'ไม่พบห้อง' });
   }
 
   res.status(204).send();

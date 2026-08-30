@@ -23,6 +23,8 @@ Status column: **Done** means built and tested. **To build** means agreed but no
 | 1.5 | Move a tenant out by setting an end date | Done |
 | 1.6 | One tenant may rent several rooms at once | Done |
 | 1.7 | A room may not have two active leases at the same time | Done |
+| 1.16 | Correcting a lease may not move it into another tenant's stay | Done |
+| 1.17 | Delete a lease created by mistake, blocked once it has bills | Done |
 | 1.8 | See every room with its current tenant, or empty | Done |
 | 1.9 | See only the empty rooms | Done |
 
@@ -51,9 +53,10 @@ Damage is charged as a normal one-time charge on a monthly bill, so the deposit 
 | 3.8 | Handle a meter that wrapped past its last digit | Done |
 | 3.9 | Handle a meter that was replaced and restarted at zero | Done |
 | 3.10 | Correct a previous reading upward without first inflating the current one | Done |
+| 3.12 | Clear a current reading, leaving the room outstanding on the checklist | Done |
 | 3.11 | Fix water and electricity independently when both read low | Done |
 | 3.6 | One reading per room per month, no duplicates | Done |
-| 3.7 | View reading history for a room | Backend done, no UI |
+| 3.7 | View a room's readings for any past month | Done — the room page's month picker |
 
 ## Fees
 
@@ -65,8 +68,17 @@ Damage is charged as a normal one-time charge on a monthly bill, so the deposit 
 | 4.4 | Cancel a recurring fee, affecting future bills only | Done |
 | 4.5 | Add a one-time charge that appears on one month only | Done |
 | 4.6 | Edit or delete any fee or charge | Done |
+| 4.7 | See which fee types are attached to somebody, so an unused one can be deleted | Done |
+| 4.8 | A fee type may be a percentage of water, electricity, rent, both utilities, or the rest of the bill | Done |
+| 4.9 | The percentage is copied onto the lease, so repricing the catalogue leaves existing tenants alone | Done |
 
 Recurring and one-time are separate. The question when adding a charge is always: does this happen again next month?
+
+A recurring fee is either a fixed amount or a share of something else on the same bill. A share is worked out afresh each month from that room's own figures, so it has no agreed baht amount — only the percentage.
+
+On the bill a share prints as `รายเดือน Monthly`, exactly like a fixed fee. The tenant is being asked to pay an amount; the arrangement behind it is between them and the owner. It is the one line that does not show how it was reached, and the basis cannot be recovered from the bill afterwards — only from the fee attached to the lease at the time.
+
+`subtotal` deliberately excludes other shares, so two of them on one bill do not depend on which was calculated first.
 
 ## Utility rates
 
@@ -77,6 +89,7 @@ Recurring and one-time are separate. The question when adding a charge is always
 | 5.3 | Set a minimum charge for electricity, with its own separate figures | Done |
 | 5.4 | Turn the minimum charge on or off for a given month, for the whole building at once | Done |
 | 5.5 | All figures editable — the threshold, the flat amount, and the per-unit rate | Done |
+| 5.11 | Show a worked example of what N units cost, from the same code that prices a bill | Done |
 | 5.6 | Set how many digits the water and electricity meters have | Done |
 | 5.7 | Set the building's own name | Done |
 | 5.8 | Set the building's address and phone, printed as the invoice header | Done |
@@ -105,7 +118,7 @@ Rates in force are read at bill generation and the resulting baht amount is froz
 |---|---|---|
 | 6.1 | Generate a bill for one tenant for one month | Done |
 | 6.2 | Bill includes rent, water, electricity, recurring fees, one-time charges | Done |
-| 6.3 | Each line shows its working, e.g. units used, meter start and end | Done |
+| 6.3 | Utility and prorated rent lines show their working, e.g. units used, meter start and end | Done |
 | 6.4 | Preview the figures before saving | Done |
 | 6.5 | One bill per tenant per month, no duplicates | Done |
 | 6.6 | View bill history by month or by tenant | Done |
@@ -113,12 +126,14 @@ Rates in force are read at bill generation and the resulting baht amount is froz
 | 6.8 | Generate bills for several rooms at once | Done |
 | 6.9 | Choose rooms by range, by tick list, or select all | Done |
 | 6.10 | Charge rent by the day instead of the full month, when chosen | Done |
+| 6.15 | Rent by the day applies to a batch as well as to a single bill | Done |
 | 6.12 | Detect a bill whose underlying data changed after it was issued | Done |
 | 6.13 | Correct a bill in one action — delete and regenerate | Done |
 | 6.14 | Print every bill for a month in one pass | Done |
 | 9.1 | One working month shared by the meter and bill pages | Done |
 | 9.2 | Open on the current month; never navigate past it | Done |
 | 9.3 | Look back at any earlier month's readings and bills | Done |
+| 9.4 | The room page names the month its meter and charges belong to, and can change it there | Done |
 | 6.11 | Printable bill | Done |
 
 ### Generating for several rooms

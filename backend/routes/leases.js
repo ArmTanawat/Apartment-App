@@ -73,7 +73,7 @@ router.get('/:id', (req, res) => {
   `).get(req.params.id);
 
   if (!lease) {
-    return res.status(404).json({ error: 'Lease not found' });
+    return res.status(404).json({ error: 'ไม่พบสัญญาเช่า' });
   }
 
   // The add-on fees for this lease, with the fee name joined in so the
@@ -93,17 +93,17 @@ router.post('/', (req, res) => {
   const { tenant_id, unit_id, start_date, end_date, monthly_rent, deposit } = req.body;
 
   if (!tenant_id || !unit_id || !start_date) {
-    return res.status(400).json({ error: 'Tenant, unit, and start date are required' });
+    return res.status(400).json({ error: 'ต้องระบุผู้เช่า ห้อง และวันเข้าอยู่' });
   }
 
   const tenant = db.prepare('SELECT * FROM tenants WHERE id = ?').get(tenant_id);
   if (!tenant) {
-    return res.status(400).json({ error: 'That tenant does not exist' });
+    return res.status(400).json({ error: 'ไม่พบผู้เช่ารายนี้' });
   }
 
   const unit = db.prepare('SELECT * FROM units WHERE id = ?').get(unit_id);
   if (!unit) {
-    return res.status(400).json({ error: 'That unit does not exist' });
+    return res.status(400).json({ error: 'ไม่พบห้องนี้' });
   }
 
   // THE DOUBLE-BOOKING CHECK.
@@ -129,7 +129,7 @@ router.post('/', (req, res) => {
   if (occupied) {
     const until = occupied.end_date ? ` (ถึง ${occupied.end_date})` : '';
     return res.status(400).json({
-      error: `Unit ${unit.unit_number} is already rented to ${occupied.full_name}${until}`
+      error: `ห้อง ${unit.unit_number} มีผู้เช่าอยู่แล้ว — ${occupied.full_name}${until}`
     });
   }
 
@@ -157,13 +157,13 @@ router.post('/', (req, res) => {
 router.put('/:id/end', (req, res) => {
   const lease = db.prepare('SELECT * FROM leases WHERE id = ?').get(req.params.id);
   if (!lease) {
-    return res.status(404).json({ error: 'Lease not found' });
+    return res.status(404).json({ error: 'ไม่พบสัญญาเช่า' });
   }
 
   const end_date = req.body.end_date || new Date().toISOString().slice(0, 10);
 
   if (end_date < lease.start_date) {
-    return res.status(400).json({ error: 'End date cannot be before the start date' });
+    return res.status(400).json({ error: 'วันที่ห้องว่างต้องไม่ก่อนวันเข้าอยู่' });
   }
 
   db.prepare('UPDATE leases SET end_date = ? WHERE id = ?').run(end_date, req.params.id);
@@ -176,13 +176,13 @@ router.put('/:id/end', (req, res) => {
 router.put('/:id', (req, res) => {
   const lease = db.prepare('SELECT * FROM leases WHERE id = ?').get(req.params.id);
   if (!lease) {
-    return res.status(404).json({ error: 'Lease not found' });
+    return res.status(404).json({ error: 'ไม่พบสัญญาเช่า' });
   }
 
   const { start_date, end_date, monthly_rent, deposit } = req.body;
 
   if (end_date && end_date < (start_date || lease.start_date)) {
-    return res.status(400).json({ error: 'End date cannot be before the start date' });
+    return res.status(400).json({ error: 'วันที่ห้องว่างต้องไม่ก่อนวันเข้าอยู่' });
   }
 
   // Only the fields supplied are changed; anything omitted keeps its old value.
@@ -192,6 +192,34 @@ router.put('/:id', (req, res) => {
   // would be read as "not supplied" and the old date would stay, leaving no
   // way to undo a move-out entered by mistake.
   const nextEnd = 'end_date' in req.body ? (end_date || null) : lease.end_date;
+  const nextStart = start_date ?? lease.start_date;
+
+  // THE SAME DOUBLE-BOOKING CHECK POST / RUNS, against the dates this update
+  // would leave behind.
+  //
+  // Without it, correcting a start date backwards walks this lease into the
+  // previous tenant's stay and nothing stops it — the room would then hold two
+  // overlapping leases, which is the one thing the schema cannot express and
+  // the whole reason the check exists on POST.
+  //
+  // Itself excluded, obviously. end_date is the day the room becomes free, so
+  // a lease ending on the 16th and one starting on the 16th do not overlap.
+  const clash = db.prepare(`
+    SELECT l.id, l.start_date, l.end_date, t.full_name
+    FROM leases l
+    JOIN tenants t ON t.id = l.tenant_id
+    WHERE l.unit_id = ?
+      AND l.id != ?
+      AND (l.end_date IS NULL OR l.end_date > ?)
+      AND (? IS NULL OR l.start_date < ?)
+  `).get(lease.unit_id, lease.id, nextStart, nextEnd, nextEnd);
+
+  if (clash) {
+    const until = clash.end_date ? ` (ถึง ${clash.end_date})` : '';
+    return res.status(400).json({
+      error: `ช่วงวันที่ทับกับสัญญาของ ${clash.full_name}${until}`
+    });
+  }
 
   db.prepare(`
     UPDATE leases
@@ -217,14 +245,14 @@ router.delete('/:id', (req, res) => {
 
   if (billCount > 0) {
     return res.status(400).json({
-      error: 'Cannot delete a lease that has bills. End the lease instead.'
+      error: 'ลบสัญญาเช่านี้ไม่ได้ เพราะมีบิลอ้างอิงอยู่ ถ้าผู้เช่าย้ายออกให้ใช้ปุ่มย้ายออกแทน'
     });
   }
 
   const result = db.prepare('DELETE FROM leases WHERE id = ?').run(req.params.id);
 
   if (result.changes === 0) {
-    return res.status(404).json({ error: 'Lease not found' });
+    return res.status(404).json({ error: 'ไม่พบสัญญาเช่า' });
   }
 
   res.status(204).send();

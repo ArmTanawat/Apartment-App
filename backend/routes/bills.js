@@ -6,6 +6,7 @@
 
 const express = require('express');
 const db = require('../db.js');
+const { FEE_BASIS } = require('../fee-basis.js');
 
 const router = express.Router();
 
@@ -99,7 +100,7 @@ router.get('/:id', (req, res) => {
   `).get(req.params.id);
 
   if (!bill) {
-    return res.status(404).json({ error: 'Bill not found' });
+    return res.status(404).json({ error: 'ไม่พบบิล' });
   }
 
   // The printable line items, exactly as they were when generated.
@@ -133,7 +134,7 @@ router.post('/', (req, res) => {
   const { lease_id, period } = req.body;
 
   if (!lease_id || !period) {
-    return res.status(400).json({ error: 'Lease and period are required' });
+    return res.status(400).json({ error: 'ต้องระบุสัญญาเช่าและงวด' });
   }
 
   const built = buildBill(lease_id, period, {
@@ -178,7 +179,7 @@ router.post('/', (req, res) => {
     res.status(201).json(bill);
   } catch (err) {
     if (err.message.includes('UNIQUE')) {
-      return res.status(400).json({ error: `A bill for ${period} already exists for this tenant` });
+      return res.status(400).json({ error: `ผู้เช่ารายนี้ออกบิลงวด ${period} ไปแล้ว` });
     }
     throw err;
   }
@@ -189,17 +190,22 @@ router.post('/', (req, res) => {
 // Takes { period, unit_ids: [1, 2, 3] } — the frontend turns a range, a tick
 // list, or select-all into that array, since all three produce the same thing.
 //
+// prorate_days is passed through to buildBill exactly as POST /bills passes it.
+// Without it, a run asked to charge 11 of 30 days would silently bill a full
+// month for every room — the screen would say one thing and the bill another.
+//
 // A room that cannot be billed does NOT stop the rest. Twenty rooms with two
 // missing readings produces eighteen bills and names the two, because failing
 // the whole run over one missing number would be miserable in real use.
 router.post('/batch', (req, res) => {
   const { period, unit_ids, prorate } = req.body;
+  const prorateDays = req.body.prorate_days ?? null;
 
   if (!period || !/^\d{4}-\d{2}$/.test(period)) {
-    return res.status(400).json({ error: 'Period must look like 2026-09' });
+    return res.status(400).json({ error: 'งวดต้องอยู่ในรูปแบบ 2026-09' });
   }
   if (!Array.isArray(unit_ids) || unit_ids.length === 0) {
-    return res.status(400).json({ error: 'Choose at least one room' });
+    return res.status(400).json({ error: 'เลือกห้องอย่างน้อยหนึ่งห้อง' });
   }
 
   const generated = [];
@@ -214,7 +220,7 @@ router.post('/batch', (req, res) => {
   for (const unitId of unit_ids) {
     const unit = db.prepare('SELECT * FROM units WHERE id = ?').get(unitId);
     if (!unit) {
-      skipped.push({ unit_id: unitId, unit_number: null, reason: 'Room not found' });
+      skipped.push({ unit_id: unitId, unit_number: null, reason: 'ไม่พบห้องนี้' });
       continue;
     }
 
@@ -233,7 +239,7 @@ router.post('/batch', (req, res) => {
     `).all(unitId, periodEnd, periodStart);
 
     if (leases.length === 0) {
-      skipped.push({ unit_id: unitId, unit_number: unit.unit_number, reason: 'No tenant' });
+      skipped.push({ unit_id: unitId, unit_number: unit.unit_number, reason: 'ไม่มีผู้เช่าเดือนนี้' });
       continue;
     }
 
@@ -249,13 +255,13 @@ router.post('/batch', (req, res) => {
           unit_id: unitId,
           unit_number: unit.unit_number,
           tenant_name: who ? who.full_name : null,
-          reason: `Already billed for ${period}`,
+          reason: `ออกบิลงวด ${period} ไปแล้ว`,
           bill_id: existing.id
         });
         continue;
       }
 
-      const built = buildBill(lease.id, period, { prorate: prorate === true });
+      const built = buildBill(lease.id, period, { prorate: prorate === true, prorateDays });
 
       if (built.error) {
         skipped.push({ unit_id: unitId, unit_number: unit.unit_number, reason: built.error });
@@ -309,12 +315,47 @@ router.post('/batch', (req, res) => {
   });
 });
 
+// GET /bills/example/water/8 — what 8 units would cost at today's rates.
+//
+// The settings screen shows a worked example beside the two rate rows, so the
+// figures can be checked against what a tenant will actually be charged. It
+// has no lease and no meter reading, so it cannot go through the preview
+// route — but it must not be a second copy of the arithmetic either, which is
+// why it lives here beside utilityCharge rather than on the client.
+//
+// Declared before '/:id' so "example" is not read as a bill id.
+router.get('/example/:kind/:units', (req, res) => {
+  const { kind } = req.params;
+  const used = Number(req.params.units);
+
+  if (kind !== 'water' && kind !== 'electricity') {
+    return res.status(400).json({ error: 'ต้องเป็น water หรือ electricity' });
+  }
+  if (!isFinite(used) || used < 0) {
+    return res.status(400).json({ error: 'จำนวนหน่วยต้องเป็นตัวเลขตั้งแต่ 0 ขึ้นไป' });
+  }
+
+  const rates = {};
+  db.prepare('SELECT key, value FROM settings').all()
+    .forEach(row => { rates[row.key] = Number(row.value); });
+
+  // The example explains what the rates mean, so the minimum always applies.
+  // Whether it applies to a given month is a separate switch on the bill page.
+  const charge = utilityCharge(
+    used,
+    rates[`${kind}_rate`], rates[`${kind}_min_units`], rates[`${kind}_min_amount`],
+    true, 0, used, false
+  );
+
+  res.json({ kind, units: used, amount: charge.amount, detail: charge.detail });
+});
+
 // DELETE /bills/5 — for a bill generated by mistake.
 // bill_items rows go with it via ON DELETE CASCADE.
 router.delete('/:id', (req, res) => {
   const result = db.prepare('DELETE FROM bills WHERE id = ?').run(req.params.id);
   if (result.changes === 0) {
-    return res.status(404).json({ error: 'Bill not found' });
+    return res.status(404).json({ error: 'ไม่พบบิล' });
   }
   res.status(204).send();
 });
@@ -330,7 +371,7 @@ function buildBill(leaseId, period, options = {}) {
   const { prorate = false, prorateDays = null } = options;
 
   if (!/^\d{4}-\d{2}$/.test(period)) {
-    return { error: 'Period must look like 2026-08' };
+    return { error: 'งวดต้องอยู่ในรูปแบบ 2026-08' };
   }
 
   const lease = db.prepare(`
@@ -342,7 +383,7 @@ function buildBill(leaseId, period, options = {}) {
   `).get(leaseId);
 
   if (!lease) {
-    return { error: 'That lease does not exist' };
+    return { error: 'ไม่พบสัญญาเช่านี้' };
   }
 
   const reading = db.prepare(`
@@ -350,7 +391,7 @@ function buildBill(leaseId, period, options = {}) {
   `).get(lease.unit_id, period);
 
   if (!reading) {
-    return { error: `No meter reading entered for unit ${lease.unit_number} in ${period}` };
+    return { error: `ห้อง ${lease.unit_number} ยังไม่ได้จดมิเตอร์งวด ${period}` };
   }
 
   // Rates are read now and their result frozen onto the bill. A later rate
@@ -397,20 +438,23 @@ function buildBill(leaseId, period, options = {}) {
     const days = prorateDays ?? totalDays;
 
     if (days < 1 || days > totalDays) {
-      return { error: `Days must be between 1 and ${totalDays} for ${period}` };
+      return { error: `จำนวนวันต้องอยู่ระหว่าง 1 ถึง ${totalDays} สำหรับงวด ${period}` };
     }
 
     rent_amount = money(lease.monthly_rent / totalDays * days);
     rentDetail = `ห้อง ${lease.unit_number} — คิด ${days} จาก ${totalDays} วัน`;
   }
 
-  const recurringFees = db.prepare(`
-    SELECT lf.amount, ft.name
+  const allRecurring = db.prepare(`
+    SELECT lf.amount, lf.percent_of, lf.percent, ft.name
     FROM lease_fees lf
     JOIN fee_types ft ON ft.id = lf.fee_type_id
     WHERE lf.lease_id = ?
     ORDER BY ft.name
   `).all(leaseId);
+
+  const recurringFees = allRecurring.filter(f => !f.percent_of);
+  const shareFees = allRecurring.filter(f => f.percent_of);
 
   // Only charges filed under THIS period. Last month's repair does not reappear.
   const oneTimeCharges = db.prepare(`
@@ -419,9 +463,47 @@ function buildBill(leaseId, period, options = {}) {
     ORDER BY id
   `).all(leaseId, period);
 
-  const fees_amount = money(
+  const fixed_amount = money(
     recurringFees.reduce((sum, f) => sum + f.amount, 0) +
     oneTimeCharges.reduce((sum, c) => sum + c.amount, 0)
+  );
+
+  // A fee can be a share of something else on this bill rather than a fixed
+  // amount — a service charge that moves with the electricity, say.
+  //
+  // Every basis here is a figure already worked out above, and `subtotal`
+  // deliberately excludes the shares themselves. That is what keeps this well
+  // defined: two shares on one bill are both a share of the same figure, and
+  // neither depends on which was worked out first. Letting one share count
+  // another would make the answer depend on the order, and on a bill nobody
+  // would be able to tell which order it had been.
+  const basisAmount = {
+    water: water_amount,
+    electricity: elec_amount,
+    rent: rent_amount,
+    utilities: money(water_amount + elec_amount),
+    subtotal: money(rent_amount + water_amount + elec_amount + fixed_amount),
+  };
+
+  // A share prints as a plain monthly fee, the same as a fixed one. The
+  // working is deliberately left off: what the tenant is being asked to pay is
+  // the amount, and the arrangement behind it is between them and the owner.
+  //
+  // This is the one line on a bill that does not show how it was reached. The
+  // basis it was a share of — and, for `subtotal`, which figures went into it
+  // — cannot be recovered from the bill afterwards, only from the fee that was
+  // attached to the lease at the time.
+  const shareItems = shareFees.map(f => {
+    const from = basisAmount[f.percent_of] ?? 0;
+    return {
+      label: f.name,
+      detail: 'รายเดือน Monthly',
+      amount: money(from * f.percent / 100),
+    };
+  });
+
+  const fees_amount = money(
+    fixed_amount + shareItems.reduce((sum, i) => sum + i.amount, 0)
   );
 
   const total = money(rent_amount + water_amount + elec_amount + fees_amount);
@@ -439,7 +521,9 @@ function buildBill(leaseId, period, options = {}) {
     { label: 'ค่าน้ำ Water', detail: water.detail, amount: water_amount },
     { label: 'ค่าไฟ Electricity', detail: elec.detail, amount: elec_amount },
     ...recurringFees.map(f => ({ label: f.name, detail: 'รายเดือน Monthly', amount: money(f.amount) })),
-    ...oneTimeCharges.map(c => ({ label: c.description, detail: 'ครั้งเดียว One-time', amount: money(c.amount) }))
+    ...oneTimeCharges.map(c => ({ label: c.description, detail: 'ครั้งเดียว One-time', amount: money(c.amount) })),
+    // Last, after the lines they are a share of.
+    ...shareItems
   ];
 
   return {

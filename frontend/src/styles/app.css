@@ -1,0 +1,376 @@
+/* Lifted verbatim from prototype/rooms.html (the <style> block, lines 11-373).
+   The design tokens at the top stay CSS variables: every colour in the app
+   reads from them, which is what made trying four palettes in an afternoon
+   possible. Nothing here is restyled. */
+
+:root{
+  --paper:#FCFCFC; --surface:#FFFFFF; --ink:#1A1A1A; --muted:#8C8C8C;
+  --line:#E4E4E4; --occupied:#2E7D46; --vacant:#B3382C; --soft:#F0F0F0;
+  /* Not a third room state — colour still answers only "is anyone living
+     here". This is the banner that says a saved bill no longer matches its
+     data, which needs to be noticed and is not about a room at all. .stale
+     already asked for --attention and the yellow was hardcoded beside it. */
+  --attention:#C9A227; --attention-soft:#FFF8E6;
+}
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--paper); color:var(--ink);
+  font-family:"Noto Sans Thai","Sarabun",system-ui,sans-serif;
+  line-height:1.75; font-size:15px;
+}
+.num{font-family:"Roboto Mono",ui-monospace,monospace; font-variant-numeric:tabular-nums;
+  font-feature-settings:"zero" 0}
+button{font-family:inherit}
+.app{display:grid; grid-template-columns:200px 1fr; min-height:100vh}
+
+/* ---------- rail ---------- */
+.rail{border-right:1px solid var(--line); padding:24px 0; background:var(--surface)}
+.brand{padding:0 20px 24px; font-weight:700; font-size:18px; line-height:1.4}
+.brand small{display:block; font-weight:400; font-size:13px; color:var(--muted); line-height:1.5}
+.nav{display:flex; flex-direction:column; gap:2px; padding:0 12px}
+.nav a{display:flex; align-items:center; gap:10px; padding:9px 12px; border-radius:8px;
+  color:var(--muted); text-decoration:none; font-size:15px}
+.nav a:hover{background:var(--soft); color:var(--ink)}
+.nav a.on{background:var(--ink); color:#fff; font-weight:500}
+.dotnav{width:6px; height:6px; border-radius:50%; background:currentColor; opacity:.55}
+
+/* ---------- shared ---------- */
+.main{padding:28px 32px 64px; max-width:1180px}
+.head{display:flex; align-items:flex-end; justify-content:space-between; gap:24px}
+h1{font-size:32px; font-weight:700; margin:0; line-height:1.4}
+.sub{color:var(--muted); font-size:15px; margin:2px 0 24px}
+.tools{display:flex; align-items:center; gap:8px}
+.monthwrap{position:relative}
+.month{display:flex; align-items:center; gap:4px; background:var(--surface);
+  border:1px solid var(--line); border-radius:8px; padding:6px 8px}
+.monthlabel{border:0; background:none; color:var(--ink); font-family:inherit; font-size:15px;
+  cursor:pointer; padding:2px 6px; border-radius:6px; min-width:132px; text-align:center}
+.monthlabel:hover{background:var(--soft)}
+.monthmenu{position:absolute; top:calc(100% + 5px); right:0; z-index:15; background:var(--surface);
+  border:1px solid var(--line); border-radius:8px; padding:5px; min-width:190px;
+  max-height:288px; overflow:auto; box-shadow:0 4px 16px rgba(0,0,0,.1)}
+.monthopt{display:flex; justify-content:space-between; align-items:center; gap:10px; width:100%;
+  border:0; background:none; font-family:inherit; font-size:14px; color:var(--ink);
+  padding:7px 10px; border-radius:6px; cursor:pointer; text-align:left}
+.monthopt:hover{background:var(--soft)}
+.monthopt.on{background:var(--ink); color:#fff}
+.monthopt .now{font-size:11px; color:var(--muted)}
+.monthopt.on .now{color:rgba(255,255,255,.6)}
+.month button{border:0; background:none; color:var(--muted); cursor:pointer; font-size:16px;
+  line-height:1; padding:2px 5px; border-radius:4px}
+.month button:hover:not([disabled]){background:var(--soft); color:var(--ink)}
+.month button[disabled]{pointer-events:none}
+.iconbtn{width:38px; height:38px; border:1px solid var(--line); background:var(--surface);
+  border-radius:8px; cursor:pointer; font-size:16px; color:var(--muted); line-height:1}
+.iconbtn:hover{border-color:var(--ink); color:var(--ink)}
+.iconbtn.on{background:var(--ink); border-color:var(--ink); color:#fff}
+
+.btn{border:1px solid var(--ink); background:var(--ink); color:#fff; border-radius:8px;
+  padding:9px 16px; font-size:15px; cursor:pointer}
+.btn:hover{opacity:.85}
+.btn.ghost{background:var(--surface); color:var(--ink)}
+.btn.ghost:hover{background:var(--soft); opacity:1}
+.btn.quiet{background:var(--surface); color:var(--muted); border-color:var(--line)}
+.btn.quiet:hover{border-color:var(--ink); color:var(--ink); background:var(--surface)}
+.btn.danger{background:var(--surface); color:var(--vacant); border-color:var(--line)}
+.btn.danger:hover{border-color:var(--vacant); background:var(--surface); opacity:1}
+.btn:disabled{opacity:.4; cursor:not-allowed}
+
+/* ---------- board ---------- */
+.filters{display:flex; gap:8px; margin-bottom:22px; flex-wrap:wrap}
+.chip{border:1px solid var(--line); background:var(--surface); color:var(--muted);
+  border-radius:8px; padding:7px 14px; font-size:14px; cursor:pointer}
+.chip:hover{border-color:var(--ink); color:var(--ink)}
+.chip.on{background:var(--ink); border-color:var(--ink); color:#fff; font-weight:500}
+.chip .n{opacity:.7; margin-left:6px}
+
+.floor{margin-bottom:26px}
+.floorlab{font-size:13px; color:var(--muted); margin-bottom:10px; display:flex;
+  align-items:center; gap:10px}
+.floorlab::after{content:""; flex:1; height:1px; background:var(--line)}
+.grid{display:grid; grid-template-columns:repeat(10,minmax(0,1fr)); gap:8px}
+@media (max-width:1100px){.grid{grid-template-columns:repeat(auto-fill,minmax(86px,1fr))}}
+
+.room{background:var(--surface); border:1px solid var(--line); border-left:3px solid var(--vacant);
+  border-radius:8px; padding:9px 9px 8px; cursor:pointer; text-align:left;
+  transition:transform .12s, border-color .12s;
+  display:flex; flex-direction:column; gap:1px; min-height:76px; overflow:hidden}
+.room:hover{transform:translateY(-1px); border-color:var(--ink)}
+.room.occ{border-left-color:var(--occupied)}
+.room.soon{border-left-style:dashed}
+.leaving{color:var(--ink); font-weight:500}
+.rno{font-size:17px; font-weight:500; line-height:1.3}
+.rname{font-size:12px; line-height:1.45; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.rvac{font-size:12px; line-height:1.45; color:var(--vacant)}
+.rfoot{margin-top:auto; display:flex; align-items:center; gap:4px; font-size:11px;
+  color:var(--muted); height:14px}
+.dot{width:5px; height:5px; border-radius:50%; flex:none}
+.dot.full{background:var(--muted)}
+.dot.open{border:1px solid var(--muted)}
+
+.addcard{background:var(--soft); border:1px dashed var(--line); border-radius:8px;
+  min-height:76px; cursor:pointer; color:var(--muted); font-size:22px; line-height:1;
+  display:flex; align-items:center; justify-content:center}
+.addcard:hover{border-color:var(--ink); color:var(--ink)}
+.addfloor{margin-top:4px}
+
+.legend{display:flex; gap:20px; flex-wrap:wrap; font-size:13px; color:var(--muted);
+  border-top:1px solid var(--line); padding-top:16px}
+.legend span{display:flex; align-items:center; gap:7px}
+.swatch{width:10px; height:10px; border-radius:2px}
+
+/* ---------- room page ---------- */
+.back{border:0; background:none; color:var(--muted); cursor:pointer; font-size:14px;
+  padding:0; margin-bottom:14px}
+.back:hover{color:var(--ink)}
+.roomhead{display:flex; align-items:flex-start; justify-content:space-between; gap:20px}
+.roomtitle{display:flex; align-items:baseline; gap:14px}
+.roomtitle h1{font-size:38px}
+.tag{font-size:13px; padding:3px 10px; border-radius:999px; border:1px solid}
+.tag.occ{color:var(--occupied); border-color:var(--occupied)}
+.tag.vac{color:var(--vacant); border-color:var(--vacant)}
+
+.cards{display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:22px; align-items:start}
+@media (max-width:900px){.cards{grid-template-columns:1fr}}
+.card{background:var(--surface); border:1px solid var(--line); border-radius:8px; padding:18px 20px}
+.card h2{font-size:15px; font-weight:500; margin:0 0 14px; display:flex;
+  align-items:center; justify-content:space-between; gap:10px}
+/* A heading that names its งวด keeps the label against the title and pushes
+   only the action to the right. */
+.card h2 .period{margin-right:auto; color:var(--muted); font-weight:400}
+.card h2 button{font-size:13px}
+.kv{display:grid; grid-template-columns:auto 1fr; gap:6px 16px; font-size:14px}
+.kv dt{color:var(--muted)}
+.kv dd{margin:0; text-align:right}
+.rowlist{font-size:14px}
+.rowitem{display:flex; justify-content:space-between; gap:12px; padding:7px 0;
+  border-bottom:1px solid var(--line)}
+.rowitem:last-child{border-bottom:0}
+.rowitem small{color:var(--muted); font-size:12px; display:block; line-height:1.5}
+.none{color:var(--muted); font-size:14px}
+.linkbtn{border:0; background:none; color:var(--muted); cursor:pointer; font-size:13px; padding:0}
+.linkbtn:hover{color:var(--ink); text-decoration:underline}
+.linkbtn.danger:hover{color:var(--vacant)}
+.actions{display:flex; gap:8px; margin-top:16px; flex-wrap:wrap}
+
+/* ---------- meter table ---------- */
+.mtable{width:100%; max-width:680px; border-collapse:collapse; font-size:14px;
+  background:var(--surface); border:1px solid var(--line); border-radius:8px; overflow:hidden}
+.mtable th{font-weight:500; font-size:12px; color:var(--muted); text-align:left;
+  padding:10px 12px; border-bottom:1px solid var(--line); white-space:nowrap}
+.mtable th.r{text-align:right}
+.mtable th.c{text-align:center}
+.mtable td{padding:7px 12px; border-bottom:1px solid var(--line); vertical-align:middle}
+.mtable tr:last-child td{border-bottom:0}
+.mtable tr:hover td{background:#FAFAFA}
+.frow td{background:var(--paper) !important; color:var(--muted); font-size:11px;
+  letter-spacing:.04em; padding:7px 12px; border-bottom:1px solid var(--line)}
+.frow:hover td{background:var(--paper) !important}
+.mno{font-size:15px; font-weight:500}
+.mname{color:var(--ink); font-size:13px; max-width:150px; overflow:hidden;
+  text-overflow:ellipsis; white-space:nowrap}
+.mprev{color:var(--ink); text-align:right; width:72px; white-space:nowrap}
+.marrow{color:#D8D8D8; padding:0 !important; width:18px; text-align:center; font-size:12px}
+.mcell{width:88px; padding-left:4px !important}
+.mcell input{width:100%; padding:6px 8px; border:1px solid var(--line); border-radius:6px;
+  font-family:"Roboto Mono",monospace; font-variant-numeric:tabular-nums;
+  font-size:14px; text-align:right; background:var(--surface); color:var(--ink)}
+.mcell input:focus{outline:2px solid var(--ink); outline-offset:-1px; border-color:transparent}
+.mcell input.bad{border-color:var(--vacant); background:#FDF6F5}
+.munit{width:56px; text-align:right; color:var(--ink); font-size:13px;
+  font-family:"Roboto Mono",monospace; font-variant-numeric:tabular-nums}
+.munit b{color:var(--ink); font-weight:500}
+.mstat{width:168px; text-align:right; font-size:12px; color:var(--ink);
+  white-space:nowrap; padding-right:14px !important}
+.mstat.ok{color:var(--occupied)}
+.mstat.no{color:var(--vacant)}
+.mprogress{display:flex; align-items:center; gap:12px; margin-bottom:18px}
+.bar{flex:1; max-width:280px; height:5px; background:var(--line); border-radius:3px; overflow:hidden}
+.bar i{display:block; height:100%; background:var(--occupied)}
+.editprev{border:0; background:none; color:var(--muted); cursor:pointer; font-size:11px;
+  padding:0 0 0 4px}
+.editprev:hover{color:var(--ink); text-decoration:underline}
+.switch{display:inline-flex; align-items:center; gap:9px; font-size:14px;
+  color:var(--muted); cursor:pointer; user-select:none; padding:6px 4px 6px 10px;
+  border:0; background:none; font-family:inherit}
+.switch:hover{color:var(--ink)}
+.track{width:36px; height:20px; border-radius:999px; background:var(--line);
+  position:relative; transition:background .15s; flex:none}
+.track i{position:absolute; top:2px; left:2px; width:16px; height:16px; border-radius:50%;
+  background:var(--surface); box-shadow:0 1px 2px rgba(0,0,0,.2); transition:left .15s}
+.switch.on .track{background:var(--ink)}
+.switch.on .track i{left:18px}
+.switch.on{color:var(--ink)}
+
+/* stacked water/electricity rows inside one room row */
+.mtable td.roomcell{border-right:1px solid var(--line); width:150px; padding-left:14px}
+.mtable td.statcell{border-left:1px solid var(--line)}
+.mlab{font-size:12px; color:var(--ink); width:34px; padding-left:14px !important}
+.mtable tr.sub td{border-bottom:0; padding-top:6px; padding-bottom:6px}
+.mtable tr.sub.last td{border-bottom:1px solid var(--line); padding-bottom:9px}
+.mtable tr.sub:not(.last) td{padding-top:9px}
+.rollnote{font-size:10px; color:var(--muted); display:block; line-height:1.3;
+  font-family:"Noto Sans Thai",sans-serif}
+.fixhead{display:block; color:var(--vacant); margin-bottom:5px}
+.fixrow{display:flex; gap:5px; margin-top:4px; align-items:center; justify-content:flex-end}
+.fixlab{font-size:11px; color:var(--ink); width:20px; text-align:right}
+.fixrow button{font-size:11px; padding:3px 8px; border:1px solid var(--line);
+  background:var(--surface); border-radius:6px; cursor:pointer; color:var(--ink)}
+.fixrow button:hover{border-color:var(--ink)}
+
+/* ---------- tenants ---------- */
+.search{display:flex; align-items:center; gap:8px; background:var(--surface);
+  border:1px solid var(--line); border-radius:8px; padding:8px 12px; max-width:300px}
+.search input{border:0; outline:0; font-family:inherit; font-size:15px; width:100%;
+  background:none; color:var(--ink)}
+.search span{color:var(--muted); font-size:14px}
+.ttable{width:100%; max-width:900px; border-collapse:collapse; font-size:14px;
+  background:var(--surface); border:1px solid var(--line); border-radius:8px; overflow:hidden}
+.ttable th{font-weight:500; font-size:12px; color:var(--muted); text-align:left;
+  padding:10px 14px; border-bottom:1px solid var(--line); white-space:nowrap}
+.ttable td{padding:11px 14px; border-bottom:1px solid var(--line); vertical-align:top}
+.ttable tr:last-child td{border-bottom:0}
+.ttable tbody tr{cursor:pointer}
+.ttable tbody tr:hover td{background:#FAFAFA}
+.tname{font-weight:500}
+.tmiss{color:var(--vacant); font-size:12px; display:block; line-height:1.5}
+.roomtag{display:inline-block; font-family:"Roboto Mono",monospace; font-size:12px;
+  border:1px solid var(--line); border-radius:5px; padding:1px 7px; margin:0 3px 3px 0}
+.roomtag.past{color:var(--muted); border-style:dashed}
+.tdim{color:var(--muted)}
+
+/* ---------- settings ---------- */
+.setwrap{max-width:640px}
+.setcard{background:var(--surface); border:1px solid var(--line); border-radius:8px;
+  padding:20px 22px; margin-bottom:16px}
+.setcard h2{font-size:16px; font-weight:500; margin:0 0 4px}
+.setcard .lead{color:var(--muted); font-size:13px; margin:0 0 16px; line-height:1.6}
+.rateline{display:flex; align-items:center; gap:10px; margin-bottom:10px; font-size:14px}
+.rateline label{color:var(--muted); min-width:120px}
+.rateline input{width:84px; padding:7px 10px; border:1px solid var(--line); border-radius:7px;
+  font-family:"Roboto Mono",monospace; font-variant-numeric:tabular-nums;
+  font-size:14px; text-align:right; background:var(--surface); color:var(--ink)}
+.rateline input:focus{outline:2px solid var(--ink); outline-offset:-1px; border-color:transparent}
+.rateline span{color:var(--muted); font-size:13px}
+.example{background:var(--soft); border-radius:7px; padding:12px 14px; margin-top:14px;
+  font-size:14px; display:flex; align-items:center; gap:10px; flex-wrap:wrap}
+.example input{width:64px; padding:5px 9px; border:1px solid var(--line); border-radius:6px;
+  font-family:"Roboto Mono",monospace; text-align:right; font-size:14px;
+  background:var(--surface); color:var(--ink)}
+.example b{font-family:"Roboto Mono",monospace; font-variant-numeric:tabular-nums; font-size:16px}
+.ftable{width:100%; border-collapse:collapse; font-size:14px}
+.ftable th{font-size:12px; color:var(--muted); font-weight:500; text-align:left;
+  padding:0 0 8px; border-bottom:1px solid var(--line)}
+.ftable th.r{text-align:right}
+.ftable td{padding:10px 0; border-bottom:1px solid var(--line)}
+.ftable tr:last-child td{border-bottom:0}
+.ftable td.r{text-align:right}
+.retired{color:var(--muted)}
+.retired .fname{text-decoration:line-through}
+.bklist{font-size:13px}
+.bkrow{display:flex; justify-content:space-between; padding:6px 0;
+  border-bottom:1px solid var(--line); color:var(--muted)}
+.bkrow:last-child{border-bottom:0}
+.bkrow b{color:var(--ink); font-weight:400; font-family:"Roboto Mono",monospace}
+
+/* ---------- bills ---------- */
+.billwrap{max-width:760px}
+.pickgrid{display:grid; grid-template-columns:repeat(auto-fill,minmax(92px,1fr)); gap:6px}
+.floorpick{margin:12px 0}
+.floorpicklab{display:flex; align-items:center; gap:10px; font-size:12px; color:var(--muted); margin-bottom:6px}
+.floorpicklab::after{content:""; flex:1; height:1px; background:var(--line); order:1}
+.floorpicklab button{order:2; font-size:12px}
+.pick{display:flex; align-items:center; gap:6px; border:1px solid var(--line); background:var(--surface);
+  border-radius:7px; padding:6px 8px; cursor:pointer; font-size:13px; font-family:inherit; color:var(--ink)}
+.pick:hover{border-color:var(--ink)}
+.pick.on{border-color:var(--ink); background:var(--soft)}
+.pick.gone{opacity:.45; cursor:not-allowed}
+.pick .box{width:13px; height:13px; border:1.5px solid var(--line); border-radius:3px; flex:none}
+.pick.on .box{background:var(--ink); border-color:var(--ink)}
+.pick .rn{font-family:"Roboto Mono",monospace; font-size:13px}
+.rangebar{display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:14px; color:var(--muted)}
+.rangebar input{width:74px; padding:6px 9px; border:1px solid var(--line); border-radius:7px;
+  font-family:"Roboto Mono",monospace; text-align:center; font-size:14px;
+  background:var(--surface); color:var(--ink)}
+.pvtable{width:100%; border-collapse:collapse; font-size:13px; margin-top:12px}
+.pvtable th{font-size:11px; color:var(--muted); font-weight:500; text-align:left;
+  padding:0 8px 7px 0; border-bottom:1px solid var(--line)}
+.pvtable th.r{text-align:right}
+.pvtable td{padding:8px 8px 8px 0; border-bottom:1px solid var(--line)}
+.pvtable td.r{text-align:right; font-family:"Roboto Mono",monospace; font-variant-numeric:tabular-nums}
+.pvtable tr.sum td{border-bottom:0; font-weight:500; padding-top:11px}
+.pvtable td.bad{color:var(--vacant)}
+.result{border:1px solid var(--line); border-radius:8px; padding:14px 16px; margin-top:14px; font-size:14px}
+.result h4{margin:0 0 8px; font-size:15px; font-weight:500}
+.result .skip{color:var(--vacant); font-size:13px; margin-top:8px; line-height:1.7}
+.blist{width:100%; border-collapse:collapse; font-size:14px}
+.blist th{font-size:12px; color:var(--muted); font-weight:500; text-align:left;
+  padding:0 0 9px; border-bottom:1px solid var(--line)}
+.blist th.r{text-align:right}
+.blist td{padding:11px 0; border-bottom:1px solid var(--line)}
+.blist tr:last-child td{border-bottom:0}
+.blist td.r{text-align:right}
+.blist tbody tr{cursor:pointer}
+.blist tbody tr:hover td{background:#FAFAFA}
+
+/* one bill */
+.paper{background:var(--surface); border:1px solid var(--line); border-radius:8px;
+  padding:32px 36px; max-width:640px}
+.phead{display:flex; justify-content:space-between; gap:24px; border-bottom:2px solid var(--ink);
+  padding-bottom:16px; margin-bottom:18px}
+.phead h2{margin:0 0 4px; font-size:20px; font-weight:700}
+.phead .small{font-size:13px; color:var(--muted); line-height:1.7}
+.pto{display:grid; grid-template-columns:auto 1fr; gap:4px 14px; font-size:14px; margin-bottom:20px}
+.pto dt{color:var(--muted)}
+.pto dd{margin:0}
+.pitems{width:100%; border-collapse:collapse; font-size:14px}
+.pitems th{font-size:12px; color:var(--muted); font-weight:500; text-align:left;
+  padding:0 0 8px; border-bottom:1px solid var(--line)}
+.pitems th.r{text-align:right}
+.pitems td{padding:9px 0; border-bottom:1px solid var(--line); vertical-align:top}
+.pitems td small{display:block; color:var(--muted); font-size:12px; line-height:1.6}
+.pitems td.r{text-align:right; font-family:"Roboto Mono",monospace;
+  font-variant-numeric:tabular-nums; white-space:nowrap; padding-left:14px}
+.pitems tr.total td{border-bottom:0; border-top:2px solid var(--ink);
+  font-weight:700; font-size:16px; padding-top:12px}
+.pfoot{margin-top:24px; padding-top:16px; border-top:1px solid var(--line);
+  font-size:13px; color:var(--muted); line-height:1.8}
+.pfoot b{color:var(--ink); font-weight:500}
+.papers .paper{margin-bottom:20px}
+.stale{background:var(--attention-soft); border:1px solid var(--attention); border-radius:8px;
+  padding:14px 16px; margin-bottom:16px; font-size:14px; line-height:1.7; max-width:640px}
+.diff{font-size:13px; margin:8px 0 0; padding-left:0; list-style:none}
+.diff li{padding:3px 0; color:var(--muted)}
+.diff b{color:var(--ink); font-family:"Roboto Mono",monospace}
+
+@media print{
+  .rail, .head, .sub, .stale, .noprint{display:none !important}
+  .app{display:block}
+  .main{padding:0; max-width:none}
+  .paper{border:0; padding:0; max-width:none}
+  /* One invoice per sheet when several print together. Saving the result as a
+     PDF is the browser's own Print dialog, not something built here. */
+  .paper + .paper{page-break-before:always}
+  body{background:#fff}
+}
+
+/* ---------- form + modal ---------- */
+.field{margin-bottom:14px}
+.field label{display:block; font-size:13px; color:var(--muted); margin-bottom:4px}
+.field input,.field select{width:100%; padding:9px 11px; border:1px solid var(--line);
+  border-radius:8px; font-size:15px; font-family:inherit; background:var(--surface); color:var(--ink)}
+.field input:focus,.field select:focus{outline:2px solid var(--ink); outline-offset:-1px; border-color:transparent}
+.field .hint{font-size:12px; color:var(--muted); margin-top:4px; line-height:1.5}
+.two{display:grid; grid-template-columns:1fr 1fr; gap:12px}
+
+.veil{position:fixed; inset:0; background:rgba(0,0,0,.28); display:flex;
+  align-items:center; justify-content:center; padding:24px; z-index:20}
+.modal{background:var(--surface); border-radius:10px; padding:24px; width:100%;
+  max-width:440px; max-height:88vh; overflow:auto}
+.modal h3{margin:0 0 4px; font-size:19px; font-weight:700}
+.modal .lead{color:var(--muted); font-size:14px; margin:0 0 18px; line-height:1.6}
+.modal .actions{justify-content:flex-end; margin-top:20px}
+.err{background:#FBF0EF; border:1px solid var(--vacant); color:var(--vacant);
+  border-radius:8px; padding:10px 12px; font-size:14px; margin-bottom:14px; line-height:1.6}
+.warn{background:var(--soft); border:1px solid var(--line); border-radius:8px;
+  padding:10px 12px; font-size:13px; color:var(--muted); margin-bottom:14px; line-height:1.6}

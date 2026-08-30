@@ -33,7 +33,7 @@ router.post('/', (req, res) => {
   const file = runBackup();
 
   if (!file) {
-    return res.status(400).json({ error: 'There is no database to back up yet' });
+    return res.status(400).json({ error: 'ยังไม่มีฐานข้อมูลให้สำรอง' });
   }
 
   const backups = listBackups();
