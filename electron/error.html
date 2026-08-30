@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<title>เปิดโปรแกรมไม่สำเร็จ</title>
+<style>
+/* The same tokens the app uses, kept here rather than linked: this page has to
+   work when nothing else has started. */
+:root{ --paper:#FCFCFC; --surface:#FFFFFF; --ink:#1A1A1A; --muted:#8C8C8C;
+       --line:#E4E4E4; --vacant:#B3382C; --soft:#F0F0F0; }
+*{box-sizing:border-box}
+body{margin:0; background:var(--paper); color:var(--ink); line-height:1.75; font-size:15px;
+  font-family:"Noto Sans Thai","Sarabun",system-ui,sans-serif;
+  display:flex; align-items:center; justify-content:center; min-height:100vh; padding:32px}
+.box{background:var(--surface); border:1px solid var(--line); border-radius:8px;
+  padding:32px 36px; max-width:520px}
+h1{font-size:26px; font-weight:700; margin:0 0 6px; line-height:1.4}
+.what{color:var(--vacant); font-size:16px; margin:0 0 18px; line-height:1.7}
+.lead{color:var(--muted); font-size:14px; margin:0 0 22px; line-height:1.7}
+.actions{display:flex; gap:8px; flex-wrap:wrap}
+button{font-family:inherit; font-size:15px; border-radius:8px; padding:9px 16px; cursor:pointer;
+  border:1px solid var(--ink); background:var(--ink); color:#fff}
+button:hover{opacity:.85}
+button.quiet{background:var(--surface); color:var(--muted); border-color:var(--line)}
+button.quiet:hover{border-color:var(--ink); color:var(--ink); opacity:1}
+button:disabled{opacity:.4; cursor:not-allowed}
+.help{margin:22px 0 0; padding-top:16px; border-top:1px solid var(--line);
+  color:var(--muted); font-size:13px; line-height:1.8}
+</style>
+</head>
+<body>
+<div class="box">
+  <h1>เปิดโปรแกรมไม่สำเร็จ</h1>
+  <p class="what" id="what"></p>
+  <p class="lead" id="lead"></p>
+  <div class="actions">
+    <button id="retry">ลองใหม่</button>
+    <button class="quiet" id="log">ดูบันทึกปัญหา</button>
+  </div>
+  <p class="help">ถ้าลองใหม่แล้วยังไม่ได้ ให้ปิดโปรแกรมทั้งหมดแล้วเปิดเครื่องใหม่อีกครั้ง
+    ถ้ายังเหมือนเดิม กดดูบันทึกปัญหาแล้วส่งไฟล์นั้นให้คนที่ดูแลโปรแกรม
+    ข้อมูลห้อง ผู้เช่า และบิลทั้งหมดยังอยู่ครบ ไม่ได้หายไปไหน</p>
+</div>
+<script>
+  const REASONS = {
+    port: ['เปิดช่องทางเชื่อมต่อภายในเครื่องไม่ได้',
+      'อาจมีโปรแกรมนี้เปิดค้างอยู่อีกหน้าต่างหนึ่ง หรือมีโปรแกรมอื่นใช้ช่องทางเดียวกันอยู่ ลองปิดให้หมดแล้วกดลองใหม่'],
+    database: ['เปิดไฟล์ข้อมูลไม่ได้',
+      'ไฟล์ข้อมูลอาจกำลังถูกโปรแกรมอื่นใช้อยู่ หรือไฟล์เสียหาย ถ้ากดลองใหม่แล้วยังไม่ได้ ยังมีสำเนาสำรองอยู่ในเครื่อง ให้คนที่ดูแลโปรแกรมช่วยกู้กลับมาได้'],
+    crashed: ['ตัวโปรแกรมส่วนหลังหยุดทำงานกะทันหัน',
+      'ยังไม่ทราบสาเหตุแน่ชัด กดลองใหม่ได้เลย ส่วนใหญ่ครั้งที่สองจะเปิดได้ตามปกติ'],
+  };
+  const reason = new URLSearchParams(location.search).get('reason') || 'crashed';
+  const [what, lead] = REASONS[reason] || REASONS.crashed;
+  document.getElementById('what').textContent = what;
+  document.getElementById('lead').textContent = lead;
+
+  const retry = document.getElementById('retry');
+  retry.addEventListener('click', async () => {
+    retry.disabled = true;
+    retry.textContent = 'กำลังลองใหม่…';
+    await window.startup.retry();
+    // If it worked this page is gone. If it did not, main reloads this page
+    // with whatever went wrong the second time.
+    retry.disabled = false;
+    retry.textContent = 'ลองใหม่';
+  });
+  document.getElementById('log').addEventListener('click', () => window.startup.openLog());
+</script>
+</body>
+</html>

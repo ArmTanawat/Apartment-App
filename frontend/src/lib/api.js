@@ -1,11 +1,15 @@
 /* api.js — the one place that knows where the server is.
  *
- * Electron will later start the Express server as a child process and open a
- * window at localhost, so every URL in the app has to keep working. That is
- * what this constant is for: changing it is a one-line edit.
+ * Nowhere, as it turns out. Express serves the built pages itself, so the app
+ * and the API are one origin and every request is a relative path — which is
+ * what makes the port the OS happens to hand the packaged app irrelevant here.
+ *
+ * In development Vite serves the pages on 5173 and proxies these paths to the
+ * server on 3001, so the same relative paths work there too. The constant
+ * stays because it is still the one place that would change.
  */
 
-export const API_BASE = 'http://localhost:3001';
+export const API_BASE = '';
 
 /* Two kinds of failure, and they are not the same thing.
  *

@@ -3,14 +3,28 @@
 Running notes on porting the prototype to React and wiring it to the backend.
 Written so a fresh session can continue from this file alone.
 
-**Status: Phase 1 (port) and Phase 2 (wire to the API) are both complete, and
-the seven questions they raised have been answered and acted on.** The React
-app in `frontend/` runs every screen against the real backend. `fetch` appears
-in exactly one file. Electron packaging is not started.
+**Status: ported, wired, product-tested, and packaged as a desktop app.** The
+React app in `frontend/` runs every screen against the Express server in
+`backend/`, and `electron/` starts that server and shows a window pointed at
+it. `fetch` appears in exactly one file.
 
 ---
 
 ## How to run it
+
+**As a desktop app**, which is how the owner uses it:
+
+```
+npm run setup     # installs all three package.json files
+npm start         # builds the frontend and opens the app
+npm run dist:win  # one Windows installer, in release/
+```
+
+`npm run dist:win` runs the install, the checks, the frontend build and the
+packaging in that order, so a rebuild in six months does not depend on
+remembering it.
+
+**From source**, unchanged:
 
 ```
 cd backend  && npm install && node server.js     # http://localhost:3001
@@ -522,6 +536,140 @@ looked at a printed page. The `date('now','localtime')` rule cannot be tested
 without moving the machine clock past midnight UTC. Neither can be reached
 from here.
 
+## Packaging it as a desktop app
+
+Done. `electron/main.js` starts `backend/server.js` as a child process, waits
+for `/health`, and shows a window pointed at it. Nothing about what the app
+does moved: no screen, no wording, no rule, no endpoint. The server is still
+the only thing that knows anything.
+
+### The four things that break
+
+**1. Where the data lives.** `db.js` and `backup.js` wrote to
+`path.join(__dirname, …)` in four places, which inside `app.asar` is
+read-only. `backend/data-dir.js` now works the two paths out once, from
+`APARTMENT_DATA_DIR` when the main process passes it and `__dirname` when it
+does not — so `node server.js` still writes beside the code exactly as before.
+Verified: the packaged app created its database and its backups folder under
+`userData` and nothing was written into the bundle.
+
+**2. The native module — not what the brief expected, and worse.**
+better-sqlite3 v13 is a **Node-API** module. Its prebuilt binaries carry no ABI
+version in their names, and one of them works on any runtime offering the
+Node-API level it was built against. There is nothing to rebuild, and running
+`@electron/rebuild` against it actively breaks it: the source build leaves a
+half-finished `build/` directory that `node-gyp-build` then prefers over the
+working prebuild. electron-builder's own automatic rebuild does the same, which
+is why `npmRebuild` is off.
+
+What does matter is the Node-API *level*. v13 declares `NAPI_VERSION=10`.
+Electron 33 bundles Node 20, which offers 9 — and loading the module then does
+not fail with a message. **It segfaults**, killing the server child before it
+prints anything, so the app shows its "stopped unexpectedly" page and nobody
+can tell why. Electron 43 bundles Node 24 and offers 10.
+
+`npm run check-runtime` compares the two numbers and then actually loads the
+module under Electron, and the build refuses to continue if either fails. It
+was tested against a doctored `NAPI_VERSION` and caught it. **Anyone downgrading
+Electron, or swapping better-sqlite3 for a module that is not Node-API, has to
+read that check before deleting it.**
+
+**3. One origin.** Express serves `frontend/dist`, so the pages and the API
+share an origin: `cors` is gone, `API_BASE` is `''`, every request is a
+relative path, and the window has one address. `vite.config.js` proxies the
+nine API paths in development so the same relative paths work there — its list
+is the mount points in `server.js`, and a new router needs a line in both.
+
+**4. The port.** `PORT` defaults to 3001 for `node server.js` and the main
+process passes 0, which asks the OS for a free one. The server prints
+`APARTMENT_SERVER_PORT=…` on its own line and the main process reads it, since
+nothing can know that port in advance. It binds to 127.0.0.1 rather than every
+interface: one person's program on one machine, with no login, has no business
+answering the local network. Verified with 3001 already taken — the app started
+on 56265 and the other thing on 3001 was undisturbed.
+
+### Starting up, and failing to
+
+No splash screen and no progress bar. The window is created hidden, the server
+is started, `/health` is polled for up to ten seconds, and only then does the
+window load the app and appear — so the first thing anyone sees is a working
+app rather than something that flashes and vanishes.
+
+When that fails the window still appears, with `electron/error.html`: Thai,
+plain words, one button that retries and one that opens the log for whoever
+gets called for help. It names which of three things happened, because "an
+error occurred" is no use to the person who has to act on it:
+
+| | |
+|---|---|
+| `port` | เปิดช่องทางเชื่อมต่อภายในเครื่องไม่ได้ |
+| `database` | เปิดไฟล์ข้อมูลไม่ได้ |
+| `crashed` | ตัวโปรแกรมส่วนหลังหยุดทำงานกะทันหัน |
+
+The classification reads the server's own output. `listen EACCES` rather than
+bare `EACCES`, because a permission error on a *file* is a database problem and
+telling the user to close another copy of the app would send them the wrong
+way. The decision is written to the log too, since the log is what the person
+the error page tells them to call will be reading.
+
+`npm run check-error-page` renders it for each reason and for a reason it does
+not recognise, and checks there is no English anywhere on it.
+
+### What was verified, and how
+
+The GUI launch of the packaged `.app` bundle could not be driven from this
+environment — it exits silently with no output and creates no `userData`, while
+the same Electron binary run directly works, so it is the sandbox refusing to
+launch an app bundle rather than anything in the build. **The checks below that
+say "packaged" were run against the packaged bundle's own Electron and its own
+`app.asar`; the ones that say "from source" were run against `electron .`,
+which is the identical code path.**
+
+| Check | Result |
+|---|---|
+| Launch, no terminal | From source: window, server, database, all as intended. Packaged bundle: not launchable here |
+| Data survives quit and relaunch | From source: a room, a tenant, a lease and a reading were all still there |
+| Database under `userData` | Yes, and a dated copy in `userData/backups` on the next launch |
+| Bill generated and printed | Packaged: every suite passed against the packaged backend, print structure included |
+| Second launch | From source: the single-instance lock focused the first window, one server child, first app undisturbed |
+| Port 3001 occupied | From source: started on 56265 anyway |
+| Database corrupted | From source: `SqliteError: file is not a database` → error page `database`, app alive, no orphan server, and restoring the file recovered completely |
+| Server exits some other way | From source: `Cannot find module` → error page `crashed` |
+| Nothing left running after quit | No electron process, no server child, port released |
+| Packaged bundle end to end | Its Electron ran its own `server.js` from inside `app.asar`, loaded better-sqlite3 from `app.asar.unpacked`, served `index.html` and the assets from the asar, and answered the API in Thai |
+| All six test suites | Passed against the **packaged** backend, on a database created seconds earlier |
+| Windows installer | `Apartment Manager Setup 1.0.0.exe`, 110 MB, x64, with `win32-x64.node` unpacked and no development database inside |
+
+**The one intermittent failure, chased down.** The first run of `npm run smoke`
+against the packaged backend failed once and then passed five times. It turned
+out to be perfectly reproducible on a *brand-new* database: `GET /backups`
+returns nothing on a first launch, because `backup.js` runs before the database
+is opened and there is nothing yet to copy. That is right, and it is what the
+owner sees on day one — the panel says `ยังไม่มีสำเนา` and offers the button.
+The test had assumed a database that had been started twice. Fixed in the test.
+
+**Windows is built for x64 explicitly.** electron-builder otherwise targets the
+architecture of whatever machine runs it, and the first Windows build came out
+arm64 — an installer that would simply not run on the building's PC.
+
+### Left alone deliberately
+
+- **No icon.** The default Electron icon is used. A real one is a file, not a
+  decision, and there was none to use.
+- **`productName` is ASCII** ("Apartment Manager"), so the install path and the
+  executable are. The window title is the Thai building name, from the page.
+- **No auto-update, telemetry or crash reporting**, and no signing certificate
+  anywhere. macOS is built unsigned; Windows is built unsigned and Windows will
+  warn on first run until it is signed.
+
+### Question for the owner
+
+**If the server stops while the app is open, there is no way back except
+quitting.** The screens already show `ติดต่อเซิร์ฟเวอร์ไม่ได้` with a retry, but
+that retry re-reads — it cannot restart a child process that has died. Making
+the main process notice and start it again is a change to how the app behaves
+rather than to how it starts, so it is recorded here rather than made.
+
 ### Still open
 
 `PUT /fees/onetime/:id` has no button — the screens add and delete one-time
@@ -616,3 +764,18 @@ The two suites that found nothing are still the ones worth keeping — the cold
 start, because it is the only path a new building takes and it had never once
 been run, and the chip counts, because a count that disagrees with the list
 under it is the kind of thing nobody notices until they are relying on it.
+
+**Packaging.** The brief predicted the native-module problem and was right that
+it would be the one that passes every test here and fails on the owner's
+machine — but the cause was not the ABI. better-sqlite3 v13 is Node-API, so the
+rebuild step the brief asked for is unnecessary, and running it breaks the
+module. What bites instead is the Node-API *level*: Electron 33 offers 9 where
+the module needs 10, and the result is a segfault with no message rather than
+the clean "compiled against a different Node.js version" error anyone would
+recognise. `npm run check-runtime` exists so that cannot ship.
+
+The GUI launch of the packaged bundle could not be driven from this
+environment. Everything reachable was checked against the packaged artifact
+instead — its own Electron, its own asar, its own database — and the six suites
+pass against the packaged backend. What remains untested is the double-click
+itself, on Windows, by someone with a mouse.

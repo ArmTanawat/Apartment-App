@@ -1,10 +1,18 @@
 // db.js — creates the database file and defines every table.
 // Runs on every server start; nothing is destroyed because of IF NOT EXISTS.
 
-const Database = require('better-sqlite3');
-const path = require('path');
+// better-sqlite3 is compiled against a particular runtime's ABI, and Node and
+// Electron do not share one. So there are two builds of it: backend's own, for
+// `node server.js`, and the one at the repository root, rebuilt for Electron.
+//
+// The packaged app ships only the second, so nothing has to be chosen there.
+// Running from source, backend/node_modules is nearer and would shadow it, and
+// the child would load a module built for the wrong runtime — so the main
+// process says which one to use. Absent, this is the ordinary require it
+// always was.
+const Database = require(process.env.APARTMENT_SQLITE || 'better-sqlite3');
+const { dbPath } = require('./data-dir.js');
 
-const dbPath = path.join(__dirname, 'apartment.db');
 const db = new Database(dbPath);
 
 // SQLite ships with foreign key enforcement OFF for backwards compatibility.

@@ -6,13 +6,11 @@
 
 const fs = require('fs');
 const path = require('path');
+const { dbPath, backupDir } = require('./data-dir.js');
 
 const KEEP = 30;
 
 function runBackup() {
-  const dbPath = path.join(__dirname, 'apartment.db');
-  const backupDir = path.join(__dirname, 'backups');
-
   // Nothing to copy on the very first run, before the database exists.
   if (!fs.existsSync(dbPath)) return null;
 
@@ -58,8 +56,6 @@ function runBackup() {
 // Lists the backup files, newest first, with their size and when they were made.
 // Reads the folder — it never opens the database.
 function listBackups() {
-  const backupDir = path.join(__dirname, 'backups');
-
   if (!fs.existsSync(backupDir)) return [];
 
   return fs.readdirSync(backupDir)

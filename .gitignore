@@ -5,6 +5,7 @@ backend/apartment.db
 backend/backups/
 
 # Build output.
+release/
 frontend/dist/
 frontend/smoke-dist/
 

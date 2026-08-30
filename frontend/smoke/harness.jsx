@@ -14,6 +14,15 @@ globalThis.MouseEvent = dom.window.MouseEvent;
 globalThis.Event = dom.window.Event;
 globalThis.KeyboardEvent = dom.window.KeyboardEvent;
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+
+// The app asks for relative paths now, because Express serves its pages. Node's
+// fetch has no document to be relative to, so the suites point them at the
+// development server. Nothing about the app changes; this is the harness
+// standing in for the origin a browser would have.
+const nodeFetch = globalThis.fetch;
+globalThis.fetch = (input, init) =>
+  nodeFetch(typeof input === 'string' && input.startsWith('/')
+    ? 'http://127.0.0.1:3001' + input : input, init);
 dom.window.print = () => { printed++; };
 dom.window.alert = m => { alerted.push(m); };
 

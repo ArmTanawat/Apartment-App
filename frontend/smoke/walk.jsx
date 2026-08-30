@@ -264,7 +264,13 @@ await type(rate, '5'); await settle(1500);
 check('fee types from GET /fees/types', $$('.ftable tbody tr').length === 3);
 check('fee types in use offer no delete button, from one GET /fees/lease',
   $$('.ftable tbody tr').filter(r => r.textContent.includes('ลบ')).length === 0);
-check('backups listed from GET /backups', $$('.bkrow').length > 0);
+// A database on its very first start has no copy yet, because backup.js runs
+// before the database is opened and there was nothing there to copy. That is
+// right, and it is what the owner sees on day one — so the check is that the
+// panel says one of the two true things, not that there is always a file.
+check('backups either listed, or said to be none yet',
+  $$('.bkrow').length > 0 || body().includes('ยังไม่มีสำเนา'),
+  text('.setwrap'));
 const before = $$('.bkrow').length;
 await click(byText('.btn', 'สำรองข้อมูลเดี๋ยวนี้'), 400);
 check('backup taken', $$('.bkrow').length >= before);

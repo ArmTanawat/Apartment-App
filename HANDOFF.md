@@ -16,7 +16,7 @@ Read `CLAUDE.md` first — it holds the rules that must not be broken. This file
 | Backend — 50 endpoints across 8 route files | Done, curl-tested |
 | Frontend — 6 screens, 9 views | Done as a prototype, then ported to React |
 | Frontend wired to the API | Done |
-| Electron packaging | Not started |
+| Electron packaging | Done — `npm run dist:win` |
 
 The requirements in `REQUIREMENTS.md` are marked Done against the backend; the React app now satisfies them against it rather than against mock data.
 
@@ -165,7 +165,7 @@ The prototype has never had a request fail, so it has no answer for any of this.
 
 ### 2. Then Electron
 
-Keep the API base URL in one constant. The plan is to have Electron start the Express server as a child process and open a window at `localhost`, so the frontend keeps calling the same URLs.
+Done. `electron/main.js` starts the Express server as a child process and opens a window at the port the OS gave it. The frontend needs no base URL at all now: Express serves the built pages itself, so the app and the API share one origin and every request is a relative path. See `PROGRESS.md` for what broke on the way, particularly the Node-API version check that has to stay.
 
 ---
 

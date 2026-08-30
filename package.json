@@ -1,0 +1,79 @@
+{
+  "name": "apartment-app",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Local software for managing a small apartment building",
+  "main": "electron/main.js",
+  "scripts": {
+    "setup": "npm install && npm --prefix backend install && npm --prefix frontend install",
+    "check-runtime": "node electron/check-runtime.js",
+    "start": "npm --prefix frontend run build && electron .",
+    "dist": "npm run setup && npm run check && npm --prefix frontend run build && electron-builder",
+    "dist:win": "npm run setup && npm run check && npm --prefix frontend run build && electron-builder --win",
+    "dist:mac": "npm run setup && npm run check && npm --prefix frontend run build && electron-builder --mac",
+    "check-error-page": "node electron/check-error-page.js",
+    "check": "npm run check-runtime && npm run check-error-page"
+  },
+  "dependencies": {
+    "better-sqlite3": "^13.0.3",
+    "express": "^5.2.1"
+  },
+  "devDependencies": {
+    "electron": "^43.4.1",
+    "electron-builder": "^25.1.8",
+    "jsdom": "^30.0.1"
+  },
+  "build": {
+    "appId": "com.baansuanplu.apartment",
+    "productName": "Apartment Manager",
+    "files": [
+      "electron/**/*",
+      "backend/*.js",
+      "backend/routes/*.js",
+      "frontend/dist/**/*",
+      "package.json",
+      "!backend/apartment.db",
+      "!backend/backups/**",
+      "!**/node_modules/*/{test,__tests__,powered-test,example,examples}/**"
+    ],
+    "asarUnpack": [
+      "**/node_modules/better-sqlite3/**"
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ],
+      "identity": null
+    },
+    "linux": {
+      "target": [
+        "AppImage"
+      ]
+    },
+    "npmRebuild": false
+  }
+}
