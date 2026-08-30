@@ -74,7 +74,11 @@ Damage is charged as a normal one-time charge on a monthly bill, so the deposit 
 
 Recurring and one-time are separate. The question when adding a charge is always: does this happen again next month?
 
-A recurring fee is either a fixed amount or a share of something else on the same bill. A share is worked out afresh each month from that room's own figures, so it has no agreed baht amount — only the percentage, and the line on the bill carries the working. `subtotal` deliberately excludes other shares, so two of them on one bill do not depend on which was calculated first.
+A recurring fee is either a fixed amount or a share of something else on the same bill. A share is worked out afresh each month from that room's own figures, so it has no agreed baht amount — only the percentage.
+
+On the bill a share prints as `รายเดือน Monthly`, exactly like a fixed fee. The tenant is being asked to pay an amount; the arrangement behind it is between them and the owner. It is the one line that does not show how it was reached, and the basis cannot be recovered from the bill afterwards — only from the fee attached to the lease at the time.
+
+`subtotal` deliberately excludes other shares, so two of them on one bill do not depend on which was calculated first.
 
 ## Utility rates
 
@@ -114,7 +118,7 @@ Rates in force are read at bill generation and the resulting baht amount is froz
 |---|---|---|
 | 6.1 | Generate a bill for one tenant for one month | Done |
 | 6.2 | Bill includes rent, water, electricity, recurring fees, one-time charges | Done |
-| 6.3 | Each line shows its working, e.g. units used, meter start and end | Done |
+| 6.3 | Utility and prorated rent lines show their working, e.g. units used, meter start and end | Done |
 | 6.4 | Preview the figures before saving | Done |
 | 6.5 | One bill per tenant per month, no duplicates | Done |
 | 6.6 | View bill history by month or by tenant | Done |

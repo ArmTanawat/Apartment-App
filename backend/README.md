@@ -113,6 +113,10 @@ together) or `subtotal`. Both are copied onto `lease_fees` when the fee is
 attached, exactly as `amount` is, so repricing the catalogue never rewrites
 what an existing tenant agreed to.
 
+A share prints as `รายเดือน Monthly`, the same as a fixed fee: the working is
+deliberately left off, so the bill shows the amount and not the arrangement
+behind it.
+
 `subtotal` is rent, both utilities, the fixed recurring fees and that month's
 one-time charges — and never another share. That exclusion is what makes it
 well defined: two shares on one bill are both a share of the same figure, so

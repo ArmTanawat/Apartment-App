@@ -428,9 +428,18 @@ the first. Any future column needs it too.
 
 **`subtotal` excludes other shares.** Two shares on one bill would otherwise
 each depend on the other, and the answer would come out differently depending
-on which was worked out first — invisible on a printed bill. Excluding them
-means every share is a share of the same figure, whatever order they are in.
-The bill line carries that figure, so it can be checked.
+on which was worked out first. Excluding them means every share is a share of
+the same figure, whatever order they are in.
+
+**A share prints as `รายเดือน Monthly`, with no working** — the owner's call.
+The tenant is being asked to pay an amount; the arrangement behind it is
+between them and the owner. It is the one line on a bill that does not show
+how it was reached, so the basis cannot be recovered from the bill afterwards,
+only from the fee attached to the lease at the time. `REQUIREMENTS.md` 6.3 was
+narrowed to match rather than left claiming every line shows its working.
+
+Wording is frozen into `bill_items` at generation, so any bill already issued
+keeps whatever it was printed with. Only bills made from now on are short.
 
 **`fee-basis.js`** holds the five bases and their Thai labels. `routes/fees.js`
 needs them to refuse a basis it does not know and `routes/bills.js` to price

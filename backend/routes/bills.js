@@ -485,13 +485,19 @@ function buildBill(leaseId, period, options = {}) {
     subtotal: money(rent_amount + water_amount + elec_amount + fixed_amount),
   };
 
+  // A share prints as a plain monthly fee, the same as a fixed one. The
+  // working is deliberately left off: what the tenant is being asked to pay is
+  // the amount, and the arrangement behind it is between them and the owner.
+  //
+  // This is the one line on a bill that does not show how it was reached. The
+  // basis it was a share of — and, for `subtotal`, which figures went into it
+  // — cannot be recovered from the bill afterwards, only from the fee that was
+  // attached to the lease at the time.
   const shareItems = shareFees.map(f => {
     const from = basisAmount[f.percent_of] ?? 0;
     return {
       label: f.name,
-      // The working, so the tenant can see the figure it came off rather than
-      // being handed a number with no way to check it.
-      detail: `รายเดือน Monthly — ${f.percent}% ของ${FEE_BASIS[f.percent_of]} ${from} บาท`,
+      detail: 'รายเดือน Monthly',
       amount: money(from * f.percent / 100),
     };
   });
@@ -516,8 +522,7 @@ function buildBill(leaseId, period, options = {}) {
     { label: 'ค่าไฟ Electricity', detail: elec.detail, amount: elec_amount },
     ...recurringFees.map(f => ({ label: f.name, detail: 'รายเดือน Monthly', amount: money(f.amount) })),
     ...oneTimeCharges.map(c => ({ label: c.description, detail: 'ครั้งเดียว One-time', amount: money(c.amount) })),
-    // Last, after everything they are a share of, so the working above each
-    // one is on the page before the line that uses it.
+    // Last, after the lines they are a share of.
     ...shareItems
   ];
 

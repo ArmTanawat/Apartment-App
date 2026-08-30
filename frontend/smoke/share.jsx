@@ -61,7 +61,8 @@ const line = pv.items.find(i => i.label.includes('ค่าบริการส
 const elec = pv.items.find(i => i.label === 'ค่าไฟ Electricity');
 check('the share equals the line it is a share of', line.amount === elec.amount,
   `${line.amount} vs ${elec.amount}`);
-check('the working is on the bill', line.detail.includes(`100% ของค่าไฟ ${elec.amount}`), line.detail);
+check('it prints as a plain monthly fee, with no working',
+  line.detail === 'รายเดือน Monthly', line.detail);
 check('it is the last line', pv.items[pv.items.length-1].label.includes('ค่าบริการสาธารณูปโภค'));
 check('and it is in the total', pv.total === pv.rent_amount + pv.water_amount + pv.elec_amount + pv.fees_amount);
 
@@ -71,15 +72,16 @@ await api('POST','/fees/lease',{lease_id:u101.lease_id, fee_type_id:sub.id});
 const pv2 = await api('GET', `/bills/preview/${u101.lease_id}/${period}`);
 const share1 = pv2.items.find(i => i.label.includes('ค่าบริการสาธารณูปโภค'));
 const share2 = pv2.items.find(i => i.label.includes('ค่าบริการรวม'));
-const fixedOnly = pv2.rent_amount + pv2.water_amount + pv2.elec_amount
-  + pv2.items.filter(i => i.detail === 'รายเดือน Monthly' || i.detail === 'ครั้งเดียว One-time')
-      .reduce((s,i) => s + i.amount, 0);
+// A share is no longer distinguishable by its detail — that is the point of
+// the change — so the base is the total with the two shares taken back off.
+const fixedOnly = Math.round((pv2.total - share1.amount - share2.amount) * 100) / 100;
 const expected = Math.round(fixedOnly * 0.1 * 100) / 100;
 check('the % of subtotal is exactly 10% of everything that is not a share',
   share2.amount === expected,
   `got ${share2.amount}, expected ${expected} (subtotal ${fixedOnly})`);
-check('and the subtotal it names on the bill excludes the other share',
-  share2.detail.includes(`ของยอดก่อนคิดรายการนี้ ${fixedOnly}`), share2.detail);
+check('both shares print as plain monthly fees',
+  share1.detail === 'รายเดือน Monthly' && share2.detail === 'รายเดือน Monthly',
+  `${share1.detail} | ${share2.detail}`);
 check('and the first share is unchanged by the second', share1.amount === elec.amount,
   `${share1.amount} vs ${elec.amount}`);
 
