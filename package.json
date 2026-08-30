@@ -12,7 +12,8 @@
     "dist:win": "npm run setup && npm run check && npm --prefix frontend run build && electron-builder --win",
     "dist:mac": "npm run setup && npm run check && npm --prefix frontend run build && electron-builder --mac",
     "check-error-page": "node electron/check-error-page.js",
-    "check": "npm run check-runtime && npm run check-error-page"
+    "check": "npm run check-runtime && npm run check-error-page",
+    "test": "node scripts/run-tests.js"
   },
   "dependencies": {
     "better-sqlite3": "^13.0.3",

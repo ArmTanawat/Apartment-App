@@ -41,6 +41,19 @@ comparison against `prototype/rooms.html` mean anything.
 ### Checking it
 
 ```
+npm test
+```
+
+From the repository root. It starts a server if one is not already running —
+on a throwaway database, so a test run never touches the one being worked on —
+runs all six suites and the two desktop-shell checks, and reports each. If a
+server is already on 3001 it uses that one instead, and says so, because the
+suites re-seed whatever database they find.
+
+The suites can still be run one at a time from `frontend/`, which is what to do
+when one of them fails and the detail matters:
+
+```
 cd frontend
 npm run smoke            # the paths from the brief's verification list
 npm run smoke:offline    # what the screens do when the server is not there
@@ -49,6 +62,9 @@ npm run smoke:share      # fees that are a percentage of something else
 npm run smoke:screens    # the filter counts, the month picker, printing, previews
 npm run smoke:rules      # the rules in CLAUDE.md, attacked at their boundaries
 ```
+
+They need a server on 3001 and they re-seed it. `npm run seed` puts the sample
+building back afterwards.
 
 `smoke/coldstart.jsx` is the seventh, and needs a server started on a database
 with no rooms in it — the first day of using the program. Move `apartment.db`
