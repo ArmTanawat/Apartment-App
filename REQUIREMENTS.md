@@ -196,6 +196,8 @@ A room missing from a month's takings is the thing the summary exists to make vi
 | 11.5 | A receipt carries a signature line and a received-payment statement, and no bank details | Done |
 | 11.6 | Issuing a receipt asks first, saying that the number is spent and the bill is frozen | Done |
 | 11.7 | Issuing one for a bill whose data has changed since says so before it is issued | Done |
+| 11.8 | Receipts have their own list on บิล, a row per bill of the month, issued or not | Done |
+| 11.9 | Print every receipt for a month from that list | Done |
 
 Issuing a receipt says a numbered piece of paper was printed. It does not say money arrived in any system, and there is still no paid flag, no outstanding balance and no payment table. That remains out of scope.
 

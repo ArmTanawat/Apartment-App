@@ -2,6 +2,7 @@ import ErrBox from '../ErrBox.jsx';
 import Modal from '../Modal.jsx';
 import { useSubmit } from '../../lib/useSubmit.js';
 import { get } from '../../lib/api.js';
+import { billDiff } from '../../lib/bills.js';
 import { baht } from '../../lib/helpers.js';
 import { useApi } from '../../lib/useApi.js';
 import { useData } from '../../state/DataContext.jsx';
@@ -18,11 +19,24 @@ import { useUi } from '../../state/UiContext.jsx';
  * When the bill is already stale, that is said first and loudest. Issuing a
  * receipt for a bill whose figures have been overtaken hands the tenant paper
  * with the old numbers on it and closes the only way back. */
-export function IssueReceiptModal({ id, stale }){
+export function IssueReceiptModal({ id }){
   const { bills, issueReceipt } = useData();
   const { closeModal, go } = useUi();
   const { error, busy, run } = useSubmit();
   const b = bills.find(x => x.id === id);
+
+  // Whether the bill has been overtaken is worked out here rather than passed
+  // in, so the warning is the same whichever button opened this — from the
+  // bill itself, or from the row in the receipts list, which has no way of
+  // knowing.
+  const check = useApi(async () => {
+    const full = await get(`/bills/${id}`);
+    const d = await billDiff(full);
+    return !!(d.changes && d.changes.length);
+  }, [id]);
+
+  if(check.loading) return <Modal><p className="lead">กำลังตรวจสอบบิล…</p></Modal>;
+  const stale = check.data === true;
 
   return (
     <Modal>

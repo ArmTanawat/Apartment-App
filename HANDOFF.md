@@ -114,7 +114,11 @@ There is no "unusual usage" highlight. No threshold was obviously right — usag
 
 ### ใบเสร็จ — `ReceiptPage`, `PrintAllReceiptsPage`
 
-Reached from a bill. A bill without a receipt offers **ออกใบเสร็จ**; one with a receipt offers **พิมพ์ใบเสร็จ**. There is no receipt without a bill, so a vacant or unbilled room never enters the flow and there is nothing to skip.
+Receipts have their own card on บิล, beside บิลเดือนนี้ and shaped the same way: a row per bill of the month, a print-all above it, a count at the foot. That is where they are issued, because issuing them is what happens over the days after the bills go out, one room at a time as people pay — not something buried inside a single bill.
+
+A row leads to its receipt either way: straight there when it has one, through the confirmation first when it does not. Unissued rows say `ยังไม่ได้ออก` rather than showing a dash, so the row reads as an action rather than a blank.
+
+The bill screen still offers **ออกใบเสร็จ** / **พิมพ์ใบเสร็จ** for when you are already looking at one bill. There is no receipt without a bill, so a vacant or unbilled room never enters the flow and there is nothing to skip.
 
 The paper is `BillPaper` again, with `receipt` passed: same tenant, same lines, same total, and four differences that each matter — the title and number, a signature line for ผู้รับเงิน, its own note about this payment, and a received-payment footer with **no bank details**, because the money has already arrived.
 

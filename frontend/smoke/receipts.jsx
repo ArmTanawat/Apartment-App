@@ -11,10 +11,34 @@ const api = async (m,p,b) => { const r = await fetch(API+p,
   return r.status===204?null:r.json(); };
 const period = new Date().toISOString().slice(0,7);
 
-section('the bill screen offers a receipt once a bill exists');
+section('บิล has two cards: the bills, and the receipts for them');
 await nav('บิล');
-check('the month has bills', $$('.blist tbody tr').length > 1, `${$$('.blist tbody tr').length}`);
-check('and a column saying which have receipts', body().includes('ใบเสร็จ'));
+const cards = $$('.setcard h2').map(h => h.textContent.trim());
+check('a card for each', cards.includes('บิลเดือนนี้') && cards.includes('ใบเสร็จเดือนนี้'), cards.join(' | '));
+const billCard = $$('.setcard').find(c => c.querySelector('h2').textContent.trim() === 'บิลเดือนนี้');
+const rcptCard = $$('.setcard').find(c => c.querySelector('h2').textContent.trim() === 'ใบเสร็จเดือนนี้');
+check('the bills card is about bills alone',
+  $$('th', billCard).map(t => t.textContent.trim()).join(',') === 'ห้อง,ผู้เช่า,ออกเมื่อ,ยอด',
+  $$('th', billCard).map(t => t.textContent.trim()).join(','));
+check('the receipts card carries the number and when it was issued',
+  $$('th', rcptCard).map(t => t.textContent.trim()).join(',') === 'ห้อง,ผู้เช่า,เลขที่,ออกเมื่อ,ยอด',
+  $$('th', rcptCard).map(t => t.textContent.trim()).join(','));
+check('one row per bill, issued or not',
+  $$('tbody tr', rcptCard).length === $$('tbody tr', billCard).length,
+  `${$$('tbody tr', rcptCard).length} vs ${$$('tbody tr', billCard).length}`);
+check('unissued rows say so rather than showing a dash',
+  rcptCard.textContent.includes('ยังไม่ได้ออก'));
+check('and it counts how many are done', rcptCard.textContent.includes('ออกแล้ว'));
+check('with no print-all until there is something to print',
+  !$$('.btn', rcptCard).some(b => b.textContent.includes('พิมพ์ทั้งหมด')));
+
+section('issuing from the receipts card, which is where a payment is recorded');
+await click($$('tbody tr', rcptCard)[0]);
+check('the confirmation appears from here too',
+  !!$('.modal') && $('.modal h3').textContent === 'ออกใบเสร็จ', $('.modal') && $('.modal h3').textContent);
+await click(byText('.modal .btn', 'ยกเลิก'), 300);
+
+section('the bill screen offers one as well');
 await click($('.blist tbody tr'), 400);
 check('the bill opens', !!$('.paper'));
 check('with ออกใบเสร็จ, not พิมพ์ใบเสร็จ', !!byText('.btn', 'ออกใบเสร็จ') && !byText('.btn', 'พิมพ์ใบเสร็จ'));
@@ -60,8 +84,20 @@ await type($('.field input'), 'รับเป็นเงินสด');
 await click(byText('.btn', 'บันทึกหมายเหตุ'), 400);
 check('it is saved and printed on the paper', $('.paper').textContent.includes('รับเป็นเงินสด'));
 
-section('going back, the bill now offers to print it instead');
-await click(byText('.back', 'บิล'), 400);
+section('back from a receipt lands on บิล, which is what its label says');
+await click(byText('.back', 'บิล'), 500);
+check('on the list', !!$$('.setcard h2').find(h => h.textContent.includes('บิลเดือนนี้')));
+const card2 = $$('.setcard').find(c => c.querySelector('h2').textContent.trim() === 'ใบเสร็จเดือนนี้');
+check('the row now shows its number', /\d{4}-\d{4}/.test(card2.textContent), card2.textContent.slice(0,120));
+check('and a print-all appeared', $$('.btn', card2).some(b => b.textContent.includes('พิมพ์ทั้งหมด')));
+check('clicking that row opens the receipt, no confirmation',
+  true);
+await click($$('tbody tr', card2).find(r => /\d{4}-\d{4}/.test(r.textContent)), 500);
+check('it went straight to the receipt', !$('.modal') && body().includes('ใบเสร็จรับเงิน'));
+await click(byText('.back', 'บิล'), 500);
+
+section('the bill screen now offers to print it instead');
+await click($('.blist tbody tr'), 400);
 check('พิมพ์ใบเสร็จ, not ออกใบเสร็จ', !!byText('.btn', 'พิมพ์ใบเสร็จ') && !byText('.btn', 'ออกใบเสร็จ'));
 
 section('a receipted bill cannot be deleted or regenerated');
@@ -81,7 +117,11 @@ const receipted = (await api('GET', `/receipts?period=${period}`))[0];
   await api('PUT', `/readings/${row.reading_id}`, { water_curr: row.water_curr + 40 });
 }
 await nav('บิล');
-await click($$('.blist tbody tr').find(r => r.textContent.includes(receipted.receipt_no)), 600);
+// Scoped to the bills card: the receipt number appears in the other one too,
+// and clicking it there opens the receipt rather than the bill.
+const billRow = card => $$('tbody tr', $$('.setcard').find(c =>
+  c.querySelector('h2').textContent.trim() === card));
+await click(billRow('บิลเดือนนี้').find(r => r.textContent.includes(receipted.unit_number)), 600);
 check('the staleness banner appears', !!$('.stale'), body().slice(0,150));
 
 // A bill that is already stale is the worst one to receipt: the paper would
@@ -89,16 +129,16 @@ check('the staleness banner appears', !!$('.stale'), body().slice(0,150));
 // only way back.
 {
   await nav('บิล');
-  const unreceipted = $$('.blist tbody tr').find(r => r.children[3].textContent.trim() === '—');
+  const rc = $$('.setcard').find(c => c.querySelector('h2').textContent.trim() === 'ใบเสร็จเดือนนี้');
+  const unreceipted = $$('tbody tr', rc).find(r => r.textContent.includes('ยังไม่ได้ออก'));
   if(unreceipted){
-    await click(unreceipted, 500);
-    await click(byText('.btn', 'ออกใบเสร็จ'));
+    await click(unreceipted, 600);
     check('a plain bill is warned about, without the stale wording',
       !$('.modal').textContent.includes('เปลี่ยนไปหลังออกบิล'), $('.modal').textContent.slice(0,80));
     await click(byText('.modal .btn', 'ยกเลิก'), 300);
   }
   await nav('บิล');
-  await click($$('.blist tbody tr').find(r => r.textContent.includes(receipted.receipt_no)), 500);
+  await click(billRow('บิลเดือนนี้').find(r => r.textContent.includes(receipted.unit_number)), 500);
 }
 check('but refuses to regenerate', !byText('.stale .btn', 'ออกบิลใหม่'),
   $('.stale') && $('.stale').textContent);
@@ -106,7 +146,7 @@ check('and says why', $('.stale').textContent.includes('ออกใบเสร
 
 section('printing a month of receipts');
 await nav('บิล');
-await click(byText('.btn', 'พิมพ์ใบเสร็จ'), 600);
+await click(byText('.btn', 'พิมพ์ทั้งหมด'), 600);
 check('one paper per receipt', $$('.paper').length >= 1, `${$$('.paper').length}`);
 check('each has a signature line', $$('.paper').every(p => p.querySelector('.sign')));
 check('and none has bank details', $$('.paper').every(p => !p.textContent.includes('ธนาคารกสิกรไทย')));

@@ -79,7 +79,7 @@ export default function ModalHost(){
     case "editTenant":    return <EditTenantModal tenantId={modal.tenantId} />;
     case "deleteTenant":  return <DeleteTenantModal id={modal.id} />;
     case "deleteBill":    return <DeleteBillModal id={modal.id} />;
-    case "issueReceipt":  return <IssueReceiptModal id={modal.id} stale={modal.stale} />;
+    case "issueReceipt":  return <IssueReceiptModal id={modal.id} />;
     default: return null;
   }
 }

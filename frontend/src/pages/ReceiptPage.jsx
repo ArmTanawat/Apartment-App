@@ -22,13 +22,13 @@ export default function ReceiptPage({ id }){
 
   if(req.loading) return <p className="sub">กำลังโหลด…</p>;
   if(req.error) return <>
-    <button className="back noprint" onClick={() => go({name:"bill", id})}>← บิล</button>
+    <button className="back noprint" onClick={() => go({name:"bills"})}>← บิล</button>
     <ErrBox>{messageOf(req.error)}</ErrBox>
   </>;
 
   const b = req.data;
   if(!b.receipt) return <>
-    <button className="back noprint" onClick={() => go({name:"bill", id})}>← บิล</button>
+    <button className="back noprint" onClick={() => go({name:"bills"})}>← บิล</button>
     <p className="none">บิลใบนี้ยังไม่ได้ออกใบเสร็จ</p>
   </>;
 
@@ -42,7 +42,7 @@ export default function ReceiptPage({ id }){
   };
 
   return <>
-    <button className="back noprint" onClick={() => go({name:"bill", id})}>← บิล</button>
+    <button className="back noprint" onClick={() => go({name:"bills"})}>← บิล</button>
     <ErrBox>{error}</ErrBox>
 
     <BillPaper bill={b} receipt={{ ...b.receipt, note: shown.trim() || null }} />

@@ -897,6 +897,48 @@ at ออกบิลใหม่ first.
 been receipted cannot be cleared, which is the same rule working correctly; it
 now says that, and says that `npm test` is unaffected because it makes its own.
 
+### Receipts got a card of their own
+
+The first cut buried receipts inside a bill: open บิล, click a row, open the
+bill, press ออกใบเสร็จ. The owner called the flow odd, and they were right —
+issuing receipts is not something you do while looking at one bill. It happens
+over the days after the bills go out, one room at a time as people pay, and it
+wants the same shape as the thing it follows.
+
+So **ใบเสร็จเดือนนี้** now sits beside **บิลเดือนนี้** on บิล, built the same
+way: a print-all above, a row per bill, a count at the foot.
+
+```
+บิลเดือนนี้            พิมพ์ทั้งเดือน 4 ใบ
+  ห้อง  ผู้เช่า          ออกเมื่อ              ยอด
+  101   นภา วงศ์ดี      2026-08-31 15:43:27  6,628.00
+  รวม 4 ใบ                                  22,563.00
+
+ใบเสร็จเดือนนี้         พิมพ์ทั้งหมด 3 ใบ
+  ห้อง  ผู้เช่า          เลขที่        ออกเมื่อ              ยอด
+  101   นภา วงศ์ดี      2026-0001    2026-08-31 15:46:00  6,628.00
+  203   เกษม บุญมา      ยังไม่ได้ออก  —                    5,355.00
+  ออกแล้ว 3 จาก 4 ใบ                                      17,208.00
+```
+
+Every bill is a row, issued or not, because that list is the month's work. An
+unissued row says `ยังไม่ได้ออก` rather than a dash, so it reads as something
+to do. A row always leads to its receipt: straight there when it has one,
+through the confirmation when it does not.
+
+Two things fell out of it:
+
+- **The bills card went back to being about bills.** The `ใบเสร็จ` column added
+  a phase earlier was the same information in two tables on one screen once
+  the card existed.
+- **The staleness warning moved into the dialog.** It used to be passed in from
+  the bill screen, which knew. A row in a list does not, and a warning that
+  depends on which button opened it is not a warning. The dialog now works it
+  out itself.
+
+`ReceiptPage`'s back button also said `← บิล` while going to the single bill.
+It goes to บิล now, which is what the label says and where both cards are.
+
 ### Thai wording I was not certain about
 
 Worth a read by a native speaker before this reaches a tenant.

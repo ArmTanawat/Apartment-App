@@ -94,7 +94,7 @@ export default function BillPage({ id }){
       {receipt
         ? <button className="btn quiet" onClick={() => go({name:"receipt", id:b.id})}>พิมพ์ใบเสร็จ</button>
         : <button className="btn quiet"
-            onClick={() => openModal({kind:"issueReceipt", id:b.id, stale})}>ออกใบเสร็จ</button>}
+            onClick={() => openModal({kind:"issueReceipt", id:b.id})}>ออกใบเสร็จ</button>}
       <button className="btn danger" onClick={() => openModal({kind:"deleteBill", id:b.id})}>ลบบิล</button>
     </div>
     {!receipt && (

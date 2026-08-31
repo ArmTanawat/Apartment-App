@@ -15,7 +15,7 @@ import { useUi } from '../state/UiContext.jsx';
  * about this month's bills: the minimum charge, and charging rent by the day. */
 export default function BillsPage(){
   const { units, bills, h, generateBills, setApplyMinimum } = useData();
-  const { period, go, picked, setPicked, prorateOn, setProrateOn,
+  const { period, go, openModal, picked, setPicked, prorateOn, setProrateOn,
           prorateDays, setProrateDays, lastResult, setLastResult } = useUi();
 
   const rgfrom = useRef(null), rgto = useRef(null);
@@ -29,6 +29,8 @@ export default function BillsPage(){
   // print-all knows how many pages it is about to produce.
   const receipts = useApi(() => get(`/receipts?period=${period}`), [period, bills]);
   const receiptFor = billId => (receipts.data || []).find(r => r.bill_id === billId);
+  const issued = monthBills.filter(b => receiptFor(b.id));
+  const issuedTotal = issued.reduce((t, b) => t + b.total, 0);
   const totalDays = daysInPeriod(period);
 
   // Every lease that was in a room during the month. Two in a handover month,
@@ -261,32 +263,67 @@ export default function BillsPage(){
         {monthBills.length ? <>
           <div className="actions" style={{margin:"0 0 14px"}}>
             <button className="btn quiet" onClick={() => go({name:"printall"})}>พิมพ์ทั้งเดือน {monthBills.length} ใบ</button>
-            {(receipts.data || []).length > 0 && (
-              <button className="btn quiet" onClick={() => go({name:"printallreceipts"})}>
-                พิมพ์ใบเสร็จ {receipts.data.length} ใบ</button>
-            )}
           </div>
           <table className="blist">
-            <thead><tr><th>ห้อง</th><th>ผู้เช่า</th><th>ออกเมื่อ</th><th>ใบเสร็จ</th><th className="r">ยอด</th></tr></thead>
+            <thead><tr><th>ห้อง</th><th>ผู้เช่า</th><th>ออกเมื่อ</th><th className="r">ยอด</th></tr></thead>
             <tbody>
-              {monthBills.map(b => {
-                const r = receiptFor(b.id);
-                return (
+              {monthBills.map(b => (
                 <tr key={b.id} onClick={() => go({name:"bill", id:b.id})}>
                   <td className="num">{b.unit_number}</td>
                   <td>{b.tenant_name}</td>
                   <td className="num" style={{color:"var(--muted)",fontSize:"13px"}}>{b.created_at}</td>
-                  <td className="num" style={{fontSize:"13px",color:r?"var(--ink)":"var(--muted)"}}>
-                    {r ? r.receipt_no : "—"}</td>
                   <td className="r num">{baht(b.total)}</td>
                 </tr>
-              );})}
-              <tr><td colSpan={4} style={{fontWeight:500,borderBottom:0,paddingTop:"11px"}}>
+              ))}
+              <tr><td colSpan={3} style={{fontWeight:500,borderBottom:0,paddingTop:"11px"}}>
                 รวม {monthBills.length} ใบ</td>
                 <td className="r num" style={{fontWeight:500,borderBottom:0,paddingTop:"11px"}}>{baht(monthTotal)}</td></tr>
             </tbody>
           </table>
         </> : <p className="none">ยังไม่ได้ออกบิลเดือนนี้</p>}
+      </div>
+
+      {/* Receipts get their own card rather than living inside a bill.
+          Every bill of the month is a row here, issued or not, because this is
+          where receipts are issued as tenants pay — one at a time, over the
+          days after the bills go out. A row leads to its receipt either way:
+          straight there if it has one, through the confirmation first if not. */}
+      <div className="setcard">
+        <h2>ใบเสร็จเดือนนี้</h2>
+        {monthBills.length ? <>
+          <p className="lead">ออกใบเสร็จเมื่อผู้เช่าจ่ายเงินแล้ว กดที่แถวเพื่อดูหรือออกใบเสร็จ</p>
+          {issued.length > 0 && (
+            <div className="actions" style={{margin:"0 0 14px"}}>
+              <button className="btn quiet" onClick={() => go({name:"printallreceipts"})}>
+                พิมพ์ทั้งหมด {issued.length} ใบ</button>
+            </div>
+          )}
+          <table className="blist">
+            <thead><tr><th>ห้อง</th><th>ผู้เช่า</th><th>เลขที่</th><th>ออกเมื่อ</th><th className="r">ยอด</th></tr></thead>
+            <tbody>
+              {monthBills.map(b => {
+                const r = receiptFor(b.id);
+                return (
+                  <tr key={b.id} onClick={() => r
+                    ? go({name:"receipt", id:b.id})
+                    : openModal({kind:"issueReceipt", id:b.id})}>
+                    <td className="num">{b.unit_number}</td>
+                    <td>{b.tenant_name}</td>
+                    <td className="num" style={{color: r ? "var(--ink)" : "var(--muted)"}}>
+                      {r ? r.receipt_no : "ยังไม่ได้ออก"}</td>
+                    <td className="num" style={{color:"var(--muted)",fontSize:"13px"}}>
+                      {r ? r.issued_at : "—"}</td>
+                    <td className="r num">{baht(b.total)}</td>
+                  </tr>
+                );
+              })}
+              <tr><td colSpan={4} style={{fontWeight:500,borderBottom:0,paddingTop:"11px"}}>
+                ออกแล้ว {issued.length} จาก {monthBills.length} ใบ</td>
+                <td className="r num" style={{fontWeight:500,borderBottom:0,paddingTop:"11px"}}>
+                  {baht(issuedTotal)}</td></tr>
+            </tbody>
+          </table>
+        </> : <p className="none">ยังไม่ได้ออกบิลเดือนนี้ จึงยังไม่มีใบเสร็จ</p>}
       </div>
     </div>
   </>;
