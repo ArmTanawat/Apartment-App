@@ -41,6 +41,8 @@ export function UiProvider({ children }){
   const [lastResult, setLastResult] = useState(null);
   // settings
   const [exampleUnits, setExampleUnits] = useState({ water: 8, electricity: 8 });
+  // reports
+  const [reportKind, setReportKind] = useState('summary');
 
   const [modal, setModal] = useState(null);
 
@@ -85,12 +87,13 @@ export function UiProvider({ children }){
     picked, setPicked, prorateOn, setProrateOn, prorateDays, setProrateDays,
     lastResult, setLastResult,
     exampleUnits, setExampleUnits,
+    reportKind, setReportKind,
     meterRevision, bumpMeter,
     detailRevision, bumpDetail,
     modal, openModal: setModal, closeModal: () => setModal(null),
   }), [view, go, period, setPeriod, shiftMonth, monthOpen, editMode, filter,
        meterFilter, showVacant, tenantSearch, tenantFilter, picked, prorateOn,
-       prorateDays, lastResult, exampleUnits, meterRevision, bumpMeter, detailRevision, bumpDetail, modal]);
+       prorateDays, lastResult, exampleUnits, reportKind, meterRevision, bumpMeter, detailRevision, bumpDetail, modal]);
 
   return <UiContext.Provider value={value}>{children}</UiContext.Provider>;
 }

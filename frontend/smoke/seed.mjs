@@ -1,3 +1,4 @@
+import { API } from './api-base.mjs';
 /* Empties the database and fills it with the same building the prototype's
  * mock data describes, so the React app can be compared against
  * prototype/rooms.html side by side. Months are placed relative to today,
@@ -10,7 +11,6 @@
  * every time however many times it has been run before.
  */
 
-const API = 'http://localhost:3001';
 
 const p2 = n => String(n).padStart(2, '0');
 const d = new Date();

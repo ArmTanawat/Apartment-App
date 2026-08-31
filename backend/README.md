@@ -73,12 +73,19 @@ The database file `apartment.db` is created automatically on first run.
 
 ### Bills
 - `GET /bills?period=2026-08` — bills for a month, or all
-- `GET /bills/:id` — one bill with its printable line items
+- `GET /bills/:id` — one bill with its printable line items, and its receipt when one has been issued
 - `GET /bills/preview/:leaseId/:period` — calculate without saving (`?prorate=true&days=11`)
 - `GET /bills/example/:kind/:units` — what N units of water or electricity cost at today's rates, for the worked example on the settings screen
 - `POST /bills` — generate and save
 - `POST /bills/batch` — generate for several rooms at once, reporting each room it skipped and why
-- `DELETE /bills/:id`
+- `DELETE /bills/:id` — refused once a receipt has been issued for it
+
+### Receipts
+- `GET /receipts?period=2026-08` — receipts for a month, by the month the bill is for
+- `POST /receipts` — issue one for a bill, assigning the next number; returns the existing receipt if the bill already has one
+- `PUT /receipts/:id` — the note only
+
+There is deliberately no `DELETE`. See "Receipts are numbered" below.
 
 ### Settings
 - `GET /settings` — utility rates, minimum charges, and meter digit counts
@@ -158,6 +165,23 @@ to the user as it arrives. They name the specific thing —
 
 The skip reasons in the `POST /bills/batch` response are read on screen the
 same way, so they are Thai too.
+
+## Receipts are numbered
+
+A receipt is a document handed to a tenant after they pay. Nothing here records
+that money arrived; there is no paid flag and no payment table, deliberately.
+
+Numbers run as a count within the Gregorian calendar year — `2026-0001`,
+`2026-0002` — and are assigned by `POST /receipts` inside the same transaction
+as the insert. Never by the caller: two requests a second apart would otherwise
+read the same highest number and both write it.
+
+One bill has one receipt, so asking twice hands back the first rather than
+issuing a second. And a number, once given out, is spent — there is no route to
+delete a receipt, because deleting a row and inserting another would print the
+same number on two pieces of paper.
+
+A bill that has a receipt cannot be deleted, and so cannot be regenerated.
 
 ## Bills are bilingual
 

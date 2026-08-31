@@ -13,7 +13,15 @@ const path = require('path');
 const fs = require('fs');
 
 const root = path.join(__dirname, '..');
-const PORT = 3001;
+
+// Always its own server, on its own database, on a port nothing else is using.
+//
+// Not the development one, even when it is running: seed.mjs clears the
+// database before each suite, and once a receipt has been issued its bill
+// cannot be deleted — so a database that has been receipted cannot be cleared
+// at all. That rule is right, and it means the tests must never borrow a
+// database somebody is using.
+const PORT = 3100 + Math.floor(Math.random() * 800);
 
 const ping = () => new Promise(resolve => {
   const req = http.get({ host: '127.0.0.1', port: PORT, path: '/health', timeout: 800 },
@@ -25,27 +33,20 @@ const ping = () => new Promise(resolve => {
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 async function main() {
-  let server = null;
-  const alreadyRunning = await ping();
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'apartment-test-'));
+  console.log(`เปิดเซิร์ฟเวอร์สำหรับทดสอบบนพอร์ต ${PORT}`);
+  console.log(`ข้อมูลชั่วคราวอยู่ที่ ${dataDir}`);
+  console.log('ฐานข้อมูลที่กำลังใช้งานอยู่จะไม่ถูกแตะ\n');
 
-  if (alreadyRunning) {
-    console.log('ใช้เซิร์ฟเวอร์ที่เปิดอยู่แล้วบนพอร์ต 3001');
-    console.log('ข้อมูลในฐานข้อมูลนั้นจะถูกล้างและใส่ข้อมูลตัวอย่างใหม่\n');
-  } else {
-    // Its own throwaway data directory, so a test run never touches whatever
-    // database the developer has been working with.
-    const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'apartment-test-'));
-    console.log(`เปิดเซิร์ฟเวอร์สำหรับทดสอบ ข้อมูลอยู่ที่ ${dataDir}\n`);
-    server = spawn(process.execPath, [path.join(root, 'backend', 'server.js')], {
-      env: { ...process.env, APARTMENT_DATA_DIR: dataDir, PORT: String(PORT) },
-      stdio: 'ignore',
-    });
-    for (let i = 0; i < 60 && !await ping(); i++) await sleep(200);
-    if (!await ping()) {
-      console.error('เปิดเซิร์ฟเวอร์ไม่สำเร็จ');
-      server.kill();
-      process.exit(1);
-    }
+  const server = spawn(process.execPath, [path.join(root, 'backend', 'server.js')], {
+    env: { ...process.env, APARTMENT_DATA_DIR: dataDir, PORT: String(PORT) },
+    stdio: 'ignore',
+  });
+  for (let i = 0; i < 60 && !await ping(); i++) await sleep(200);
+  if (!await ping()) {
+    console.error('เปิดเซิร์ฟเวอร์ไม่สำเร็จ');
+    server.kill();
+    process.exit(1);
   }
 
   const suites = [
@@ -55,13 +56,16 @@ async function main() {
     ['smoke:stale',   'เมื่อข้อมูลถูกเปลี่ยนจากที่อื่น'],
     ['smoke:offline', 'เมื่อเซิร์ฟเวอร์ไม่ทำงาน'],
     ['smoke:rules',   'กฎการคิดเงินทุกข้อ'],
+    ['smoke:receipts','ใบเสร็จและรายงาน'],
+    ['check-text',    'จำนวนเงินเป็นตัวหนังสือ และเลขมิเตอร์'],
   ];
 
   const failed = [];
   for (const [name, what] of suites) {
     process.stdout.write(`${name.padEnd(14)} ${what.padEnd(38)} `);
     const r = spawnSync('npm', ['--prefix', 'frontend', 'run', name],
-      { cwd: root, encoding: 'utf8', shell: process.platform === 'win32' });
+      { cwd: root, encoding: 'utf8', shell: process.platform === 'win32',
+        env: { ...process.env, APARTMENT_TEST_PORT: String(PORT) } });
     const out = (r.stdout || '') + (r.stderr || '');
     const good = /all passed|0 failed/.test(out);
     console.log(good ? 'ผ่าน' : 'ไม่ผ่าน');
@@ -82,7 +86,8 @@ async function main() {
     if (!good) failed.push(name);
   }
 
-  if (server) server.kill();
+  server.kill();
+  fs.rmSync(dataDir, { recursive: true, force: true });
 
   console.log(failed.length
     ? `\nไม่ผ่าน ${failed.length} ชุด: ${failed.join(', ')}`

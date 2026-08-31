@@ -1,6 +1,7 @@
 /* A jsdom driver for the ported UI. Not a test framework — it clicks through
    the paths in the verification list and prints what it found, so a change can
    be checked without opening a browser. */
+import { API } from './api-base.mjs';
 import { JSDOM } from 'jsdom';
 
 const dom = new JSDOM('<!doctype html><html><body><div id="root"></div></body></html>',
@@ -22,7 +23,7 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 const nodeFetch = globalThis.fetch;
 globalThis.fetch = (input, init) =>
   nodeFetch(typeof input === 'string' && input.startsWith('/')
-    ? 'http://127.0.0.1:3001' + input : input, init);
+    ? API + input : input, init);
 dom.window.print = () => { printed++; };
 dom.window.alert = m => { alerted.push(m); };
 

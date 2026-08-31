@@ -8,6 +8,7 @@
  * It writes to the database. seed.mjs is imported first and empties it, so the
  * walk starts from the same building every time.
  */
+import { API } from './api-base.mjs';
 import './seed.mjs';
 import { $, $$, alerted, body, byText, check, click, done, nav, section,
          select, settle, text, type, typeAndSave } from './harness.jsx';
@@ -79,7 +80,7 @@ check('the tenant card still shows today', body().includes('ผู้เช่�
 await click($$('.roomhead .month button')[2], 400);   // forward again
 
 section('deleting a lease is not the same as moving out');
-const leaseOf104 = (await (await fetch('http://localhost:3001/units')).json())
+const leaseOf104 = (await (await fetch(`${API}/units`)).json())
   .find(u => u.unit_number === '104').lease_id;
 await click(byText('.btn', 'แก้สัญญา'));
 check('the edit dialog offers it', !!byText('.modal .btn', 'ลบสัญญานี้'));
@@ -95,7 +96,7 @@ await click(byText('.modal .btn', 'ลบสัญญา'), 400);
 check('the lease is gone and the room is vacant', !$('.modal') && text('.tag') === 'ว่าง',
   text('.tag'));
 check('the lease row is gone from the server',
-  (await fetch(`http://localhost:3001/leases/${leaseOf104}`)).status === 404);
+  (await fetch(`${API}/leases/${leaseOf104}`)).status === 404);
 // put the tenant back for the rest of the walk
 await click(byText('.btn', 'ย้ายเข้า'));
 const sel3 = $('.modal select');
@@ -259,7 +260,7 @@ check('the box keeps its text', rate.value === '7');
 check('example follows the new threshold', text('.example b', waterCard) === '109.00',
   text('.example b', waterCard));
 check('the change reached the server',
-  (await (await fetch('http://localhost:3001/settings')).json()).water_min_units === 7);
+  (await (await fetch(`${API}/settings`)).json()).water_min_units === 7);
 await type(rate, '5'); await settle(1500);
 check('fee types from GET /fees/types', $$('.ftable tbody tr').length === 3);
 check('fee types in use offer no delete button, from one GET /fees/lease',

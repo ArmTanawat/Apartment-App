@@ -136,6 +136,14 @@ Rates in force are read at bill generation and the resulting baht amount is froz
 | 9.3 | Look back at any earlier month's readings and bills | Done |
 | 9.4 | The room page names the month its meter and charges belong to, and can change it there | Done |
 | 6.11 | Printable bill | Done |
+| 6.16 | Issue a numbered receipt for a bill after the tenant pays | Done |
+| 6.17 | Receipt numbers run in sequence within the year, never reused, never repeated | Done |
+| 6.18 | One receipt per bill; asking again returns the one already issued | Done |
+| 6.19 | A bill with a receipt cannot be deleted or regenerated | Done |
+| 6.20 | A per-receipt note, separate from the note printed on every bill | Done |
+| 6.21 | Print every receipt for a month in one pass | Done |
+| 6.22 | The total in Thai words on both the bill and the receipt | Done |
+| 6.23 | Meter figures shown as labelled fields, not only inside the working | Done |
 
 ### Generating for several rooms
 
@@ -162,6 +170,34 @@ monthly_rent / days_in_month x days_occupied
 ```
 
 The bill line records the working, for example "11 of 30 days". Nothing changes in the schema — `rent_amount` stores the calculated figure like any other.
+
+## Reports
+
+| # | Requirement | Status |
+|---|---|---|
+| 10.1 | A monthly summary of every bill issued, with totals | Done |
+| 10.2 | The summary accounts for rooms it does not list, and names them | Done |
+| 10.3 | A meter report for the month, every room, columns lined up | Done |
+| 10.4 | The meter report includes rooms read but not yet billed, and marks rooms not read at all | Done |
+| 10.5 | Both reports print like an invoice, on the working month | Done |
+
+Both are built from what the API already returns for other screens — `GET /bills?period=` and `GET /readings?period=` — and needed no endpoint of their own.
+
+A room missing from a month's takings is the thing the summary exists to make visible, so the rooms it leaves out are counted and named at the foot rather than silently absent. The meter report is for spotting a meter that has gone wrong, which is why it lists every room including the ones nothing has been entered for.
+
+## Receipts
+
+| # | Requirement | Status |
+|---|---|---|
+| 11.1 | A receipt is a printed document; the program records nothing about payment | Done |
+| 11.2 | A receipt exists only for a bill | Done |
+| 11.3 | Numbers are assigned by the server inside the insert, never by the client | Done |
+| 11.4 | A number, once issued, is spent — voiding does not hand it to the next receipt | Not built |
+| 11.5 | A receipt carries a signature line and a received-payment statement, and no bank details | Done |
+
+Issuing a receipt says a numbered piece of paper was printed. It does not say money arrived in any system, and there is still no paid flag, no outstanding balance and no payment table. That remains out of scope.
+
+Voiding is deliberately absent. A receipt row cannot be deleted, because deleting one and inserting another would hand the same number out twice — and a number appearing on two pieces of paper is the one thing that makes a receipt book worthless. Building it properly means marking a row void and leaving its number spent, which is a decision for the owner rather than a default.
 
 ## Bill language
 
@@ -190,8 +226,9 @@ The backups sit on the same machine as the database, so the folder should also b
 
 | # | Gap | Note |
 |---|---|---|
-| G1 | No screen for a room's meter history | `GET /readings/history/:unitId` exists and is unused |
-| G2 | A lease created by mistake cannot be deleted, only ended | `DELETE /leases/:id` exists and is unused |
+| G1 | ~~No screen for a room's meter history~~ | Closed — the room page names its งวด and carries a month picker; `GET /readings/history/:unitId` is still unused |
+| G2 | ~~A lease created by mistake cannot be deleted, only ended~~ | Closed — แก้สัญญา offers ลบสัญญานี้ |
+| G3 | A receipt cannot be voided | Deliberate; see Receipts above |
 
 Neither blocks anything. Both are listed so they are not mistaken for dead code on the server.
 

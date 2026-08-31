@@ -100,6 +100,26 @@ The least-visited page. Its real job is the data that prints on an invoice — n
 
 Also the only place a tenant holding several rooms is visible, since the board is organised by room.
 
+### รายงาน — `ReportsPage`
+
+Two printable reports over the working month, chosen with a chip.
+
+**สรุปยอดรวมประจำเดือน** is one row per bill with totals at the foot. Rooms with no bill are not rows — there is nothing to put in the columns — but they are counted and named underneath, split into "has a tenant, not billed yet" and "no tenant this month". A room quietly missing from a month's takings is the thing the report exists to make visible.
+
+**รายงานมิเตอร์** is one row per room: previous, current and units used for each utility, in tabular figures so a wrong digit stands out of the column. Every room appears, including ones read but not yet billed — which is exactly when an error is still worth catching — and ones with no reading, marked rather than dropped.
+
+Neither needed an endpoint. Both are built from `GET /bills?period=` and `GET /readings?period=`, which the other screens already load.
+
+There is no "unusual usage" highlight. No threshold was obviously right — usage doubles between seasons here — and a hint that fires every April is worse than none.
+
+### ใบเสร็จ — `ReceiptPage`, `PrintAllReceiptsPage`
+
+Reached from a bill. A bill without a receipt offers **ออกใบเสร็จ**; one with a receipt offers **พิมพ์ใบเสร็จ**. There is no receipt without a bill, so a vacant or unbilled room never enters the flow and there is nothing to skip.
+
+The paper is `BillPaper` again, with `receipt` passed: same tenant, same lines, same total, and four differences that each matter — the title and number, a signature line for ผู้รับเงิน, its own note about this payment, and a received-payment footer with **no bank details**, because the money has already arrived.
+
+The bills list gains a receipt-number column and a print-all for receipts beside the one for invoices.
+
 ### ตั้งค่า — `settingsHTML()`
 
 Building name, address and phone, with a live preview of the invoice header. Bank details and a free-text note, with a preview of the footer. Water and electricity rates shown as a worked example that recalculates as you type. Meter digit counts. Fee types with an active toggle. Backups with a date and a button.
@@ -146,6 +166,8 @@ Wiring will surface places where a button has no endpoint, or an endpoint has no
 |---|---|
 | `GET /readings/history/:unitId` | The room page showed only the working month's meter and called it "มิเตอร์เดือนนี้" whatever month that was. It now names its งวด and carries a month picker, so any past month is one click away. The endpoint stays unused: one room across many months is a different screen, and stepping the picker turned out to be enough. |
 | `DELETE /leases/:id` | A lease created by mistake could only be ended, which leaves a record of a tenancy that never happened — and bills a full month to someone who never moved in, since a lease that starts and ends inside a month still counts as having been in the room. แก้สัญญา now offers ลบสัญญานี้. Ending is right for a real move-out; deleting is right for a typo. |
+
+Receipts add three routes — `GET /receipts?period=`, `POST /receipts`, `PUT /receipts/:id` — and deliberately no `DELETE`. `GET /bills/:id` now carries the bill's receipt when it has one, which is how the bill screen knows which button to offer and why the staleness banner refuses to regenerate.
 
 Neither blocked the wiring.
 

@@ -14,7 +14,9 @@
     "smoke:stale": "vite build --ssr smoke/stale.jsx --outDir smoke-dist && node smoke-dist/stale.js",
     "smoke:share": "vite build --ssr smoke/share.jsx --outDir smoke-dist && node smoke-dist/share.js",
     "smoke:rules": "node smoke/rules.mjs",
-    "smoke:screens": "vite build --ssr smoke/screens.jsx --outDir smoke-dist && node smoke-dist/screens.js"
+    "smoke:screens": "vite build --ssr smoke/screens.jsx --outDir smoke-dist && node smoke-dist/screens.js",
+    "check-text": "node smoke/text.mjs",
+    "smoke:receipts": "vite build --ssr smoke/receipts.jsx --outDir smoke-dist && node smoke-dist/receipts.js"
   },
   "dependencies": {
     "react": "^19.2.8",

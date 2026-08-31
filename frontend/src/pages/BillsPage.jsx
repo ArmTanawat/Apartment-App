@@ -2,9 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import ErrBox from '../components/ErrBox.jsx';
 import MonthPicker from '../components/MonthPicker.jsx';
 import Switch from '../components/Switch.jsx';
-import { messageOf } from '../lib/api.js';
+import { get, messageOf } from '../lib/api.js';
 import { previewOrReason } from '../lib/bills.js';
 import { baht, daysInPeriod } from '../lib/helpers.js';
+import { useApi } from '../lib/useApi.js';
 import { useData } from '../state/DataContext.jsx';
 import { useUi } from '../state/UiContext.jsx';
 
@@ -24,6 +25,10 @@ export default function BillsPage(){
 
   const monthBills = bills.filter(b => b.period === period);
   const monthTotal = monthBills.reduce((s, b) => s + b.total, 0);
+  // Which of them have had a receipt issued, so the list can say so and the
+  // print-all knows how many pages it is about to produce.
+  const receipts = useApi(() => get(`/receipts?period=${period}`), [period, bills]);
+  const receiptFor = billId => (receipts.data || []).find(r => r.bill_id === billId);
   const totalDays = daysInPeriod(period);
 
   // Every lease that was in a room during the month. Two in a handover month,
@@ -256,19 +261,27 @@ export default function BillsPage(){
         {monthBills.length ? <>
           <div className="actions" style={{margin:"0 0 14px"}}>
             <button className="btn quiet" onClick={() => go({name:"printall"})}>พิมพ์ทั้งเดือน {monthBills.length} ใบ</button>
+            {(receipts.data || []).length > 0 && (
+              <button className="btn quiet" onClick={() => go({name:"printallreceipts"})}>
+                พิมพ์ใบเสร็จ {receipts.data.length} ใบ</button>
+            )}
           </div>
           <table className="blist">
-            <thead><tr><th>ห้อง</th><th>ผู้เช่า</th><th>ออกเมื่อ</th><th className="r">ยอด</th></tr></thead>
+            <thead><tr><th>ห้อง</th><th>ผู้เช่า</th><th>ออกเมื่อ</th><th>ใบเสร็จ</th><th className="r">ยอด</th></tr></thead>
             <tbody>
-              {monthBills.map(b => (
+              {monthBills.map(b => {
+                const r = receiptFor(b.id);
+                return (
                 <tr key={b.id} onClick={() => go({name:"bill", id:b.id})}>
                   <td className="num">{b.unit_number}</td>
                   <td>{b.tenant_name}</td>
                   <td className="num" style={{color:"var(--muted)",fontSize:"13px"}}>{b.created_at}</td>
+                  <td className="num" style={{fontSize:"13px",color:r?"var(--ink)":"var(--muted)"}}>
+                    {r ? r.receipt_no : "—"}</td>
                   <td className="r num">{baht(b.total)}</td>
                 </tr>
-              ))}
-              <tr><td colSpan={3} style={{fontWeight:500,borderBottom:0,paddingTop:"11px"}}>
+              );})}
+              <tr><td colSpan={4} style={{fontWeight:500,borderBottom:0,paddingTop:"11px"}}>
                 รวม {monthBills.length} ใบ</td>
                 <td className="r num" style={{fontWeight:500,borderBottom:0,paddingTop:"11px"}}>{baht(monthTotal)}</td></tr>
             </tbody>

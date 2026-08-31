@@ -1,3 +1,4 @@
+import { API } from './api-base.mjs';
 /* Product testing, backend rules.
  *
  * Not a regression suite — this goes after the rules in CLAUDE.md and
@@ -7,9 +8,8 @@
  *
  *   node smoke/rules.mjs
  */
-const A = 'http://localhost:3001';
 const call = async (m, p, b) => {
-  const r = await fetch(A + p, { method: m, headers: {'Content-Type':'application/json'},
+  const r = await fetch(API + p, { method: m, headers: {'Content-Type':'application/json'},
     body: b === undefined ? undefined : JSON.stringify(b) });
   const body = r.status === 204 ? null : await r.json().catch(() => null);
   return { status: r.status, body };

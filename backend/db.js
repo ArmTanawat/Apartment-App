@@ -117,6 +117,21 @@ db.exec(`
     sort_order  INTEGER NOT NULL DEFAULT 0
   );
 
+  -- A receipt is a document handed to a tenant after they pay. The program
+  -- still records nothing about payment: this row says a piece of paper was
+  -- issued, not that money arrived anywhere.
+  --
+  -- One receipt per bill, and no number twice — the two things that make a
+  -- receipt book worth keeping. Both are UNIQUE rather than checked in code,
+  -- because a duplicate here cannot be undone once the paper is handed over.
+  CREATE TABLE IF NOT EXISTS receipts (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    bill_id     INTEGER NOT NULL UNIQUE REFERENCES bills(id),
+    receipt_no  TEXT NOT NULL UNIQUE,
+    issued_at   TEXT DEFAULT (datetime('now','localtime')),
+    note        TEXT
+  );
+
   CREATE TABLE IF NOT EXISTS settings (
     key   TEXT PRIMARY KEY,
     value TEXT NOT NULL

@@ -17,6 +17,7 @@
 | `one_time_charges` | Charges for a single month only | A repair, a replacement |
 | `bills` | Finished monthly bills | Every month, per tenant |
 | `bill_items` | The printed breakdown of each bill | With every bill |
+| `receipts` | Numbered paper issued after a tenant pays | When a receipt is printed |
 | `settings` | Water and electricity rates, and minimum charges | Rarely |
 | `period_settings` | Whether the minimum applies in a given month | Once a month |
 
@@ -169,6 +170,32 @@ The printed breakdown — one row per line on the bill.
 `bills` holds the totals for accounting; `bill_items` holds what the tenant actually reads. `detail` carries the working, so a tenant can see where a number came from rather than being asked to trust it.
 
 These rows are written at generation time and never touched again. Rebuilding the breakdown later from `lease_fees` would print today's prices onto an old bill.
+
+### `receipts`
+
+The paper a tenant is given after they pay.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | INTEGER | Primary key |
+| `bill_id` | INTEGER | → `bills.id`, **UNIQUE** |
+| `receipt_no` | TEXT | `'2026-0001'`, **UNIQUE** |
+| `issued_at` | TEXT | `datetime('now','localtime')` |
+| `note` | TEXT | About this payment, not about every bill |
+
+This table records that a document was printed. It does **not** record that money arrived: there is no paid flag, no amount received and no payment table, and adding one is still out of scope.
+
+**Why the number is stored rather than derived.** A count of receipts is not a receipt number — deleting a row would renumber every receipt after it, and two receipts issued in the same second would both read the same count. It has to be written down at the moment it is given out, and never worked out again.
+
+**Why `bill_id` is UNIQUE.** One bill, one receipt. Without it, pressing the button twice would produce two numbered pieces of paper for one payment, and nothing afterwards could tell which one the tenant is holding.
+
+**Why `receipt_no` is UNIQUE.** A number on two receipts is the one thing that makes a receipt book worthless. The constraint is in the schema rather than in a check, because by the time a duplicate is noticed the paper has been handed over.
+
+**Why a spent number is never reissued.** The number identifies a document that exists in the world. Deleting the row and inserting another would give the next receipt a number that is already printed on something in a tenant's file. There is no `DELETE` route for that reason: voiding, if it is ever built, marks the row and leaves its number spent.
+
+The number runs as a count within the Gregorian calendar year, matching the periods stored everywhere else. It is assigned on the server, inside the same transaction as the insert — read-then-write outside one would let two receipts a second apart take the same number.
+
+`issued_at` uses `datetime('now','localtime')` like every other timestamp here. UTC would date a receipt issued at 2am to the previous day.
 
 ### `settings`
 

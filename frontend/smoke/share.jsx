@@ -2,10 +2,11 @@
  *
  *   npm run smoke:share
  */
+import { API } from './api-base.mjs';
 import './seed.mjs';
 import { $, $$, body, byText, check, click, done, nav, section, select, text, type } from './harness.jsx';
 
-const api = async (m,p,b) => { const r = await fetch('http://localhost:3001'+p,
+const api = async (m,p,b) => { const r = await fetch(API+p,
   {method:m, headers:{'Content-Type':'application/json'}, body:b?JSON.stringify(b):undefined});
   return r.status===204?null:r.json(); };
 const period = new Date().toISOString().slice(0,7);

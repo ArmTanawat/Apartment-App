@@ -197,6 +197,13 @@ export function DataProvider({ children }){
       generateBill: async body => { const r = await post('/bills', body); await after(['bills']); return r; },
       deleteBill: async id => { await del(`/bills/${id}`); await after(['bills']); },
 
+      // ---- receipts ----
+      // The paper a tenant gets after paying. The number is the server's to
+      // give, so nothing is passed but the bill. Issuing twice for one bill
+      // hands back the first receipt rather than making a second number.
+      issueReceipt: (bill_id, note) => post('/receipts', { bill_id, note }),
+      updateReceiptNote: (id, note) => put(`/receipts/${id}`, { note }),
+
       // ---- settings ----
       patchSettings: async patch => { await put('/settings', patch); await after(['settings']); },
       setApplyMinimum: async (p, on) => {

@@ -42,6 +42,12 @@ These must be checked in route handlers. Both were deliberate decisions, not ove
 
 Every date comparison must use this meaning. In practice that means `end_date > date` everywhere — the vacancy query, the active-lease lookup, the overlap guard in `POST /leases`, and the lease selection in `POST /bills/batch`. A single `>=` among them splits the system in two: the board reports a room as vacant while the overlap guard refuses to let anyone move in, with no error to trace. Grep for `end_date` before changing any of them.
 
+**A bill with a receipt cannot be deleted or regenerated.** The tenant is holding a numbered piece of paper saying what they paid. Deleting the bill leaves that paper pointing at nothing; regenerating — which is a delete and an insert — leaves it disagreeing with a bill that now says something else. `DELETE /bills/:id` refuses and names the receipt number, and the staleness banner offers no regenerate button, saying why instead.
+
+**A receipt number is assigned on the server, inside the same transaction as the insert.** Never by the client, and never read-then-written outside a transaction: two receipts issued a second apart would otherwise both read the highest number, both add one, and both write the same one. `UNIQUE` on `receipt_no` is the last line of defence, not the plan.
+
+**A receipt number, once issued, is spent.** It identifies a document that exists in the world. Deleting the row and inserting another would give the next receipt a number already printed on something in a tenant's file, so there is no `DELETE /receipts/:id`. Voiding, if it is ever built, marks the row and leaves the number spent.
+
 **A bill is stored, so correcting one means deleting and regenerating it.** There is no in-place edit. Changing a meter reading or adding a charge does not touch a bill already saved, and reprinting it produces the same figures as before.
 
 The screen hides this. Opening a bill quietly fetches `GET /bills/preview/:leaseId/:period` alongside it and compares. When they differ, a banner says the data changed after this bill was made, and one button does the whole correction — delete, regenerate, done. The user never sees a delete step.
@@ -113,6 +119,10 @@ So when the user edits anything for a period that already has a bill, say so pla
 **Bills are bilingual, and the wording is frozen at generation.** System labels are Thai then English — `ค่าเช่า Rent`, `ค่าน้ำ Water`, `ค่าไฟ Electricity`. The working in `detail` is Thai only, because a bilingual version of every line would double the bill's length for no gain. Fee names come from `fee_types.name` and `one_time_charges.description`, typed by the user, so seeded fee types are written bilingually as the example to follow.
 
 These strings land in `bill_items` and are never touched again. Editing a label later does not change a bill already generated — which is correct, and also means getting the wording right matters more than it looks.
+
+**The total in Thai words is display only.** `bahtText()` derives it from the number already on the document. Storing it would give one piece of paper two places to disagree with itself, and a rounding fix would then have to be applied twice. The rules it exists for — สิบ not หนึ่งสิบ, ยี่สิบ not สองสิบ, a trailing 1 becoming เอ็ด once anything precedes it, across group boundaries as well as inside one — have a test table in `frontend/smoke/text.mjs`. Change the table before the function.
+
+**The meter figures on a printed line are read out of the stored working, not out of the reading.** `meterFields()` lifts previous, current and units used out of `bill_items.detail` so they can be printed as labelled fields. Taking them from `meter_readings` instead would print today's numbers on an old bill the moment a reading was corrected — the same mistake as recomputing an amount. Anything that does not parse falls back to printing the sentence as it always was, which is what keeps bills issued before this existed readable.
 
 **Periods stay Gregorian in the database.** `'2026-09'` sorts and compares correctly as text. Displaying a Buddhist year is a formatting function on the frontend, not a stored value.
 

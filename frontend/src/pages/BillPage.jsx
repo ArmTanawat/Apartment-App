@@ -11,7 +11,7 @@ import { useUi } from '../state/UiContext.jsx';
 /* One saved bill, with a check against what the same inputs would produce now.
  * The comparison is line by line, never on the total. */
 export default function BillPage({ id }){
-  const { deleteBill, generateBill } = useData();
+  const { deleteBill, generateBill, issueReceipt } = useData();
   const { go, openModal } = useUi();
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -32,6 +32,17 @@ export default function BillPage({ id }){
 
   const { bill: b, d } = req.data;
   const stale = d.changes && d.changes.length > 0;
+  const receipt = b.receipt;
+
+  const makeReceipt = async () => {
+    setBusy(true); setError(null);
+    try {
+      await issueReceipt(b.id);
+      go({name:"receipt", id:b.id});
+    } catch (e) {
+      setError(messageOf(e));
+    } finally { setBusy(false); }
+  };
 
   // Delete then regenerate, in one action. The old figures are replaced, not
   // edited, because a bill stores what it charged rather than recomputing.
@@ -61,12 +72,24 @@ export default function BillPage({ id }){
             <b>{c.from === null ? "ไม่มี" : baht(c.from)}</b> →{" "}
             <b>{c.to === null ? "ไม่มี" : baht(c.to)}</b></li>
         ))}</ul>
-        <div className="actions">
-          <button className="btn quiet" onClick={() => go({name:"bills"})}>เก็บบิลเดิมไว้</button>
-          <button className="btn" disabled={busy} onClick={regen}>ออกบิลใหม่</button>
-        </div>
-        <div style={{fontSize:"12px",color:"var(--muted)",marginTop:"8px"}}>
-          ออกใหม่จะได้บิลคนละใบ ถ้าพิมพ์ใบเดิมให้ผู้เช่าไปแล้ว ต้องพิมพ์ใหม่ให้ด้วย</div>
+        {receipt ? <>
+          {/* A receipted bill is settled paper. Regenerating it would leave the
+              tenant holding a numbered receipt for a bill that no longer says
+              the same thing. */}
+          <div className="warn" style={{margin:"10px 0 0"}}>
+            ออกใบเสร็จเลขที่ <b className="num">{receipt.receipt_no}</b> ไปแล้ว
+            จึงออกบิลใหม่ไม่ได้ ผู้เช่าถือกระดาษที่ระบุยอดนี้อยู่ บิลใบนี้จึงต้องคงเดิม</div>
+          <div className="actions">
+            <button className="btn quiet" onClick={() => go({name:"bills"})}>เก็บบิลเดิมไว้</button>
+          </div>
+        </> : <>
+          <div className="actions">
+            <button className="btn quiet" onClick={() => go({name:"bills"})}>เก็บบิลเดิมไว้</button>
+            <button className="btn" disabled={busy} onClick={regen}>ออกบิลใหม่</button>
+          </div>
+          <div style={{fontSize:"12px",color:"var(--muted)",marginTop:"8px"}}>
+            ออกใหม่จะได้บิลคนละใบ ถ้าพิมพ์ใบเดิมให้ผู้เช่าไปแล้ว ต้องพิมพ์ใหม่ให้ด้วย</div>
+        </>}
       </div>
     )}
     {d.error && (
@@ -77,7 +100,14 @@ export default function BillPage({ id }){
 
     <div className="actions noprint" style={{maxWidth:"640px"}}>
       <button className="btn" onClick={() => window.print()}>พิมพ์</button>
+      {receipt
+        ? <button className="btn quiet" onClick={() => go({name:"receipt", id:b.id})}>พิมพ์ใบเสร็จ</button>
+        : <button className="btn quiet" disabled={busy} onClick={makeReceipt}>ออกใบเสร็จ</button>}
       <button className="btn danger" onClick={() => openModal({kind:"deleteBill", id:b.id})}>ลบบิล</button>
     </div>
+    {!receipt && (
+      <p className="sub noprint" style={{maxWidth:"640px",marginTop:"10px",fontSize:"13px"}}>
+        ออกใบเสร็จเมื่อผู้เช่าจ่ายเงินแล้ว — ใบเสร็จมีเลขที่กำกับ และออกได้ใบเดียวต่อหนึ่งบิล</p>
+    )}
   </>;
 }

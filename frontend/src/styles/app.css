@@ -333,10 +333,43 @@ h1{font-size:32px; font-weight:700; margin:0; line-height:1.4}
   font-variant-numeric:tabular-nums; white-space:nowrap; padding-left:14px}
 .pitems tr.total td{border-bottom:0; border-top:2px solid var(--ink);
   font-weight:700; font-size:16px; padding-top:12px}
+/* The meter figures a utility line is worked out from, lifted out of the
+   sentence that explains the charge so they can be checked at a glance. */
+.meter{display:flex; gap:18px; flex-wrap:wrap; margin-top:4px;
+  font-family:"Roboto Mono",monospace; font-variant-numeric:tabular-nums;
+  font-size:12px; color:var(--ink)}
+.meter b{font-family:"Noto Sans Thai",sans-serif; font-weight:400;
+  color:var(--muted); margin-right:5px}
+/* The total in words. Not muted like the working under a line — on a receipt
+   this is the figure that is being agreed to. */
+.pitems td small.words{color:var(--ink); font-size:13px; font-weight:400; margin-top:5px}
+/* The reason a receipt exists on paper. */
+.sign{margin-top:44px; display:flex; justify-content:flex-end}
+.sign > div{width:250px; text-align:center}
+.sign i{display:block; border-bottom:1px dotted var(--ink); height:36px}
+.sign span{font-size:13px; color:var(--muted)}
 .pfoot{margin-top:24px; padding-top:16px; border-top:1px solid var(--line);
   font-size:13px; color:var(--muted); line-height:1.8}
 .pfoot b{color:var(--ink); font-weight:500}
 .papers .paper{margin-bottom:20px}
+/* A report is the same paper as an invoice, but a table of every room needs
+   more width than a document addressed to one of them. */
+.paper.wide{max-width:940px}
+.rtable{width:100%; border-collapse:collapse; font-size:13px; margin-top:4px}
+.rtable th{font-size:11px; color:var(--muted); font-weight:500; text-align:left;
+  padding:0 0 8px; border-bottom:1px solid var(--line); white-space:nowrap}
+.rtable th.r{text-align:right}
+.rtable th.g{border-left:1px solid var(--line); padding-left:12px}
+.rtable td{padding:7px 0; border-bottom:1px solid var(--line); vertical-align:top}
+.rtable td.r{text-align:right; font-family:"Roboto Mono",monospace;
+  font-variant-numeric:tabular-nums; white-space:nowrap; padding-left:12px}
+.rtable td.g{border-left:1px solid var(--line); padding-left:12px}
+.rtable tr.sum td{border-bottom:0; border-top:2px solid var(--ink);
+  font-weight:700; padding-top:11px}
+.rtable td.gap{color:var(--muted)}
+.rnote{margin-top:16px; padding-top:14px; border-top:1px solid var(--line);
+  font-size:12px; color:var(--muted); line-height:1.8}
+.rnote b{color:var(--ink); font-weight:500}
 .stale{background:var(--attention-soft); border:1px solid var(--attention); border-radius:8px;
   padding:14px 16px; margin-bottom:16px; font-size:14px; line-height:1.7; max-width:640px}
 .diff{font-size:13px; margin:8px 0 0; padding-left:0; list-style:none}

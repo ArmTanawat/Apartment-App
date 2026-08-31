@@ -4,6 +4,9 @@ import BillsPage from './pages/BillsPage.jsx';
 import BoardPage from './pages/BoardPage.jsx';
 import MeterPage from './pages/MeterPage.jsx';
 import PrintAllPage from './pages/PrintAllPage.jsx';
+import PrintAllReceiptsPage from './pages/PrintAllReceiptsPage.jsx';
+import ReceiptPage from './pages/ReceiptPage.jsx';
+import ReportsPage from './pages/ReportsPage.jsx';
 import RoomPage from './pages/RoomPage.jsx';
 import SettingsPage from './pages/SettingsPage.jsx';
 import TenantPage from './pages/TenantPage.jsx';
@@ -16,6 +19,7 @@ const NAV = [
   {k:"meter",    l:"บันทึกมิเตอร์"},
   {k:"bills",    l:"บิล"},
   {k:"tenants",  l:"ผู้เช่า"},
+  {k:"reports",  l:"รายงาน"},
   {k:"settings", l:"ตั้งค่า"},
 ];
 
@@ -36,7 +40,8 @@ function Shell(){
   const active = view.name === "meter" ? "meter"
     : (view.name === "tenants" || view.name === "tenant") ? "tenants"
     : view.name === "settings" ? "settings"
-    : ["bills","bill","printall"].includes(view.name) ? "bills"
+    : view.name === "reports" ? "reports"
+    : ["bills","bill","printall","receipt","printallreceipts"].includes(view.name) ? "bills"
     : "board";
 
   const subject = PAGE_SUBJECT[view.name];
@@ -51,6 +56,9 @@ function Shell(){
     : view.name === "bills"    ? <BillsPage />
     : view.name === "bill"     ? <BillPage id={view.id} />
     : view.name === "printall" ? <PrintAllPage />
+    : view.name === "receipt"  ? <ReceiptPage id={view.id} />
+    : view.name === "printallreceipts" ? <PrintAllReceiptsPage />
+    : view.name === "reports"  ? <ReportsPage />
     : <BoardPage />;
 
   return <>

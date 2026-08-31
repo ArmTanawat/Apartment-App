@@ -8,11 +8,12 @@
  *
  *   npm run smoke:stale
  */
+import { API } from './api-base.mjs';
 import './seed.mjs';
 import { $, $$, byText, check, click, done, nav, section, text, type } from './harness.jsx';
 
 const api = async (m, p, b) => {
-  const r = await fetch('http://localhost:3001' + p,
+  const r = await fetch(API + p,
     { method: m, headers: {'Content-Type':'application/json'}, body: b ? JSON.stringify(b) : undefined });
   return r.status === 204 ? null : r.json();
 };

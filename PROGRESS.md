@@ -3,7 +3,8 @@
 Running notes on porting the prototype to React and wiring it to the backend.
 Written so a fresh session can continue from this file alone.
 
-**Status: ported, wired, product-tested, and packaged as a desktop app.** The
+**Status: ported, wired, product-tested, packaged as a desktop app, and
+carrying reports and receipts.** The
 React app in `frontend/` runs every screen against the Express server in
 `backend/`, and `electron/` starts that server and shows a window pointed at
 it. `fetch` appears in exactly one file.
@@ -61,6 +62,8 @@ npm run smoke:stale      # what they do when the data changed underneath them
 npm run smoke:share      # fees that are a percentage of something else
 npm run smoke:screens    # the filter counts, the month picker, printing, previews
 npm run smoke:rules      # the rules in CLAUDE.md, attacked at their boundaries
+npm run smoke:receipts   # ใบเสร็จ and รายงาน
+npm run check-text       # Thai baht words, and the meter figures out of a bill line
 ```
 
 They need a server on 3001 and they re-seed it. `npm run seed` puts the sample
@@ -771,6 +774,123 @@ What cannot be fixed from source is the bold application-menu title on macOS.
 It comes from the bundle's `Info.plist` at launch, so under `npm start` it says
 `Electron` whatever the app does at runtime. The packaged app is correct.
 
+## รายงาน and ใบเสร็จ
+
+Two screens added last. Neither changed how a bill is calculated.
+
+### Reports needed no endpoint, and got none
+
+Both are built from what the other screens already load — `GET /bills?period=`
+for the summary, `GET /readings?period=` for the meter report. A report that
+needed its own endpoint would have been a sign it was computing something,
+and neither does.
+
+**The summary accounts for what it does not list.** A room with no bill is not
+a row — there is nothing to put in the columns — but the foot says how many
+were left out and names them, split into "has a tenant, not billed yet" and
+"no tenant this month". A room quietly missing from a month's takings is the
+thing this report exists to make visible, and leaving it out silently would
+defeat it.
+
+**The meter report lists every room**, including ones read but not yet billed
+— which is exactly when a wrong number is still worth catching — and ones with
+no reading at all, marked rather than dropped. Figures are tabular and
+right-aligned so a wrong digit stands out of the column, which is the whole
+job.
+
+**There is no unusual-usage highlight.** The brief allowed one and allowed
+leaving it out if no threshold was obviously right. None is: usage here doubles
+between seasons, so anything that would catch a broken meter in November fires
+on every room in April. A hint that cries wolf is worse than none, and the
+columns already do the work.
+
+### Receipts
+
+A receipt is a document. Issuing one records that a numbered piece of paper was
+printed — not that money arrived. There is still no paid flag, no balance and
+no payments table.
+
+**Voiding is deliberately not built.** A receipt number identifies a document
+that exists in the world, so deleting a row and inserting another would print
+the same number on two pieces of paper. Doing it properly means marking a row
+void and leaving its number spent, which is a decision for the owner. There is
+no `DELETE /receipts/:id`.
+
+That decision had a consequence worth recording: **a database that has been
+receipted can no longer be cleared through the API**, because clearing means
+deleting bills and a receipted bill cannot be deleted. `seed.mjs` used to reset
+whatever database it found. It now cannot — which is right — so `npm test`
+always starts its own server, on its own temporary database, on a random free
+port, and the suites read that port from `APARTMENT_TEST_PORT`. The tests never
+borrow a database anybody is using. That is better than what it replaced,
+where a test run wiped the development data by design.
+
+**The number is assigned inside the insert transaction.** Read-then-write
+outside one would let two receipts a second apart take the same number, and
+`UNIQUE` on `receipt_no` would then turn a race into a crash rather than
+preventing it.
+
+**A bill with a receipt cannot be deleted or regenerated.** Enforced in
+`DELETE /bills/:id`, which names the receipt number, and surfaced twice on
+screen: the delete dialog refuses up front, and the staleness banner shows the
+difference but offers no regenerate button, saying why instead.
+
+### The three things the invoice was missing
+
+**The total in Thai words.** `bahtText()`, written against the table in the
+brief before the function existed, plus fourteen more cases. It is display
+only — deriving it from the number already on the page, because storing it
+would give one document two places to disagree with itself.
+
+The rule that a generic implementation gets wrong is เอ็ด, and it reaches
+across group boundaries: 1,000,001 is หนึ่งล้านเอ็ด, even though within its own
+group of six the 1 stands alone. That case is flagged below.
+
+**Meter figures as labelled fields.** `meterFields()` lifts previous, current
+and units used out of `bill_items.detail` and prints them as their own columns,
+with the charge explanation kept beside them — it is what lets a tenant follow
+the arithmetic rather than trust it.
+
+Read out of the *stored working*, not out of `meter_readings`, deliberately. A
+bill records what it charged: taking the numbers from the reading would print
+today's figures on an old bill the moment a reading was corrected, which is the
+same mistake as recomputing an amount. Bills issued before this existed parse
+identically, and anything that does not parse falls back to the sentence as it
+always was.
+
+**Where a receipt is printed from.** The bill screen offers ออกใบเสร็จ, then
+พิมพ์ใบเสร็จ once one exists. The bills list gained a receipt-number column and
+a print-all beside the one for invoices.
+
+### Verified against the packaged app
+
+| Check | Result |
+|---|---|
+| Three receipts in a row | `2026-0001 2026-0002 2026-0003` — consecutive, no gap, no repeat |
+| A second receipt for the same bill | Returned `2026-0001`, status 200, still three receipts |
+| Deleting a receipted bill | `ลบบิลนี้ไม่ได้ เพราะออกใบเสร็จเลขที่ 2026-0001 ไปแล้ว` |
+| Deleting a bill with no receipt | Still 204, unchanged |
+| A meter changed behind a receipted bill | Banner appears, names the changed line, offers no regenerate button and says why |
+| Printing | One paper per receipt, signature line on each, bank details on none |
+| Reports over an awkward month | Summary listed 4 bills and accounted for all 10 rooms it left out (7 unbilled, 3 with no tenant); meter report listed all 14 rooms, 7 with figures and 7 marked unread |
+| Baht text | `.00`, `.50`, `123,456.75`, `100,000` and `250,000.05` all read correctly |
+
+### Thai wording I was not certain about
+
+Worth a read by a native speaker before this reaches a tenant.
+
+1. **1,000,001 → หนึ่งล้านเอ็ด.** The brief flagged this exact case. I applied
+   เอ็ด whenever a trailing 1 has anything before it, across the ล้าน boundary
+   as well as within a group. It cannot occur on a bill in this building, but
+   the rule it encodes affects 101 and 1,001, which can.
+2. **0.50 → ศูนย์บาทห้าสิบสตางค์**, where ห้าสิบสตางค์ alone may read better.
+   Not reachable on a real bill, since a bill with no baht has no lines.
+3. **ได้รับเงินตามรายการข้างต้นเรียบร้อยแล้ว** as the receipt footer, replacing
+   the invoice's payment instructions.
+4. **ผู้รับเงิน** as the signature label.
+5. **ห้องที่ไม่ได้อยู่ในรายงานนี้** as the heading for the rooms the summary
+   leaves out.
+
 ### Still open
 
 `PUT /fees/onetime/:id` has no button — the screens add and delete one-time
@@ -897,3 +1017,13 @@ not thought about: the server dying while the first page was still loading. My
 first two theories were both about the check being wrong. They were both true
 and neither was the cause, and reading the app's own log would have got there
 sooner than either.
+
+**Reports and receipts.** The interesting constraint was not the receipt
+numbering, which the brief specified precisely, but what the no-voiding rule
+did to the test setup: once a database has receipts it cannot be cleared, and
+`seed.mjs` had been clearing whatever it found. Isolating the tests onto their
+own database was the honest fix and left them better than before.
+
+The judgement call was the unusual-usage highlight. The brief allowed it and
+allowed skipping it. There is no threshold here that catches a broken meter in
+November without firing on every room in April, so it is not there.

@@ -20,6 +20,7 @@ const readingsRouter = require('./routes/readings.js');
 const feesRouter = require('./routes/fees.js');
 const billsRouter = require('./routes/bills.js');
 const settingsRouter = require('./routes/settings.js');
+const receiptsRouter = require('./routes/receipts.js');
 const backupsRouter = require('./routes/backups.js');
 
 const app = express();
@@ -36,6 +37,7 @@ app.use('/readings', readingsRouter);
 app.use('/fees', feesRouter);
 app.use('/bills', billsRouter);
 app.use('/settings', settingsRouter);
+app.use('/receipts', receiptsRouter);
 app.use('/backups', backupsRouter);
 
 // A quick way to confirm the server is alive without touching the database.
