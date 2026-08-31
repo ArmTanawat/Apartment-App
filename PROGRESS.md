@@ -751,9 +751,25 @@ The title in the window's own bar is separate again: it comes from `<title>` in
 `frontend/index.html`.
 
 **The icon** goes in `build/icon.png`, 512×512 or larger, square.
-`electron-builder` converts it for both platforms. There is no icon today, so
-the default Electron one is used. `build/README.md` says the same thing in Thai
-for whoever looks there first.
+`electron-builder` converts it for both platforms — a 1254×1254 PNG became
+`Contents/Resources/icon.icns` in the bundle, with `CFBundleName` reading
+`Apartment Manager`.
+
+**Neither shows up under `npm start`, and that caught the owner out.** Running
+from source there is no bundle of ours: Electron lends the app its own, so the
+Dock icon and the menu-bar name are Electron's, and `build/icon.png` is never
+read — it is a build input, not a runtime one.
+
+`electron/main.js` now closes most of that gap when unpackaged: it calls
+`app.setName()` with `productName` so the menu items read the right thing, and
+`app.dock.setIcon()` on macOS so the Dock shows the real icon. The name is set
+*after* the data directory is captured and the path is set back explicitly,
+because `getPath('userData')` derives from the name and letting it move would
+orphan an existing database. Verified: the data stayed in `apartment-app`.
+
+What cannot be fixed from source is the bold application-menu title on macOS.
+It comes from the bundle's `Info.plist` at launch, so under `npm start` it says
+`Electron` whatever the app does at runtime. The packaged app is correct.
 
 ### Still open
 

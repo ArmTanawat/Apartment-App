@@ -13,7 +13,35 @@ const path = require('path');
 
 // The database, its backups and the server log all live here. Inside the
 // packaged app the code is read-only, so nothing may be written beside it.
+//
+// Read before anything below touches the app's name, because getPath derives
+// this from that name. Letting it move would leave an existing database behind
+// under the old one.
 const DATA_DIR = app.getPath('userData');
+
+// What macOS shows in the menu bar, and what the Dock icon is.
+//
+// The packaged app takes both from its bundle, which electron-builder fills in
+// from `productName` and `build/icon.png`. Running from source there is no
+// bundle of ours — it is Electron's own — so the menu would say `apartment-app`
+// and the Dock would show Electron's icon, and `npm start` would look nothing
+// like the thing being built. Neither is worth a second of anyone wondering.
+if (!app.isPackaged) {
+  try {
+    const { productName } = require('../package.json').build;
+    if (productName) {
+      app.setName(productName);
+      // Put it back: the name has just changed and every path derived from it
+      // would otherwise follow.
+      app.setPath('userData', DATA_DIR);
+    }
+  } catch { /* a cosmetic touch is not worth failing to start over */ }
+
+  if (process.platform === 'darwin') {
+    const icon = path.join(__dirname, '..', 'build', 'icon.png');
+    if (fs.existsSync(icon)) app.whenReady().then(() => app.dock.setIcon(icon));
+  }
+}
 const LOG_PATH = path.join(DATA_DIR, 'server.log');
 const SERVER_PATH = path.join(__dirname, '..', 'backend', 'server.js');
 const HEALTH_TIMEOUT_MS = 10000;
