@@ -6,7 +6,7 @@ import { DeleteLeaseModal, EditLeaseModal, MoveInModal, MoveOutModal } from './L
 import { EditPrevModal, MeterModal } from './MeterModals.jsx';
 import { ChargeModal, DeleteFeeModal, DeleteFeeTypeModal, FeeModal, FeeTypeModal } from './FeeModals.jsx';
 import { AddTenantModal, DeleteTenantModal, EditTenantModal } from './TenantModals.jsx';
-import { DeleteBillModal } from './BillModals.jsx';
+import { DeleteBillModal, IssueReceiptModal } from './BillModals.jsx';
 
 /* Which record each dialog is about.
  *
@@ -35,6 +35,7 @@ const SUBJECT = {
   feeType:       ['id',       'feeTypes'],
   deleteFeeType: ['id',       'feeTypes'],
   deleteBill:    ['id',       'bills'],
+  issueReceipt:  ['id',       'bills'],
 };
 
 /* The prototype's openModal(html) wrote a string into #modalRoot. Here the
@@ -78,6 +79,7 @@ export default function ModalHost(){
     case "editTenant":    return <EditTenantModal tenantId={modal.tenantId} />;
     case "deleteTenant":  return <DeleteTenantModal id={modal.id} />;
     case "deleteBill":    return <DeleteBillModal id={modal.id} />;
+    case "issueReceipt":  return <IssueReceiptModal id={modal.id} stale={modal.stale} />;
     default: return null;
   }
 }

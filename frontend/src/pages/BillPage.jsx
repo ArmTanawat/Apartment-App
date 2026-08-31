@@ -11,7 +11,7 @@ import { useUi } from '../state/UiContext.jsx';
 /* One saved bill, with a check against what the same inputs would produce now.
  * The comparison is line by line, never on the total. */
 export default function BillPage({ id }){
-  const { deleteBill, generateBill, issueReceipt } = useData();
+  const { deleteBill, generateBill } = useData();
   const { go, openModal } = useUi();
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -34,15 +34,6 @@ export default function BillPage({ id }){
   const stale = d.changes && d.changes.length > 0;
   const receipt = b.receipt;
 
-  const makeReceipt = async () => {
-    setBusy(true); setError(null);
-    try {
-      await issueReceipt(b.id);
-      go({name:"receipt", id:b.id});
-    } catch (e) {
-      setError(messageOf(e));
-    } finally { setBusy(false); }
-  };
 
   // Delete then regenerate, in one action. The old figures are replaced, not
   // edited, because a bill stores what it charged rather than recomputing.
@@ -102,12 +93,14 @@ export default function BillPage({ id }){
       <button className="btn" onClick={() => window.print()}>พิมพ์</button>
       {receipt
         ? <button className="btn quiet" onClick={() => go({name:"receipt", id:b.id})}>พิมพ์ใบเสร็จ</button>
-        : <button className="btn quiet" disabled={busy} onClick={makeReceipt}>ออกใบเสร็จ</button>}
+        : <button className="btn quiet"
+            onClick={() => openModal({kind:"issueReceipt", id:b.id, stale})}>ออกใบเสร็จ</button>}
       <button className="btn danger" onClick={() => openModal({kind:"deleteBill", id:b.id})}>ลบบิล</button>
     </div>
     {!receipt && (
       <p className="sub noprint" style={{maxWidth:"640px",marginTop:"10px",fontSize:"13px"}}>
-        ออกใบเสร็จเมื่อผู้เช่าจ่ายเงินแล้ว — ใบเสร็จมีเลขที่กำกับ และออกได้ใบเดียวต่อหนึ่งบิล</p>
+        ออกใบเสร็จเมื่อผู้เช่าจ่ายเงินแล้ว — ใบเสร็จมีเลขที่กำกับ ออกได้ใบเดียวต่อหนึ่งบิล
+        และหลังจากนั้นบิลใบนี้จะแก้ไม่ได้อีก</p>
     )}
   </>;
 }

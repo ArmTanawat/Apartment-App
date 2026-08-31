@@ -28,8 +28,22 @@ check('and the working survives beside them',
 check('the total is spelled out in Thai',
   /\(.*บาท(ถ้วน|.*สตางค์)\)/.test(body()), text('.pitems tr.total'));
 
+section('it asks before a door that only opens one way');
+await click(byText('.btn', 'ออกใบเสร็จ'));
+check('a dialog stops first', !!$('.modal') && $('.modal h3').textContent === 'ออกใบเสร็จ',
+  $('.modal') && $('.modal h3').textContent);
+check('it says the number cannot be taken back',
+  $('.modal').textContent.includes('ยกเลิกหรือใช้ซ้ำกับใบอื่นไม่ได้'));
+check('and that the bill is frozen after it',
+  $('.modal').textContent.includes('ออกบิลใหม่ไม่ได้อีก'));
+check('and when to press it', $('.modal').textContent.includes('เมื่อผู้เช่าจ่ายเงินแล้ว'));
+check('it names the bill it is about', $('.modal .lead').textContent.includes('ห้อง'));
+await click(byText('.modal .btn', 'ยกเลิก'), 300);
+check('ยกเลิก issues nothing', !$('.modal') && !!byText('.btn', 'ออกใบเสร็จ'));
+
 section('issuing it');
-await click(byText('.btn', 'ออกใบเสร็จ'), 600);
+await click(byText('.btn', 'ออกใบเสร็จ'));
+await click(byText('.modal .btn', 'ออกใบเสร็จ'), 700);
 check('the receipt opens', !!$('.paper'), body().slice(0,120));
 check('it calls itself a receipt', body().includes('ใบเสร็จรับเงิน') && body().includes('Receipt'));
 check('it carries a number', /\d{4}-\d{4}/.test(text('.phead')), text('.phead'));
@@ -69,6 +83,23 @@ const receipted = (await api('GET', `/receipts?period=${period}`))[0];
 await nav('บิล');
 await click($$('.blist tbody tr').find(r => r.textContent.includes(receipted.receipt_no)), 600);
 check('the staleness banner appears', !!$('.stale'), body().slice(0,150));
+
+// A bill that is already stale is the worst one to receipt: the paper would
+// carry figures that are known to be out of date, and issuing it closes the
+// only way back.
+{
+  await nav('บิล');
+  const unreceipted = $$('.blist tbody tr').find(r => r.children[3].textContent.trim() === '—');
+  if(unreceipted){
+    await click(unreceipted, 500);
+    await click(byText('.btn', 'ออกใบเสร็จ'));
+    check('a plain bill is warned about, without the stale wording',
+      !$('.modal').textContent.includes('เปลี่ยนไปหลังออกบิล'), $('.modal').textContent.slice(0,80));
+    await click(byText('.modal .btn', 'ยกเลิก'), 300);
+  }
+  await nav('บิล');
+  await click($$('.blist tbody tr').find(r => r.textContent.includes(receipted.receipt_no)), 500);
+}
 check('but refuses to regenerate', !byText('.stale .btn', 'ออกบิลใหม่'),
   $('.stale') && $('.stale').textContent);
 check('and says why', $('.stale').textContent.includes('ออกใบเสร็จเลขที่'), $('.stale').textContent);

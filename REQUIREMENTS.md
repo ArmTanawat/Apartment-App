@@ -194,6 +194,8 @@ A room missing from a month's takings is the thing the summary exists to make vi
 | 11.3 | Numbers are assigned by the server inside the insert, never by the client | Done |
 | 11.4 | A number, once issued, is spent — voiding does not hand it to the next receipt | Not built |
 | 11.5 | A receipt carries a signature line and a received-payment statement, and no bank details | Done |
+| 11.6 | Issuing a receipt asks first, saying that the number is spent and the bill is frozen | Done |
+| 11.7 | Issuing one for a bill whose data has changed since says so before it is issued | Done |
 
 Issuing a receipt says a numbered piece of paper was printed. It does not say money arrived in any system, and there is still no paid flag, no outstanding balance and no payment table. That remains out of scope.
 

@@ -875,6 +875,28 @@ a print-all beside the one for invoices.
 | Reports over an awkward month | Summary listed 4 bills and accounted for all 10 rooms it left out (7 unbilled, 3 with no tenant); meter report listed all 14 rooms, 7 with figures and 7 marked unread |
 | Baht text | `.00`, `.50`, `123,456.75`, `100,000` and `250,000.05` all read correctly |
 
+### Issuing a receipt asks first
+
+Added after the fact, at the owner's request, and it should have been there
+from the start. Every other irreversible action in this app stops and explains
+— ลบห้อง, ลบผู้เช่า, ลบสัญญา, ลบบิล — and issuing a receipt is the same kind of
+thing wearing different clothes: a number is spent and the bill behind it is
+frozen for good. Nothing about the button looked destructive, which is exactly
+why it needed saying out loud.
+
+The dialog names the bill, then three things in order: the number cannot be
+cancelled or reused, the bill can no longer be deleted or regenerated, and one
+bill gets one receipt.
+
+**When the bill is already stale it says so first, in red.** That is the worst
+moment to issue one — the paper would carry figures known to be out of date,
+and issuing it closes the only way back to correcting them. The wording points
+at ออกบิลใหม่ first.
+
+`seed.mjs` also stopped failing with a raw stack trace. A database that has
+been receipted cannot be cleared, which is the same rule working correctly; it
+now says that, and says that `npm test` is unaffected because it makes its own.
+
 ### Thai wording I was not certain about
 
 Worth a read by a native speaker before this reaches a tenant.
