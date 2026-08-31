@@ -359,11 +359,14 @@ h1{font-size:32px; font-weight:700; margin:0; line-height:1.4}
 .rtable th{font-size:11px; color:var(--muted); font-weight:500; text-align:left;
   padding:0 0 8px; border-bottom:1px solid var(--line); white-space:nowrap}
 .rtable th.r{text-align:right}
-.rtable th.g{border-left:1px solid var(--line); padding-left:12px}
+/* Where one utility's columns end and the next begin. Space rather than a
+   rule: the columns already line up, and a line down the middle of a table
+   that is read across is one more thing between the eye and the numbers. */
+.rtable th.g{padding-left:26px}
 .rtable td{padding:7px 0; border-bottom:1px solid var(--line); vertical-align:top}
 .rtable td.r{text-align:right; font-family:"Roboto Mono",monospace;
   font-variant-numeric:tabular-nums; white-space:nowrap; padding-left:12px}
-.rtable td.g{border-left:1px solid var(--line); padding-left:12px}
+.rtable td.g{padding-left:26px}
 .rtable tr.sum td{border-bottom:0; border-top:2px solid var(--ink);
   font-weight:700; padding-top:11px}
 .rtable td.gap{color:var(--muted)}
