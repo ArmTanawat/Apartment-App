@@ -262,7 +262,9 @@ The figures are read at generation time and the resulting baht amount is frozen 
 
 ## What you should know
 
-**Dates are compared in local time.** `date('now','localtime')`, not `date('now')` — SQLite's `now` is UTC, and Thailand is seven hours ahead, so plain `now` reports yesterday until 7am.
+**Every date comparison uses `date('now','localtime')`, never `date('now')`.** SQLite's `now` is UTC. Thailand is seven hours ahead, so between midnight and 7am plain `date('now')` returns yesterday — a room whose lease ends today would still show as occupied all morning, and `/units/vacant` would miss it. The same applies to `datetime('now')` on `bills.created_at`, which would otherwise record a time seven hours off.
+
+The program reads the machine's clock and needs no network, so this works offline. It does mean a wrong system clock produces wrong dates, and there is nothing to check that against.
 
 **Occupancy is derived, never stored.** A unit is unoccupied if it has no lease that is currently active (`end_date IS NULL` or in the future). Nothing needs to be manually marked.
 
@@ -295,6 +297,14 @@ Integer satang (3800 baht stored as `380000`) is the stricter approach and is wh
 `bill_note` is free text so a due date, a holiday closure, or a Line ID can reach every tenant without needing a new setting each time.
 
 **Payments were left out on purpose.** When added later, a `payments` table will point at `bills.id`. Nothing in this design needs restructuring for that.
+
+**Periods stay Gregorian in the database.** `'2026-09'` sorts and compares correctly as text. Displaying a Buddhist year is a formatting function on the frontend, not a stored value.
+
+**The database is backed up on every server start.** `backup.js` copies `apartment.db` into `backups/` with a timestamp and keeps the last 30. It runs before the database is opened, so the copy is of a settled file. The whole database being one file is what makes this trivial — and without it, a corrupted file loses every bill ever generated, since no server holds a copy.
+
+**`settings.value` is TEXT, and numeric settings are converted on read.** One table holds both a rate and the building's name. `routes/settings.js` keeps the list of numeric keys and does the conversion once, so nothing downstream has to remember that `9` arrived as a string — `'9' + 1` would give `'91'` and a bill would be silently wrong.
+
+**A meter's digit count lives in settings, not in the reading.** `water_meter_digits` and `electricity_meter_digits` give the dial's capacity for a rollover — five digits wrap at 100000. Counting the digits in the reading itself is wrong for any meter showing a padded number: a five-digit dial reading 500 looks like three digits and would add 1000 instead of 100000.
 
 ---
 
@@ -335,6 +345,34 @@ if (conflict) {
 Without this check nothing errors — the row inserts happily, and the room silently appears rented to two people at once. It shows up much later as a confusing bug, which is why it is worth writing on day one.
 
 The same category of rule applies elsewhere: one meter reading per unit per month, one bill per lease per month. Those two can be enforced by the database with a `UNIQUE(unit_id, period)` and `UNIQUE(lease_id, period)` constraint, because they only involve columns in a single row.
+
+---
+
+## Design decisions
+
+**No `is_occupied` column.** Occupancy is derived from lease dates: a unit is vacant when it has no lease with `end_date IS NULL OR end_date > date('now')`. A stored flag would drift out of sync the first time someone forgot to update it. This is why moving a tenant out automatically frees the room with no second write.
+
+**Rent is copied onto the lease, not referenced.** `units.base_rent` is today's asking price; `leases.monthly_rent` is what this tenant agreed to. Copying at move-in means raising the rent later never rewrites an existing tenant's terms or a past bill.
+
+**Bills store amounts, they do not recalculate them.** A bill is a historical record. If the water rate changes, last year's bills must still show what was charged. Never compute a bill total on read.
+
+**Meter readings attach to units, not leases.** The meter belongs to the room and keeps counting when a tenant changes. Readings store both `prev` and `curr` so each row is self-contained and survives a skipped month or a corrected typo.
+
+**Fee types are data, not code.** `fee_types` is a table so new fee kinds are added through the UI without a code change. Retire a fee with `is_active = 0`; never delete, because old bills reference it.
+
+**Recurring and one-time charges are separate tables.** `lease_fees` recurs every month (parking, facility). `one_time_charges` is filed under a single `period` and appears on that month's bill only (a repair, a replacement). Putting a repair into `lease_fees` would silently bill the tenant for it every month afterwards. When adding a charge, the question is always "does this happen again next month?"
+
+**`bill_items` stores the printed breakdown.** Each line is written at generation time with its own label, detail, and amount. Reconstructing the breakdown later from `lease_fees` would show today's prices on an old bill.
+
+**One tenant can hold many leases.** Someone renting three rooms is three rows in `leases`. This is intended, not a bug to guard against.
+
+**Utility settings are key–value, the monthly switch is a table.** `settings` holds six rows: a rate, a minimum threshold, and a minimum flat amount for each of water and electricity, with entirely separate figures. Adding a setting should be an `INSERT`, never an `ALTER TABLE`.
+
+Whether the minimum applies is decided per month, so it lives in `period_settings` keyed by period. It is one switch for the whole building — not per room, because ticking twenty rooms every month is worse than one tick. A month with no row defaults to applying the minimum.
+
+**Changing how a charge is calculated never touches the schema.** Bills store computed amounts, so the minimum-charge formula and prorated rent both slot into `buildBill()` and land in the existing columns. If a change to the calculation seems to need a new column, check that assumption first — it usually means the working belongs in `bill_items.detail` instead.
+
+**Rent by the day is opt-in per bill.** Full month is the default because it is what nearly always happens. When chosen, `monthly_rent / days_in_month * days_occupied`, with the working recorded in the bill line, for example "11 of 30 days".
 
 ---
 

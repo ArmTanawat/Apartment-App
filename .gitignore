@@ -10,3 +10,7 @@ frontend/dist/
 frontend/smoke-dist/
 
 .DS_Store
+
+# The pre-React design reference. In git history since the first commit;
+# kept on disk only so it can still be opened by double-clicking.
+archive/

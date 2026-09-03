@@ -45,7 +45,7 @@ apartment-app/
 │       ├── bills.js       6
 │       ├── settings.js    4
 │       └── backups.js     2
-└── prototype/
+└── archive/              not in git; kept on disk only
     ├── rooms.html         The whole frontend, 2780 lines, mock data
     └── board.html         An early board-only sketch, superseded
 ```
@@ -56,7 +56,7 @@ apartment-app/
 
 ## The screens
 
-All six live in `prototype/rooms.html` as one file with a small view router. `render()` switches on `view.name`.
+All six live in `archive/rooms.html` as one file with a small view router. `render()` switches on `view.name`.
 
 ### ห้องพัก — `boardHTML()`
 
@@ -136,7 +136,7 @@ Building name, address and phone, with a live preview of the invoice header. Ban
 
 The prototype holds its data in module-level arrays — `units`, `tenants`, `leases`, `readings`, `bills`, `leaseFees`, `charges`, `feeTypes`, `settings`, `periodSettings`. Every one of them maps to an endpoint that already exists and returns the same shape.
 
-**Delete the duplicated calculation.** `buildBill()` at line 1308 and `utilityCharge()` at line 1693 in `rooms.html` are copies of the logic in `routes/bills.js`. They were written so the prototype could show real numbers, and they currently agree with the backend on every case tested. They will not stay in agreement. Replace them with `GET /bills/preview/:leaseId/:period`.
+**Delete the duplicated calculation.** `buildBill()` at line 1308 and `utilityCharge()` at line 1693 in `archive/rooms.html` are copies of the logic in `routes/bills.js`. They were written so the prototype could show real numbers, and they currently agree with the backend on every case tested. They will not stay in agreement. Replace them with `GET /bills/preview/:leaseId/:period`.
 
 `billDiff()` should compare the saved bill against that preview response rather than against a locally computed one.
 
@@ -276,4 +276,4 @@ node server.js          # http://localhost:3001
 
 `apartment.db` is created on first start. Delete it to begin from nothing. A backup is copied into `backend/backups/` on every start, keeping the last 30.
 
-The prototype is a single file — open `prototype/rooms.html` in a browser. It needs no server, and changes nothing.
+The prototype is a single file — open `archive/rooms.html` in a browser. It needs no server, and changes nothing.

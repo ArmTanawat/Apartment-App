@@ -1,7 +1,7 @@
 import { API } from './api-base.mjs';
 /* Empties the database and fills it with the same building the prototype's
  * mock data describes, so the React app can be compared against
- * prototype/rooms.html side by side. Months are placed relative to today,
+ * archive/rooms.html side by side. Months are placed relative to today,
  * not hardcoded.
  *
  *   node server.js            # in backend/

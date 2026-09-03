@@ -318,6 +318,66 @@ A regenerated bill has a new id. If the old one was already printed and handed o
 
 ---
 
+## Screen behaviour rules
+
+These were decided in advance because the backend already behaves this way. Each one records a real bug or a real decision; they are binding, not suggestions.
+
+**Warn before editing a month that is already billed.** Changing a recurring fee, a one-time charge, or a meter reading affects only bills generated afterwards. A bill already saved keeps its own stored line items and does not change — which is correct, because it records what was actually charged.
+
+So when the user edits anything for a period that already has a bill, say so plainly: "A bill for September already exists. This change will apply from next month." Offer to delete and regenerate the bill if the correction should apply to that month. Never silently leave the user thinking a fix took effect on a bill that it did not touch.
+
+**Cancelling a recurring fee is a delete, not a flag.** `DELETE /fees/lease/:id` stops future charges. Past bills keep showing the fee because the tenant did pay it then. The UI should not present this as "the fee never existed" — it stops from now on.
+
+**Use the preview endpoint before saving.** `GET /bills/preview/:leaseId/:period` returns the same figures `POST /bills` would store, without writing anything. Show it, let the user confirm, then post.
+
+**The readings screen is a checklist.** `GET /readings?period=YYYY-MM` returns every room, with nulls for rooms not yet entered. Render those as empty inputs; the filled ones are already done. Call `GET /readings/previous/...` to prefill the previous-reading boxes so only one number is typed per utility.
+
+**The batch billing screen reports partial success.** Selecting twenty rooms may produce eighteen bills and two failures. Show both: the count generated, and each failed room with its reason ("no meter reading for September", "already billed"). Do not show a plain success message when some rooms were skipped.
+
+**Room selection offers three routes to the same list.** A range (101 to 109), a tick list, or select all. The range is a filter over the room list on the client — the API takes an explicit array of rooms either way.
+
+**API base URL lives in one constant.** Everything goes through it, so wrapping the app in Electron later is a one-line change.
+
+**Bills are bilingual, and the wording is frozen at generation.** System labels are Thai then English — `ค่าเช่า Rent`, `ค่าน้ำ Water`, `ค่าไฟ Electricity`. The working in `detail` is Thai only, because a bilingual version of every line would double the bill's length for no gain. Fee names come from `fee_types.name` and `one_time_charges.description`, typed by the user, so seeded fee types are written bilingually as the example to follow.
+
+These strings land in `bill_items` and are never touched again. Editing a label later does not change a bill already generated — which is correct, and also means getting the wording right matters more than it looks.
+
+**The total in Thai words is display only.** `bahtText()` derives it from the number already on the document. Storing it would give one piece of paper two places to disagree with itself, and a rounding fix would then have to be applied twice. The rules it exists for — สิบ not หนึ่งสิบ, ยี่สิบ not สองสิบ, a trailing 1 becoming เอ็ด once anything precedes it, across group boundaries as well as inside one — have a test table in `frontend/smoke/text.mjs`. Change the table before the function.
+
+**The meter figures on a printed line are read out of the stored working, not out of the reading.** `meterFields()` lifts previous, current and units used out of `bill_items.detail` so they can be printed as labelled fields. Taking them from `meter_readings` instead would print today's numbers on an old bill the moment a reading was corrected — the same mistake as recomputing an amount. Anything that does not parse falls back to printing the sentence as it always was, which is what keeps bills issued before this existed readable.
+
+**Label the move-out date for what it is.** Not วันย้ายออก, which is ambiguous about whether the room is free that day, but ห้องว่างตั้งแต่วันที่. The stored value is the day the room becomes available, and the label should say so rather than leaving the user to guess. Offer ว่างวันนี้ and สิ้นเดือนนี้ as shortcuts, since those are almost every case.
+
+**A scheduled move-out must be visible.** `GET /units` returns `leaving_on` and `is_leaving` for a room whose tenant has a future end date. The room is still occupied, but it is about to come free, and a landlord looking for something to rent needs to see that. Show the date on the card and offer a กำลังจะว่าง filter.
+
+**Cancelling a scheduled move-out sends `end_date: null` explicitly.** `PUT /leases/:id` checks for the key with `in` rather than `??`, so a null clears it. Omitting the key keeps the existing date. Anywhere else that uses `??` for partial updates, clearing is not possible — check before assuming a field can be blanked.
+
+**Meter readings are editable from two places.** The บันทึกมิเตอร์ page for the monthly walk-through, and the room page for fixing one room on its own. Both call the same `POST /readings` and `PUT /readings/:id`. Duplicating the entry point is worth it — going to a list of sixteen rooms to correct the one already open is friction for no reason.
+
+**A departed tenant is still reachable for the billing month.** The room page scopes fees and charges to every lease that occupied the room during the period, not to the lease active today. A tenant who left on the 10th still gets a bill for that month, and a repair found afterwards is theirs — so the charge form has to reach their lease. Filtering by `activeLease` alone silently makes that impossible.
+
+**A reading below last month has three possible causes and they bill differently.** A typo, a replaced meter, or a dial that wrapped past its last digit. The API refuses the reading rather than guessing, and the screen asks which it was.
+
+A replaced meter starts at zero, so the previous reading is set to 0 and usage is just the new number. A wrapped dial keeps counting from where it was, so `water_rollover` / `elec_rollover` holds the meter's capacity and usage is `(curr + rollover) - prev`. For 9995 → 12 on a four-digit meter that is 17 units; treating it as a replacement would bill 12 and lose 5.
+
+**A reading may hold a previous figure with no current one.** `water_curr` and `elec_curr` are nullable. That is the state left after the previous figure was corrected upward and the meter has to be read again — refusing the correction until the current number is inflated first is backwards.
+
+A row in that state counts as not entered on the checklist, produces no usage, and is skipped when the next month looks for its previous reading. `is_entered` therefore means both current numbers are present, not merely that a row exists.
+
+**Save each meter on its own.** A water figure that is wrong must not discard an electricity figure typed correctly beside it. Returning early from a save because one of them failed loses the other, and the loss is invisible until the screen redraws.
+
+**Water and electricity are corrected separately.** Both can be below last month at once, and a rollover or a replacement applies to one meter, not the room. Any fix offered for a low reading has to name which meter it acts on.
+
+**One working month, shared by every page that has one.** บันทึกมิเตอร์ and บิล both act on it, and changing it on one changes it on the other. It starts at the current month.
+
+**The board has no month picker.** It shows who is in which room *today* — occupancy, move-in, move-out are all live facts, and a board showing August would make its own buttons meaningless. It does use the working month for one thing: the note saying what is still outstanding. The page says which of the two each figure refers to, because mixing them silently is how a reader ends up trusting the wrong number.
+
+**The working month never goes past the current one.** Nothing can be read or billed for a month that has not happened, and a reading typed into next month is a data error that surfaces weeks later. Going back is unlimited.
+
+**The board must agree with what the forms allow.** If a room shows vacant, moving someone in must succeed. Any date rule used to colour a card has to be the same rule the form validates against.
+
+---
+
 ## Build order
 
 1. **ห้องพัก + ห้อง** — the board and the room page. Together they exercise the grid, forms, API calls, and error handling, and are useful on their own.

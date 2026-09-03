@@ -1,4 +1,4 @@
-/* Lifted verbatim from prototype/rooms.html (the <style> block, lines 11-373).
+/* Lifted verbatim from archive/rooms.html (the <style> block, lines 11-373).
    The design tokens at the top stay CSS variables: every colour in the app
    reads from them, which is what made trying four palettes in an afternoon
    possible. Nothing here is restyled. */
