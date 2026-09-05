@@ -8,12 +8,17 @@ import { useUi } from '../state/UiContext.jsx';
 
 /* One receipt, for one bill.
  *
- * The note is the only thing on it that can be changed, and only before it is
- * handed over. Everything else — the number, the lines, the total, the date —
- * is what the tenant will be holding. */
+ * The note is the only thing stored on it. Everything else — the room, the
+ * period, the lines, the total — is read off the bill each time the page is
+ * drawn, which is what makes a corrected bill produce a corrected receipt
+ * without anything here having to notice.
+ *
+ * ยกเลิกใบเสร็จ removes it and nothing else. A receipt carries no number, so
+ * cancelling spends nothing and issuing again is the same act as the first
+ * time. It is still worth asking, because a tenant may be holding the page. */
 export default function ReceiptPage({ id }){
   const { updateReceiptNote } = useData();
-  const { go } = useUi();
+  const { go, openModal } = useUi();
   const [note, setNote] = useState(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
@@ -59,10 +64,12 @@ export default function ReceiptPage({ id }){
         <button className="btn" onClick={() => window.print()}>พิมพ์</button>
         <button className="btn quiet" disabled={saving || shown === (b.receipt.note || "")}
           onClick={saveNote}>บันทึกหมายเหตุ</button>
+        <button className="btn danger"
+          onClick={() => openModal({kind:"cancelReceipt", id})}>ยกเลิกใบเสร็จ</button>
       </div>
       <p className="sub" style={{fontSize:"13px",marginTop:"10px"}}>
-        เลขที่ <b className="num">{b.receipt.receipt_no}</b> ออกไปแล้ว ยกเลิกไม่ได้
-        และจะไม่ถูกใช้ซ้ำกับใบอื่น</p>
+        ใบเสร็จนี้ไม่มีเลขที่กำกับ ตัวเลขบนใบมาจากบิลงวด {b.period} ห้อง {b.unit_number}
+        ถ้าแก้บิลใบนั้นแล้วออกใหม่ ใบเสร็จจะถูกยกเลิกไปด้วย แล้วออกใหม่ได้ทันที</p>
     </div>
   </>;
 }

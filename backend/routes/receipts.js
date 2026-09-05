@@ -1,39 +1,26 @@
 // routes/receipts.js — issuing the paper a tenant gets after they pay.
 //
 // A receipt is a document, not a payment record. Nothing here says money
-// arrived; it says a numbered piece of paper was printed for a bill. Payment
-// tracking is deliberately not in this program.
+// arrived; it says a piece of paper was printed for a bill. Payment tracking is
+// deliberately not in this program.
+//
+// A receipt has no number and no figures of its own. It is the paper form of
+// one bill: the room, the tenant, the period and every line come off the bill
+// when the page is drawn. Two things follow from that, and they are the point
+// of the design rather than side effects.
+//
+//   Issuing can be undone. DELETE removes the row and the bill goes back to
+//   ยังไม่ได้ออก. Nothing has been spent, so nothing is lost by cancelling.
+//
+//   A corrected bill carries its receipt with it. Correcting a bill is a delete
+//   and an insert, ON DELETE CASCADE takes the receipt with the old bill, and
+//   the user issues again against the corrected figures. The tenant never ends
+//   up holding paper the program disagrees with.
 
 const express = require('express');
 const db = require('../db.js');
 
 const router = express.Router();
-
-// Receipt numbers run as a count within the calendar year — 2026-0001,
-// 2026-0002 — in the Gregorian year the periods everywhere else use.
-//
-// Assigned HERE, inside the same transaction as the insert, and never by the
-// caller. Two receipts issued a second apart would otherwise read the highest
-// number, both add one, and both write the same one.
-//
-// Padded to four digits so the text sorts the way the numbers do. A fifth
-// digit still sorts correctly after 9999; a year that reaches it in this
-// building would be a surprise of a different kind.
-const issue = db.transaction((bill_id, note) => {
-  const year = db.prepare(`SELECT strftime('%Y', 'now', 'localtime') AS y`).get().y;
-  const last = db.prepare(`
-    SELECT receipt_no FROM receipts WHERE receipt_no LIKE ? ORDER BY receipt_no DESC LIMIT 1
-  `).get(`${year}-%`);
-
-  const next = last ? Number(last.receipt_no.slice(year.length + 1)) + 1 : 1;
-  const receipt_no = `${year}-${String(next).padStart(4, '0')}`;
-
-  const result = db.prepare(`
-    INSERT INTO receipts (bill_id, receipt_no, note) VALUES (?, ?, ?)
-  `).run(bill_id, receipt_no, note || null);
-
-  return result.lastInsertRowid;
-});
 
 const withBill = `
   SELECT
@@ -51,9 +38,13 @@ const withBill = `
 // GET /receipts?period=2026-08 — the receipts for a month, for the print-all
 // view. Filtered by the month the BILL is for, not the day the receipt was
 // printed: a receipt for August handed over in September is an August receipt.
+//
+// Ordered by room, which is the order the bills list and the print-all use.
+// There is no number to sort on any more, and issue order is not an order
+// anybody looks for a receipt in.
 router.get('/', (req, res) => {
   const { period } = req.query;
-  const sql = `${withBill} ${period ? 'WHERE b.period = ?' : ''} ORDER BY r.receipt_no`;
+  const sql = `${withBill} ${period ? 'WHERE b.period = ?' : ''} ORDER BY u.unit_number`;
   res.json(period ? db.prepare(sql).all(period) : db.prepare(sql).all());
 });
 
@@ -73,21 +64,23 @@ router.post('/', (req, res) => {
 
   // A bill already has one. Handing back the existing receipt is right: the
   // caller wanted the receipt for this bill and there it is. Refusing would
-  // make a second press of the button look like a failure, and issuing
-  // another would put two numbers against one payment.
+  // make a second press of the button look like a failure, and issuing another
+  // would put two pieces of paper against one bill.
   const existing = db.prepare(`${withBill} WHERE r.bill_id = ?`).get(bill_id);
   if (existing) {
     return res.json(existing);
   }
 
-  const id = issue(bill_id, note);
-  res.status(201).json(db.prepare(`${withBill} WHERE r.id = ?`).get(id));
+  const result = db.prepare('INSERT INTO receipts (bill_id, note) VALUES (?, ?)')
+    .run(bill_id, note);
+
+  res.status(201).json(db.prepare(`${withBill} WHERE r.id = ?`).get(result.lastInsertRowid));
 });
 
 // PUT /receipts/:id — the note only.
 //
-// Not the number, not the bill, not the date. Everything else on a receipt is
-// what was handed over.
+// Not the bill and not the date. Everything else on a receipt is read off the
+// bill when the page is drawn, so there is nothing else here to change.
 router.put('/:id', (req, res) => {
   const existing = db.prepare('SELECT * FROM receipts WHERE id = ?').get(req.params.id);
   if (!existing) {
@@ -100,8 +93,20 @@ router.put('/:id', (req, res) => {
   res.json(db.prepare(`${withBill} WHERE r.id = ?`).get(req.params.id));
 });
 
-// There is deliberately no DELETE. See CLAUDE.md: a receipt number, once
-// issued, is spent. Deleting a row and inserting another would hand the same
-// number out twice, which is the one thing a receipt book must never do.
+// DELETE /receipts/:id — cancel one.
+//
+// The bill goes back to ยังไม่ได้ออก and can be issued again. This is what a
+// receipt with no number buys: there is no document identity to strand, so
+// cancelling costs nothing and a mis-press is recoverable.
+//
+// The note goes with it. It described this issuing, and there is no second
+// issuing it would still be true of.
+router.delete('/:id', (req, res) => {
+  const result = db.prepare('DELETE FROM receipts WHERE id = ?').run(req.params.id);
+  if (result.changes === 0) {
+    return res.status(404).json({ error: 'ไม่พบใบเสร็จ' });
+  }
+  res.status(204).send();
+});
 
 module.exports = router;

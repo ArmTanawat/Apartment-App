@@ -38,7 +38,10 @@ export default function BillPage({ id }){
   // Delete then regenerate, in one action. The old figures are replaced, not
   // edited, because a bill stores what it charged rather than recomputing.
   // A regenerated bill has a new id — if the old one was printed and handed
-  // over, it needs reprinting, which the note under the buttons says.
+  // over, it needs reprinting, which the note under the buttons says. A receipt
+  // for the old bill goes with it, through ON DELETE CASCADE, so the room shows
+  // ยังไม่ได้ออก again and the receipt is issued afresh against the new figures.
+  // That is the whole of what "the receipt follows the bill" means here.
   const regen = async () => {
     setBusy(true); setError(null);
     try {
@@ -63,24 +66,21 @@ export default function BillPage({ id }){
             <b>{c.from === null ? "ไม่มี" : baht(c.from)}</b> →{" "}
             <b>{c.to === null ? "ไม่มี" : baht(c.to)}</b></li>
         ))}</ul>
-        {receipt ? <>
-          {/* A receipted bill is settled paper. Regenerating it would leave the
-              tenant holding a numbered receipt for a bill that no longer says
-              the same thing. */}
+        {/* A receipted bill can be corrected now. The receipt goes with the old
+            bill, which is right — it carried no number and no figures of its
+            own, so there is nothing to strand. What it does mean is a second
+            trip to the printer, and that is worth saying before the press. */}
+        {receipt && (
           <div className="warn" style={{margin:"10px 0 0"}}>
-            ออกใบเสร็จเลขที่ <b className="num">{receipt.receipt_no}</b> ไปแล้ว
-            จึงออกบิลใหม่ไม่ได้ ผู้เช่าถือกระดาษที่ระบุยอดนี้อยู่ บิลใบนี้จึงต้องคงเดิม</div>
-          <div className="actions">
-            <button className="btn quiet" onClick={() => go({name:"bills"})}>เก็บบิลเดิมไว้</button>
-          </div>
-        </> : <>
-          <div className="actions">
-            <button className="btn quiet" onClick={() => go({name:"bills"})}>เก็บบิลเดิมไว้</button>
-            <button className="btn" disabled={busy} onClick={regen}>ออกบิลใหม่</button>
-          </div>
-          <div style={{fontSize:"12px",color:"var(--muted)",marginTop:"8px"}}>
-            ออกใหม่จะได้บิลคนละใบ ถ้าพิมพ์ใบเดิมให้ผู้เช่าไปแล้ว ต้องพิมพ์ใหม่ให้ด้วย</div>
-        </>}
+            บิลใบนี้ออกใบเสร็จไปแล้ว ออกบิลใหม่จะยกเลิกใบเสร็จนั้นไปด้วย
+            แล้วต้องออกใบเสร็จใหม่จากบิลใบใหม่</div>
+        )}
+        <div className="actions">
+          <button className="btn quiet" onClick={() => go({name:"bills"})}>เก็บบิลเดิมไว้</button>
+          <button className="btn" disabled={busy} onClick={regen}>ออกบิลใหม่</button>
+        </div>
+        <div style={{fontSize:"12px",color:"var(--muted)",marginTop:"8px"}}>
+          ออกใหม่จะได้บิลคนละใบ ถ้าพิมพ์ใบเดิมให้ผู้เช่าไปแล้ว ต้องพิมพ์ใหม่ให้ด้วย</div>
       </div>
     )}
     {d.error && (
@@ -99,8 +99,8 @@ export default function BillPage({ id }){
     </div>
     {!receipt && (
       <p className="sub noprint" style={{maxWidth:"640px",marginTop:"10px",fontSize:"13px"}}>
-        ออกใบเสร็จเมื่อผู้เช่าจ่ายเงินแล้ว — ใบเสร็จมีเลขที่กำกับ ออกได้ใบเดียวต่อหนึ่งบิล
-        และหลังจากนั้นบิลใบนี้จะแก้ไม่ได้อีก</p>
+        ออกใบเสร็จเมื่อผู้เช่าจ่ายเงินแล้ว — ออกได้ใบเดียวต่อหนึ่งบิล ยกเลิกได้
+        และยังแก้บิลใบนี้ได้ตามปกติ</p>
     )}
   </>;
 }

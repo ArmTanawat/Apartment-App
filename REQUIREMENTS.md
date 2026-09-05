@@ -136,10 +136,11 @@ Rates in force are read at bill generation and the resulting baht amount is froz
 | 9.3 | Look back at any earlier month's readings and bills | Done |
 | 9.4 | The room page names the month its meter and charges belong to, and can change it there | Done |
 | 6.11 | Printable bill | Done |
-| 6.16 | Issue a numbered receipt for a bill after the tenant pays | Done |
-| 6.17 | Receipt numbers run in sequence within the year, never reused, never repeated | Done |
+| 6.16 | Issue a receipt for a bill after the tenant pays | Done |
+| 6.17 | A receipt carries no number; it is identified by the bill it settles | Done |
 | 6.18 | One receipt per bill; asking again returns the one already issued | Done |
-| 6.19 | A bill with a receipt cannot be deleted or regenerated | Done |
+| 6.19 | A receipt can be cancelled, and the bill issued again afterwards | Done |
+| 6.24 | Correcting a receipted bill cancels its receipt, and both screens say so first | Done |
 | 6.20 | A per-receipt note, separate from the note printed on every bill | Done |
 | 6.21 | Print every receipt for a month in one pass | Done |
 | 6.22 | The total in Thai words on both the bill and the receipt | Done |
@@ -191,17 +192,17 @@ A room missing from a month's takings is the thing the summary exists to make vi
 |---|---|---|
 | 11.1 | A receipt is a printed document; the program records nothing about payment | Done |
 | 11.2 | A receipt exists only for a bill | Done |
-| 11.3 | Numbers are assigned by the server inside the insert, never by the client | Done |
-| 11.4 | A number, once issued, is spent — voiding does not hand it to the next receipt | Not built |
+| 11.3 | A receipt stores nothing but a note; every figure is read off the bill when printed | Done |
+| 11.4 | Cancelling a receipt is an ordinary delete, and issuing again is the same act as the first | Done |
 | 11.5 | A receipt carries a signature line and a received-payment statement, and no bank details | Done |
-| 11.6 | Issuing a receipt asks first, saying that the number is spent and the bill is frozen | Done |
+| 11.6 | Issuing a receipt asks first, saying it can be cancelled and what corrects it away | Done |
 | 11.7 | Issuing one for a bill whose data has changed since says so before it is issued | Done |
 | 11.8 | Receipts have their own list on บิล, a row per bill of the month, issued or not | Done |
 | 11.9 | Print every receipt for a month from that list | Done |
 
-Issuing a receipt says a numbered piece of paper was printed. It does not say money arrived in any system, and there is still no paid flag, no outstanding balance and no payment table. That remains out of scope.
+Issuing a receipt says a piece of paper was printed. It does not say money arrived in any system, and there is still no paid flag, no outstanding balance and no payment table. That remains out of scope.
 
-Voiding is deliberately absent. A receipt row cannot be deleted, because deleting one and inserting another would hand the same number out twice — and a number appearing on two pieces of paper is the one thing that makes a receipt book worthless. Building it properly means marking a row void and leaving its number spent, which is a decision for the owner rather than a default.
+Receipts carried a running number in the first version, and everything awkward about them followed from it: a number printed on paper in a tenant's file is a promise the program can never contradict, so a receipt could not be cancelled and the bill under it could not be corrected. Dropping the number drops the promise. What is lost is auditability — a numbered book has a sequence, and a gap in it is a question; this has neither. That was weighed and chosen: the building is small, receipts are handed over in person, and being unable to fix a wrong meter reading after issuing cost more than the sequence was worth.
 
 ## Bill language
 
@@ -232,7 +233,7 @@ The backups sit on the same machine as the database, so the folder should also b
 |---|---|---|
 | G1 | ~~No screen for a room's meter history~~ | Closed — the room page names its งวด and carries a month picker; `GET /readings/history/:unitId` is still unused |
 | G2 | ~~A lease created by mistake cannot be deleted, only ended~~ | Closed — แก้สัญญา offers ลบสัญญานี้ |
-| G3 | A receipt cannot be voided | Deliberate; see Receipts above |
+| G3 | ~~A receipt cannot be voided~~ | Closed — receipts carry no number and are cancelled with `DELETE /receipts/:id` |
 
 Neither blocks anything. Both are listed so they are not mistaken for dead code on the server.
 

@@ -20,8 +20,8 @@ const rcptCard = $$('.setcard').find(c => c.querySelector('h2').textContent.trim
 check('the bills card is about bills alone',
   $$('th', billCard).map(t => t.textContent.trim()).join(',') === 'ห้อง,ผู้เช่า,ออกเมื่อ,ยอด',
   $$('th', billCard).map(t => t.textContent.trim()).join(','));
-check('the receipts card carries the number and when it was issued',
-  $$('th', rcptCard).map(t => t.textContent.trim()).join(',') === 'ห้อง,ผู้เช่า,เลขที่,ออกเมื่อ,ยอด',
+check('the receipts card says whether one is out, and when',
+  $$('th', rcptCard).map(t => t.textContent.trim()).join(',') === 'ห้อง,ผู้เช่า,สถานะ,ออกเมื่อ,ยอด',
   $$('th', rcptCard).map(t => t.textContent.trim()).join(','));
 check('one row per bill, issued or not',
   $$('tbody tr', rcptCard).length === $$('tbody tr', billCard).length,
@@ -52,14 +52,16 @@ check('and the working survives beside them',
 check('the total is spelled out in Thai',
   /\(.*บาท(ถ้วน|.*สตางค์)\)/.test(body()), text('.pitems tr.total'));
 
-section('it asks before a door that only opens one way');
+section('it asks first, though nothing here is one-way');
 await click(byText('.btn', 'ออกใบเสร็จ'));
 check('a dialog stops first', !!$('.modal') && $('.modal h3').textContent === 'ออกใบเสร็จ',
   $('.modal') && $('.modal h3').textContent);
-check('it says the number cannot be taken back',
-  $('.modal').textContent.includes('ยกเลิกหรือใช้ซ้ำกับใบอื่นไม่ได้'));
-check('and that the bill is frozen after it',
-  $('.modal').textContent.includes('ออกบิลใหม่ไม่ได้อีก'));
+check('it says the receipt can be cancelled',
+  $('.modal').textContent.includes('ยกเลิกได้'), $('.modal').textContent.slice(0,140));
+check('and that correcting the bill takes it with it',
+  $('.modal').textContent.includes('ใบเสร็จจะถูกยกเลิกไปด้วย'));
+check('and it no longer claims a number is spent',
+  !$('.modal').textContent.includes('ใช้ซ้ำ'), $('.modal').textContent.slice(0,140));
 check('and when to press it', $('.modal').textContent.includes('เมื่อผู้เช่าจ่ายเงินแล้ว'));
 check('it names the bill it is about', $('.modal .lead').textContent.includes('ห้อง'));
 await click(byText('.modal .btn', 'ยกเลิก'), 300);
@@ -70,8 +72,10 @@ await click(byText('.btn', 'ออกใบเสร็จ'));
 await click(byText('.modal .btn', 'ออกใบเสร็จ'), 700);
 check('the receipt opens', !!$('.paper'), body().slice(0,120));
 check('it calls itself a receipt', body().includes('ใบเสร็จรับเงิน') && body().includes('Receipt'));
-check('it carries a number', /\d{4}-\d{4}/.test(text('.phead')), text('.phead'));
-check('it names the month it settles', text('.pto').includes('งวด'));
+check('it carries no number', !/\d{4}-\d{4}/.test(text('.phead')), text('.phead'));
+check('it names the month it settles, where an invoice does',
+  text('.phead').includes(period), text('.phead'));
+check('and does not say it twice', !text('.pto').includes('งวด'), text('.pto'));
 check('there is a line to sign', !!$('.sign') && $('.sign').textContent.includes('ผู้รับเงิน'));
 check('it says the money arrived', body().includes('ได้รับเงินตามรายการข้างต้น'));
 check('and carries no bank details', !$('.paper').textContent.includes('ธนาคารกสิกรไทย'),
@@ -88,11 +92,11 @@ section('back from a receipt lands on บิล, which is what its label says');
 await click(byText('.back', 'บิล'), 500);
 check('on the list', !!$$('.setcard h2').find(h => h.textContent.includes('บิลเดือนนี้')));
 const card2 = $$('.setcard').find(c => c.querySelector('h2').textContent.trim() === 'ใบเสร็จเดือนนี้');
-check('the row now shows its number', /\d{4}-\d{4}/.test(card2.textContent), card2.textContent.slice(0,120));
+check('the row now says it is out', card2.textContent.includes('ออกแล้ว'), card2.textContent.slice(0,120));
 check('and a print-all appeared', $$('.btn', card2).some(b => b.textContent.includes('พิมพ์ทั้งหมด')));
 check('clicking that row opens the receipt, no confirmation',
   true);
-await click($$('tbody tr', card2).find(r => /\d{4}-\d{4}/.test(r.textContent)), 500);
+await click($$('tbody tr', card2).find(r => r.textContent.includes('ออกแล้ว')), 500);
 check('it went straight to the receipt', !$('.modal') && body().includes('ใบเสร็จรับเงิน'));
 await click(byText('.back', 'บิล'), 500);
 
@@ -100,12 +104,42 @@ section('the bill screen now offers to print it instead');
 await click($('.blist tbody tr'), 400);
 check('พิมพ์ใบเสร็จ, not ออกใบเสร็จ', !!byText('.btn', 'พิมพ์ใบเสร็จ') && !byText('.btn', 'ออกใบเสร็จ'));
 
-section('a receipted bill cannot be deleted or regenerated');
+section('a receipted bill can be deleted now, but says what that costs');
 await click(byText('.btn', 'ลบบิล'), 400);
-check('the dialog refuses', $('.modal .err') && $('.modal .err').textContent.includes('ลบไม่ได้'),
+check('the dialog does not refuse', !$('.modal .err'),
   $('.modal') && $('.modal').textContent.slice(0,100));
-check('and names the receipt number', /\d{4}-\d{4}/.test($('.modal .err').textContent));
-await click(byText('.modal .btn', 'ปิด'));
+check('it warns the receipt goes too',
+  $('.modal').textContent.includes('ยกเลิกใบเสร็จไปด้วย'), $('.modal').textContent.slice(0,160));
+check('and the delete button is there', !!byText('.modal .btn', 'ลบบิล'));
+await click(byText('.modal .btn', 'ยกเลิก'), 300);
+check('backing out deletes nothing', !$('.modal') && !!byText('.btn', 'พิมพ์ใบเสร็จ'));
+
+section('a receipt can be taken back, which is the whole of the change');
+const firstReceipt = (await api('GET', `/receipts?period=${period}`))[0];
+await click(byText('.btn', 'พิมพ์ใบเสร็จ'), 500);
+check('the receipt page offers to cancel', !!byText('.btn', 'ยกเลิกใบเสร็จ'), body().slice(0,120));
+check('and no longer claims it cannot be', !body().includes('ยกเลิกไม่ได้'));
+await click(byText('.btn', 'ยกเลิกใบเสร็จ'), 400);
+check('it asks first', !!$('.modal') && $('.modal h3').textContent.includes('ยกเลิกใบเสร็จ'),
+  $('.modal') && $('.modal h3').textContent);
+check('saying the bill itself is untouched',
+  $('.modal').textContent.includes('บิลใบนี้ไม่ถูกลบ'), $('.modal').textContent.slice(0,160));
+await click(byText('.modal .btn', 'ไม่ยกเลิก'), 300);
+check('backing out cancels nothing', !$('.modal'));
+await click(byText('.btn', 'ยกเลิกใบเสร็จ'), 400);
+await click(byText('.modal .btn', 'ยกเลิกใบเสร็จ'), 700);
+check('it lands back on the bill, which still exists', !!$('.paper') && body().includes('ใบแจ้งหนี้'),
+  body().slice(0,120));
+check('and offers to issue again, not to print', !!byText('.btn', 'ออกใบเสร็จ') && !byText('.btn', 'พิมพ์ใบเสร็จ'));
+{
+  const gone = await api('GET', `/receipts?period=${period}`);
+  check('the row is gone from the server too',
+    !gone.some(r => r.bill_id === firstReceipt.bill_id), `${gone.length} left`);
+}
+await click(byText('.btn', 'ออกใบเสร็จ'));
+await click(byText('.modal .btn', 'ออกใบเสร็จ'), 700);
+check('issuing again works, with nothing spent in between',
+  body().includes('ใบเสร็จรับเงิน'), body().slice(0,120));
 
 const billId = Number((await api('GET', `/bills?period=${period}`))[0].id);
 const receipted = (await api('GET', `/receipts?period=${period}`))[0];
@@ -140,9 +174,10 @@ check('the staleness banner appears', !!$('.stale'), body().slice(0,150));
   await nav('บิล');
   await click(billRow('บิลเดือนนี้').find(r => r.textContent.includes(receipted.unit_number)), 500);
 }
-check('but refuses to regenerate', !byText('.stale .btn', 'ออกบิลใหม่'),
-  $('.stale') && $('.stale').textContent);
-check('and says why', $('.stale').textContent.includes('ออกใบเสร็จเลขที่'), $('.stale').textContent);
+check('and offers to regenerate even though it is receipted',
+  !!byText('.stale .btn', 'ออกบิลใหม่'), $('.stale') && $('.stale').textContent);
+check('saying the receipt goes with the old bill',
+  $('.stale').textContent.includes('ยกเลิกใบเสร็จนั้นไปด้วย'), $('.stale').textContent);
 
 section('printing a month of receipts');
 await nav('บิล');
@@ -150,7 +185,30 @@ await click(byText('.btn', 'พิมพ์ทั้งหมด'), 600);
 check('one paper per receipt', $$('.paper').length >= 1, `${$$('.paper').length}`);
 check('each has a signature line', $$('.paper').every(p => p.querySelector('.sign')));
 check('and none has bank details', $$('.paper').every(p => !p.textContent.includes('ธนาคารกสิกรไทย')));
-check('the header names the range of numbers', /\d{4}-\d{4}/.test(body()));
+check('the header names the rooms rather than a range of numbers',
+  !/\d{4}-\d{4}/.test(text('.noprint')) && text('.noprint').includes('ห้อง'), text('.noprint'));
+
+section('correcting a receipted bill takes the receipt with it');
+await nav('บิล');
+await click(billRow('บิลเดือนนี้').find(r => r.textContent.includes(receipted.unit_number)), 600);
+check('the stale banner is still there to act on', !!$('.stale'));
+await click(byText('.stale .btn', 'ออกบิลใหม่'), 900);
+check('a new bill is shown', !!$('.paper') && body().includes('ใบแจ้งหนี้'), body().slice(0,120));
+check('and it offers to issue a receipt, not to print one',
+  !!byText('.btn', 'ออกใบเสร็จ') && !byText('.btn', 'พิมพ์ใบเสร็จ'));
+check('the staleness is gone, because the figures now match', !$('.stale'));
+{
+  const after = await api('GET', `/receipts?period=${period}`);
+  check('the old receipt went with the old bill',
+    !after.some(r => r.bill_id === receipted.bill_id), `${after.length} left`);
+}
+await nav('บิล');
+{
+  const rc = $$('.setcard').find(c => c.querySelector('h2').textContent.trim() === 'ใบเสร็จเดือนนี้');
+  const row = $$('tbody tr', rc).find(r => r.textContent.includes(receipted.unit_number));
+  check('and that room reads ยังไม่ได้ออก again',
+    row && row.textContent.includes('ยังไม่ได้ออก'), row && row.textContent);
+}
 
 section('รายงาน');
 await nav('รายงาน');

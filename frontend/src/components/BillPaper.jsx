@@ -39,17 +39,17 @@ export default function BillPaper({ bill: b, receipt = null }){
         </div>
         <div style={{textAlign:"right"}}>
           <div style={{fontWeight:500}}>{isReceipt ? "ใบเสร็จรับเงิน" : "ใบแจ้งหนี้"}</div>
+          {/* Both papers name the month here. A receipt used to carry its own
+              number in this slot; without one there is nothing that identifies
+              it except the bill it settles, which is the month and the room. */}
           <div className="small">{isReceipt ? "Receipt" : "Invoice"}<br />
-            <span className="num">{isReceipt ? receipt.receipt_no : b.period}</span></div>
+            <span className="num">{b.period}</span></div>
         </div>
       </div>
 
       <dl className="pto">
         <dt>ผู้เช่า</dt><dd>{b.tenant_name}</dd>
         <dt>ห้อง</dt><dd className="num">{b.unit_number}</dd>
-        {/* A receipt shows its own number above, so the month it settles has to
-            be said here instead — otherwise nothing on the page names it. */}
-        {isReceipt ? <><dt>งวด</dt><dd className="num">{b.period}</dd></> : null}
         {b.tenant_phone ? <><dt>โทร</dt><dd className="num">{b.tenant_phone}</dd></> : null}
         {b.tenant_address ? <><dt>ที่อยู่</dt><dd>{b.tenant_address}</dd></> : null}
       </dl>

@@ -78,12 +78,13 @@ The database file `apartment.db` is created automatically on first run.
 - `GET /bills/example/:kind/:units` — what N units of water or electricity cost at today's rates, for the worked example on the settings screen
 - `POST /bills` — generate and save
 - `POST /bills/batch` — generate for several rooms at once, reporting each room it skipped and why
-- `DELETE /bills/:id` — refused once a receipt has been issued for it
+- `DELETE /bills/:id` — the receipt for it, if any, goes too
 
 ### Receipts
 - `GET /receipts?period=2026-08` — receipts for a month, by the month the bill is for
-- `POST /receipts` — issue one for a bill, assigning the next number; returns the existing receipt if the bill already has one
+- `POST /receipts` — issue one for a bill; returns the existing receipt if the bill already has one
 - `PUT /receipts/:id` — the note only
+- `DELETE /receipts/:id` — cancel one; the bill goes back to unissued
 
 There is deliberately no `DELETE`. See "Receipts are numbered" below.
 
@@ -166,22 +167,26 @@ to the user as it arrives. They name the specific thing —
 The skip reasons in the `POST /bills/batch` response are read on screen the
 same way, so they are Thai too.
 
-## Receipts are numbered
+## Receipts have no number
 
 A receipt is a document handed to a tenant after they pay. Nothing here records
 that money arrived; there is no paid flag and no payment table, deliberately.
 
-Numbers run as a count within the Gregorian calendar year — `2026-0001`,
-`2026-0002` — and are assigned by `POST /receipts` inside the same transaction
-as the insert. Never by the caller: two requests a second apart would otherwise
-read the same highest number and both write it.
+A receipt carries no identifier and no figures of its own. It is the paper form
+of one bill: the room, the period, every line and the total come off the bill
+when the page is drawn, and the only thing stored on the row is a note. Two
+things follow, and they are the point rather than side effects.
 
-One bill has one receipt, so asking twice hands back the first rather than
-issuing a second. And a number, once given out, is spent — there is no route to
-delete a receipt, because deleting a row and inserting another would print the
-same number on two pieces of paper.
+Issuing can be undone. `DELETE /receipts/:id` removes the row and the bill goes
+back to unissued. Nothing was spent, so nothing is lost by cancelling.
 
-A bill that has a receipt cannot be deleted, and so cannot be regenerated.
+A corrected bill takes its receipt with it, through `ON DELETE CASCADE`.
+Correcting a bill is a delete and an insert, so the old receipt goes and the
+user issues again against the new figures. The tenant never ends up holding
+paper the program disagrees with.
+
+One bill has one receipt, so asking twice hands back the one that exists rather
+than issuing a second.
 
 ## Bills are bilingual
 

@@ -198,11 +198,15 @@ export function DataProvider({ children }){
       deleteBill: async id => { await del(`/bills/${id}`); await after(['bills']); },
 
       // ---- receipts ----
-      // The paper a tenant gets after paying. The number is the server's to
-      // give, so nothing is passed but the bill. Issuing twice for one bill
-      // hands back the first receipt rather than making a second number.
+      // The paper a tenant gets after paying. A receipt has nothing of its own
+      // but a note — the room, the period and every figure are read off the
+      // bill — so nothing is passed but the bill. Issuing twice for one bill
+      // hands back the one that exists rather than making a second.
+      //
+      // Cancelling is an ordinary delete, because a receipt spends nothing.
       issueReceipt: (bill_id, note) => post('/receipts', { bill_id, note }),
       updateReceiptNote: (id, note) => put(`/receipts/${id}`, { note }),
+      cancelReceipt: id => del(`/receipts/${id}`),
 
       // ---- settings ----
       patchSettings: async patch => { await put('/settings', patch); await after(['settings']); },

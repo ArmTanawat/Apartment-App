@@ -9,6 +9,12 @@ against the Express server, the whole thing is packaged as a desktop app, and
 reports and receipts are built. `fetch` appears in exactly one file. The only
 work not done is listed under [Open](#open) at the foot.
 
+**Receipts changed shape on 2026-09-05** and this is the branch it happened on
+(`editablereceipt`). They no longer carry a running number, they can be
+cancelled, and correcting a bill carries its receipt with it. The reasoning and
+what it cost are under [Receipts](#receipts); an existing database migrates
+itself on the next server start.
+
 ---
 
 ## How to run it
@@ -310,36 +316,58 @@ room in April.
 
 ### Receipts
 
-Issuing a receipt records that a numbered piece of paper was printed — not that
-money arrived. There is still no paid flag, no balance and no payments table.
+Issuing a receipt records that a piece of paper was printed — not that money
+arrived. There is still no paid flag, no balance and no payments table.
 
-**The number is assigned inside the insert transaction.** Read-then-write
-outside one would let two receipts a second apart take the same number, and
-`UNIQUE` on `receipt_no` would turn a race into a crash rather than preventing
-it.
+**A receipt carries no number.** This is the decision the rest of the design
+hangs off, and it replaced a first version that did have one — a count within
+the year, `2026-0001`, assigned inside the insert transaction.
 
-**Voiding is not built, and there is no `DELETE /receipts/:id`.** A receipt
-number identifies a document that exists in the world. Doing it properly means
-marking a row void and leaving its number spent, which is a decision for the
-owner.
+The number was not the problem in itself; the promise it made was. A number
+printed on paper in a tenant's file is something the program can never
+afterwards contradict, and everything awkward about the first version followed
+from honouring it: a receipt could not be cancelled, and the bill under it could
+not be corrected, because either would leave that paper disagreeing with the
+database. A wrong meter reading found after issuing was unfixable.
 
-That has a consequence worth knowing before touching the tests: **a database
-that has been receipted can no longer be cleared through the API**, because
-clearing means deleting bills and a receipted bill cannot be deleted. This is
-why `npm test` makes its own server and its own database rather than borrowing
-one.
+Dropping the number drops the promise. The row is now a marker saying "the paper
+for this bill has been printed", plus a note; the room, the period, every line
+and the total are read off the bill each time the page is drawn.
 
-**A bill with a receipt cannot be deleted or regenerated.** Enforced in
-`DELETE /bills/:id`, which names the receipt number, and surfaced twice on
-screen: the delete dialog refuses up front, and the staleness banner shows the
-difference but offers no regenerate button, saying why instead.
+**What was traded away:** auditability. A numbered book has a sequence, and a
+gap in it is a question. This has neither. The owner weighed that against being
+unable to correct a bill and chose this — the building is small and receipts are
+handed over in person.
 
-**Issuing one asks first.** The dialog names the bill, then three things in
-order: the number cannot be cancelled or reused, the bill can no longer be
-deleted or regenerated, and one bill gets one receipt. When the bill is already
-stale it says so first, in red, and points at ออกบิลใหม่ — that is the worst
-moment to issue one, because the paper would carry figures known to be out of
-date and issuing it closes the only way back.
+**Cancelling is an ordinary delete.** `DELETE /receipts/:id`, and the bill goes
+back to `ยังไม่ได้ออก`. The note goes with it: it described that issuing, and
+there is no second issuing it would still be true of.
+
+**A corrected bill takes its receipt with it,** through `ON DELETE CASCADE` on
+`receipts.bill_id`. Correcting a bill is a delete and an insert, so the old
+receipt goes and the user issues again against the new figures. Without the
+cascade the delete fails on the foreign key and a receipted bill is
+uncorrectable, which is exactly the behaviour this replaced.
+
+**Migrating an old database** needs a table rebuild, not an `ALTER TABLE`:
+SQLite will not drop a column a UNIQUE constraint is built on, and cannot add
+`ON DELETE CASCADE` to a foreign key that exists. `dropReceiptNumbers()` in
+`db.js` does it by SQLite's own documented procedure — foreign keys off, one
+transaction, `foreign_key_check` before committing — guarded on the old column
+so it runs once. Rows, ids, notes and timestamps survive; only the numbers go.
+
+**`seed.mjs` can clear a receipted database again.** It could not while a
+receipt held its bill down, and had to stop and explain that the only way to
+reset was to delete the file. `npm test` still makes its own server and its own
+database, which is right for other reasons — the suites re-seed whatever they
+find.
+
+**Issuing one still asks first,** but for a different reason. Nothing is spent
+and nothing is frozen, so the only question that matters is whether the tenant
+has actually paid — which the program cannot detect, and which printing a
+receipt for is the mistake worth stopping. When the bill is already stale it
+says so first, in red, and points at ออกบิลใหม่: recoverable now, but still a
+page printed twice and a tenant who has to be told why.
 
 **ใบเสร็จเดือนนี้ sits beside บิลเดือนนี้ on บิล**, built the same way: a
 print-all above, a row per bill, a count at the foot. Every bill is a row,
@@ -491,7 +519,8 @@ range box, printing, the month picker, the board's edit-mode add buttons.
 Things a later session might take for bugs. Each was decided, not overlooked.
 
 - **No payments, paid flag or balance.** Out of scope, as `CLAUDE.md` says.
-- **No receipt voiding.** See [Receipts](#receipts).
+- **No receipt number, and no sequence to audit.** Deliberate, and the reason
+  cancelling and correcting work at all. See [Receipts](#receipts).
 - **No unusual-usage highlight on the meter report.** No threshold is right.
 - **No polling.** A stale screen that is never written to stays stale.
 - **`GET /readings/history/:unitId` has no screen.**
@@ -507,23 +536,14 @@ Things a later session might take for bugs. Each was decided, not overlooked.
 
 ## Open
 
-**Two suites fail as of 2026-09-01, and it is not the app being wrong about
-money.** `npm test` reports `smoke` and `smoke:receipts` failing. Both fail
-identically with the working tree clean, so nothing in this repo's recent
-changes caused them, and the other eight suites pass.
-
-- `smoke` fails one check, `still billable for the month` (`walk.jsx:62`): after
-  moving a tenant out with today as the day the room comes free, the board's
-  note `ยังต้องออกบิลให้` is not on the page.
-- `smoke:receipts` crashes rather than asserting — `GET /bills?period=` comes
-  back empty and the suite reads `[0].id` off it.
-
-Both are about the working month, and today is the first day of one. The seed
-places its months relative to today, so a suite that assumes the current month
-already has something in it has nothing to find on the 1st. That is a guess and
-not yet proven; the first thing to try is running `npm test` on a day that is
-not the 1st, which distinguishes a test that only holds mid-month from a real
-regression in either the board note or the bill list.
+**The two suites that failed on 2026-09-01 were a calendar effect, now
+confirmed.** `smoke` and `smoke:receipts` both failed on the 1st and both pass
+unchanged on the 5th. The seed places its months relative to today, so on the
+first day of a month the working month has nothing in it yet and a suite that
+assumes otherwise finds nothing. Nothing was wrong with the app. Neither suite
+has been made robust to the date — running `npm test` on the 1st will fail the
+same way again, and fixing that means seeding the working month rather than
+relying on it having been filled.
 
 **Windows has never been installed on.** The x64 installer builds
 (`Apartment Manager Setup 1.0.0.exe`, 110 MB, `win32-x64.node` unpacked, no

@@ -39,9 +39,11 @@ export default function PrintAllReceiptsPage(){
       <div className="head"><h1>พิมพ์ใบเสร็จทั้งเดือน</h1></div>
       <p className="sub">งวด {period} · <span className="num">{receipts.length}</span> ใบ ·
         รวม <span className="num">{baht(total)}</span> บาท · หนึ่งใบต่อหนึ่งหน้า</p>
+      {/* There is no number range to name any more, so what identifies the
+          stack is the rooms in it. Ordered by room, the same as the list this
+          page was reached from. */}
       <p className="sub" style={{marginTop:"-18px",fontSize:"13px"}}>
-        เลขที่ <span className="num">{receipts[0].receipt_no}</span>
-        {receipts.length > 1 && <> ถึง <span className="num">{receipts.at(-1).receipt_no}</span></>}</p>
+        ห้อง <span className="num">{receipts.map(r => r.unit_number).join(", ")}</span></p>
       <div className="actions" style={{maxWidth:"640px",alignItems:"center"}}>
         <button className="btn" onClick={() => window.print()}>พิมพ์ทั้งหมด</button>
         <span style={{color:"var(--muted)",fontSize:"13px"}}>

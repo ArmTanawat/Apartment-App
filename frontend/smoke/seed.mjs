@@ -36,21 +36,11 @@ async function call(method, path, body){
 // Emptied in dependency order: a lease with bills cannot be deleted, and
 // neither can a unit or a tenant with leases. Fees and charges go with their
 // lease through ON DELETE CASCADE.
-for(const b of await call('GET','/bills')){
-  try { await call('DELETE', `/bills/${b.id}`); }
-  catch (e) {
-    // A bill with a receipt cannot be deleted, by design — so a database that
-    // has been receipted cannot be cleared at all. That is the rule working
-    // rather than a fault, and it deserves saying rather than a stack trace.
-    console.error('\nล้างฐานข้อมูลนี้ไม่ได้ เพราะมีใบเสร็จที่ออกไปแล้ว');
-    console.error(String(e.message));
-    console.error('\nใบเสร็จยกเลิกไม่ได้ บิลที่ออกใบเสร็จแล้วจึงลบไม่ได้ด้วย');
-    console.error('ถ้าต้องการข้อมูลตัวอย่างใหม่ ให้ปิดเซิร์ฟเวอร์ ลบไฟล์ backend/apartment.db');
-    console.error('แล้วเปิดเซิร์ฟเวอร์ใหม่ ไฟล์จะถูกสร้างให้เอง จากนั้นค่อยรัน npm run seed');
-    console.error('\nส่วน npm test ไม่ได้รับผลกระทบ — มันสร้างฐานข้อมูลชั่วคราวของตัวเองอยู่แล้ว\n');
-    process.exit(1);
-  }
-}
+// A receipt goes with its bill through ON DELETE CASCADE, so a receipted
+// database clears like any other. It did not use to: a receipt held its bill
+// down, and this loop had to stop and explain that the database could only be
+// cleared by deleting the file.
+for(const b of await call('GET','/bills')) await call('DELETE', `/bills/${b.id}`);
 for(const l of await call('GET','/leases')){
   for(const r of await call('GET',`/readings/history/${l.unit_id}`))
     await call('DELETE',`/readings/${r.id}`).catch(() => {});

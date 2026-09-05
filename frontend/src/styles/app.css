@@ -320,19 +320,30 @@ h1{font-size:32px; font-weight:700; margin:0; line-height:1.4}
   padding-bottom:16px; margin-bottom:18px}
 .phead h2{margin:0 0 4px; font-size:20px; font-weight:700}
 .phead .small{font-size:13px; color:var(--muted); line-height:1.7}
-.pto{display:grid; grid-template-columns:auto 1fr; gap:4px 14px; font-size:14px; margin-bottom:20px}
+/* Who the bill is addressed to. Smaller than the lines it introduces: the
+   tenant already knows their own name and room, so this is a label on the
+   document rather than something to be read, and the height it gives back
+   goes to the fees. */
+.pto{display:grid; grid-template-columns:auto 1fr; gap:2px 14px; font-size:13px; margin-bottom:16px}
 .pto dt{color:var(--muted)}
 .pto dd{margin:0}
 .pitems{width:100%; border-collapse:collapse; font-size:14px}
 .pitems th{font-size:12px; color:var(--muted); font-weight:500; text-align:left;
   padding:0 0 8px; border-bottom:1px solid var(--line)}
 .pitems th.r{text-align:right}
-.pitems td{padding:9px 0; border-bottom:1px solid var(--line); vertical-align:top}
-.pitems td small{display:block; color:var(--muted); font-size:12px; line-height:1.6}
+/* Tight padding, but the rule between lines stays. A bill with a repair, four
+   recurring fees and both utilities has to fit on one sheet beside the header
+   and the signature, so the height came out of the padding — 9px to 4px, which
+   is most of what there was to take. Taking the rules out as well was tried and
+   put back: a utility line's working sits directly above the next line's label,
+   and with nothing between them the muted grey was not enough on its own. The
+   rule costs 1px and does the separating the spacing used to do. */
+.pitems td{padding:4px 0; border-bottom:1px solid var(--line); vertical-align:top}
+.pitems td small{display:block; color:var(--muted); font-size:12px; line-height:1.5}
 .pitems td.r{text-align:right; font-family:"Roboto Mono",monospace;
   font-variant-numeric:tabular-nums; white-space:nowrap; padding-left:14px}
 .pitems tr.total td{border-bottom:0; border-top:2px solid var(--ink);
-  font-weight:700; font-size:16px; padding-top:12px}
+  font-weight:700; font-size:16px; padding-top:10px}
 /* The meter figures a utility line is worked out from, lifted out of the
    sentence that explains the charge so they can be checked at a glance. */
 .meter{display:flex; gap:18px; flex-wrap:wrap; margin-top:4px;

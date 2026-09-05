@@ -299,7 +299,7 @@ export default function BillsPage(){
             </div>
           )}
           <table className="blist">
-            <thead><tr><th>ห้อง</th><th>ผู้เช่า</th><th>เลขที่</th><th>ออกเมื่อ</th><th className="r">ยอด</th></tr></thead>
+            <thead><tr><th>ห้อง</th><th>ผู้เช่า</th><th>สถานะ</th><th>ออกเมื่อ</th><th className="r">ยอด</th></tr></thead>
             <tbody>
               {monthBills.map(b => {
                 const r = receiptFor(b.id);
@@ -309,8 +309,11 @@ export default function BillsPage(){
                     : openModal({kind:"issueReceipt", id:b.id})}>
                     <td className="num">{b.unit_number}</td>
                     <td>{b.tenant_name}</td>
-                    <td className="num" style={{color: r ? "var(--ink)" : "var(--muted)"}}>
-                      {r ? r.receipt_no : "ยังไม่ได้ออก"}</td>
+                    {/* A receipt has no number to show, so the column says
+                        whether one exists. An unissued row reads as something
+                        still to do rather than as a blank. */}
+                    <td style={{color: r ? "var(--ink)" : "var(--muted)"}}>
+                      {r ? "ออกแล้ว" : "ยังไม่ได้ออก"}</td>
                     <td className="num" style={{color:"var(--muted)",fontSize:"13px"}}>
                       {r ? r.issued_at : "—"}</td>
                     <td className="r num">{baht(b.total)}</td>

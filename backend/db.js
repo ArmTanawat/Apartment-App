@@ -121,13 +121,22 @@ db.exec(`
   -- still records nothing about payment: this row says a piece of paper was
   -- issued, not that money arrived anywhere.
   --
-  -- One receipt per bill, and no number twice — the two things that make a
-  -- receipt book worth keeping. Both are UNIQUE rather than checked in code,
-  -- because a duplicate here cannot be undone once the paper is handed over.
+  -- There is no receipt number. The receipt carries no identity of its own —
+  -- it is the paper form of one bill, and the bill is what identifies it. That
+  -- is what lets a receipt be cancelled and issued again, and what lets its
+  -- figures follow a bill that was corrected: nothing was printed on it that
+  -- the program would then be contradicting.
+  --
+  -- One receipt per bill, which is UNIQUE rather than checked in code.
+  --
+  -- ON DELETE CASCADE is the whole of the correction story. Correcting a bill
+  -- is a delete and an insert, so the receipt for the old bill goes with it and
+  -- the room shows ยังไม่ได้ออก again. Without the cascade the delete would
+  -- fail on the foreign key and a receipted bill would be uncorrectable, which
+  -- is the behaviour this replaced.
   CREATE TABLE IF NOT EXISTS receipts (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    bill_id     INTEGER NOT NULL UNIQUE REFERENCES bills(id),
-    receipt_no  TEXT NOT NULL UNIQUE,
+    bill_id     INTEGER NOT NULL UNIQUE REFERENCES bills(id) ON DELETE CASCADE,
     issued_at   TEXT DEFAULT (datetime('now','localtime')),
     note        TEXT
   );
@@ -160,6 +169,52 @@ addColumn('fee_types', 'percent_of', 'TEXT');
 addColumn('fee_types', 'percent', 'REAL');
 addColumn('lease_fees', 'percent_of', 'TEXT');
 addColumn('lease_fees', 'percent', 'REAL');
+
+// Receipts used to carry a running number and to hold their bill down. Both
+// are gone: a receipt is now the paper form of a bill, cancellable, and its
+// figures follow the bill if it is corrected.
+//
+// Neither change can be made with ALTER TABLE. SQLite refuses to drop a column
+// that a UNIQUE constraint is built on, and a foreign key cannot have
+// ON DELETE CASCADE added to it afterwards. So the table is rebuilt, by the
+// procedure SQLite's own documentation gives for this: foreign keys off, the
+// whole thing in one transaction, and a foreign_key_check before committing.
+//
+// Guarded on the old column, so it runs once on a database that predates the
+// change and never on one created since.
+function dropReceiptNumbers() {
+  const cols = db.prepare(`PRAGMA table_info(receipts)`).all();
+  if (!cols.length || !cols.some(c => c.name === 'receipt_no')) return;
+
+  db.pragma('foreign_keys = OFF');
+  try {
+    db.transaction(() => {
+      db.exec(`
+        CREATE TABLE receipts_new (
+          id          INTEGER PRIMARY KEY AUTOINCREMENT,
+          bill_id     INTEGER NOT NULL UNIQUE REFERENCES bills(id) ON DELETE CASCADE,
+          issued_at   TEXT DEFAULT (datetime('now','localtime')),
+          note        TEXT
+        );
+        INSERT INTO receipts_new (id, bill_id, issued_at, note)
+          SELECT id, bill_id, issued_at, note FROM receipts;
+        DROP TABLE receipts;
+        ALTER TABLE receipts_new RENAME TO receipts;
+      `);
+
+      const broken = db.prepare(`PRAGMA foreign_key_check`).all();
+      if (broken.length) {
+        throw new Error(`ย้ายตารางใบเสร็จไม่สำเร็จ: พบข้อมูลที่อ้างถึงแถวที่ไม่มีอยู่ ${broken.length} แถว`);
+      }
+    })();
+  } finally {
+    db.pragma('foreign_keys = ON');
+  }
+
+  console.log('ปรับตารางใบเสร็จแล้ว: เลิกใช้เลขที่ใบเสร็จ ใบเสร็จเดิมยังอยู่ครบ');
+}
+
+dropReceiptNumbers();
 
 // Seed the utility rates only if missing. INSERT OR IGNORE does nothing when
 // the key already exists, so edited rates are never reset on restart.

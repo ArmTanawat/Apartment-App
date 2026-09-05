@@ -17,7 +17,7 @@
 | `one_time_charges` | Charges for a single month only | A repair, a replacement |
 | `bills` | Finished monthly bills | Every month, per tenant |
 | `bill_items` | The printed breakdown of each bill | With every bill |
-| `receipts` | Numbered paper issued after a tenant pays | When a receipt is printed |
+| `receipts` | The paper issued after a tenant pays | When a receipt is printed |
 | `settings` | Water and electricity rates, and minimum charges | Rarely |
 | `period_settings` | Whether the minimum applies in a given month | Once a month |
 
@@ -178,22 +178,23 @@ The paper a tenant is given after they pay.
 | Column | Type | Notes |
 |---|---|---|
 | `id` | INTEGER | Primary key |
-| `bill_id` | INTEGER | → `bills.id`, **UNIQUE** |
-| `receipt_no` | TEXT | `'2026-0001'`, **UNIQUE** |
+| `bill_id` | INTEGER | → `bills.id`, **UNIQUE**, **ON DELETE CASCADE** |
 | `issued_at` | TEXT | `datetime('now','localtime')` |
 | `note` | TEXT | About this payment, not about every bill |
 
 This table records that a document was printed. It does **not** record that money arrived: there is no paid flag, no amount received and no payment table, and adding one is still out of scope.
 
-**Why the number is stored rather than derived.** A count of receipts is not a receipt number — deleting a row would renumber every receipt after it, and two receipts issued in the same second would both read the same count. It has to be written down at the moment it is given out, and never worked out again.
+**Why there is no receipt number.** A number is an identity, and an identity is a promise: once it is printed on paper in a tenant's file, the program can never contradict it. That promise is what used to make a receipt permanent — it could not be cancelled, and the bill under it could not be corrected, because either would leave the paper disagreeing with the database.
 
-**Why `bill_id` is UNIQUE.** One bill, one receipt. Without it, pressing the button twice would produce two numbered pieces of paper for one payment, and nothing afterwards could tell which one the tenant is holding.
+Dropping the number drops the promise, and everything else follows from that. The row is now nothing but a marker that says "the paper for this bill has been printed", plus a note. The room, the period, every line and the total are read off the bill each time the page is drawn.
 
-**Why `receipt_no` is UNIQUE.** A number on two receipts is the one thing that makes a receipt book worthless. The constraint is in the schema rather than in a check, because by the time a duplicate is noticed the paper has been handed over.
+**Why `bill_id` is UNIQUE.** One bill, one receipt. Without it, pressing the button twice would produce two pieces of paper for one payment.
 
-**Why a spent number is never reissued.** The number identifies a document that exists in the world. Deleting the row and inserting another would give the next receipt a number that is already printed on something in a tenant's file. There is no `DELETE` route for that reason: voiding, if it is ever built, marks the row and leaves its number spent.
+**Why `bill_id` cascades.** Correcting a bill is a delete and an insert, so the receipt for the old bill has to go somewhere. Taking it with the bill is the only option that leaves nothing dangling: the room reads `ยังไม่ได้ออก` again and the user issues afresh against the corrected figures. Without the cascade the delete fails on the foreign key and a receipted bill becomes uncorrectable, which is the behaviour this replaced.
 
-The number runs as a count within the Gregorian calendar year, matching the periods stored everywhere else. It is assigned on the server, inside the same transaction as the insert — read-then-write outside one would let two receipts a second apart take the same number.
+**What is lost, and why it was acceptable.** A receipt book with numbers can be audited — a gap in the sequence is a question. This one cannot be. That was the owner's call: the building is small, receipts are handed over in person, and being unable to fix a wrong meter reading after issuing a receipt cost more than the audit trail was worth.
+
+**Migrating an existing database.** `db.js` rebuilds the table when it finds the old `receipt_no` column, because SQLite will not drop a column a UNIQUE constraint is built on, and cannot add `ON DELETE CASCADE` to an existing foreign key. Rows, ids, notes and timestamps are carried across; only the numbers are dropped. It runs once and is a no-op afterwards.
 
 `issued_at` uses `datetime('now','localtime')` like every other timestamp here. UTC would date a receipt issued at 2am to the previous day.
 
