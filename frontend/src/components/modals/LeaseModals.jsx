@@ -74,13 +74,13 @@ export function MoveInModal({ unitId }){
           <div className="warn">ชื่อ เบอร์ และที่อยู่ทั้งหมดนี้จะขึ้นบนใบแจ้งหนี้
             กรอกให้ครบตั้งแต่ตอนนี้จะได้ไม่ต้องกลับมาแก้ตอนออกบิล</div>
           <div className="field"><label>ชื่อ — นามสกุล</label>
-            <input placeholder="สมชาย ใจดี" value={newName} onChange={e=>setNewName(e.target.value)} /></div>
+            <input value={newName} onChange={e=>setNewName(e.target.value)} /></div>
           <div className="field"><label>เบอร์โทร</label>
-            <input className="num" placeholder="081-234-5678" value={newPhone} onChange={e=>setNewPhone(e.target.value)} /></div>
+            <input className="num" value={newPhone} onChange={e=>setNewPhone(e.target.value)} /></div>
           <div className="field"><label>ที่อยู่</label>
-            <input placeholder="12/3 ถ.สุขุมวิท กรุงเทพฯ" value={newAddr} onChange={e=>setNewAddr(e.target.value)} /></div>
+            <input value={newAddr} onChange={e=>setNewAddr(e.target.value)} /></div>
           <div className="field"><label>เลขบัตรประชาชน</label>
-            <input className="num" placeholder="1234567890123" value={newIdCard} onChange={e=>setNewIdCard(e.target.value)} /></div>
+            <input className="num" value={newIdCard} onChange={e=>setNewIdCard(e.target.value)} /></div>
         </div>
       )}
       <div className="two">

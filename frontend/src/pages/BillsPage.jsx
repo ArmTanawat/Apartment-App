@@ -163,9 +163,9 @@ export default function BillsPage(){
 
         <div className="rangebar" style={{marginBottom:"4px"}}>
           <span>ช่วงห้อง</span>
-          <input ref={rgfrom} placeholder="101" />
+          <input ref={rgfrom} />
           <span>ถึง</span>
-          <input ref={rgto} placeholder="601" />
+          <input ref={rgto} />
           <button className="btn quiet" style={{padding:"6px 12px",fontSize:"13px"}} onClick={applyRange}>เลือก</button>
           <span style={{flex:1}} />
           <button className="btn quiet" style={{padding:"6px 12px",fontSize:"13px"}}

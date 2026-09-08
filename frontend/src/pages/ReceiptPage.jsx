@@ -55,8 +55,7 @@ export default function ReceiptPage({ id }){
     <div className="noprint" style={{maxWidth:"640px",marginTop:"18px"}}>
       <div className="field">
         <label>หมายเหตุบนใบเสร็จนี้</label>
-        <input value={shown} onChange={e => setNote(e.target.value)}
-          placeholder="เช่น รับเป็นเงินสด หรือ โอนเข้าบัญชีวันที่ 3" />
+        <input value={shown} onChange={e => setNote(e.target.value)} />
         <div className="hint">เขียนเรื่องของการจ่ายครั้งนี้โดยเฉพาะ
           ไม่ใช่ข้อความที่ขึ้นทุกใบ ซึ่งตั้งไว้ที่หน้าตั้งค่า</div>
       </div>

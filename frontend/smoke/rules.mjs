@@ -396,6 +396,60 @@ section('numeric settings come back as numbers, not text');
 // ---- clean up ----
 // By name rather than by the ids collected along the way: a case that creates
 // a fee type inline is easy to write and easy to forget to register, and the
+section('what a tenant record keeps, and what a partial update does to it');
+{
+  const full = {
+    full_name: 'ผู้เช่า เก็บครบ', phone: '081-234-5678', id_card: '1103700123456',
+    id_card_issued: '2019-04-12', id_card_expires: '2027-04-11',
+    address: '12/3 ถ.สุขุมวิท', line_id: 'somchai_j',
+    vehicle_plate: 'กข 1234 กรุงเทพฯ', note: 'ผู้ติดต่อฉุกเฉิน 089-999-1111',
+  };
+  const made1 = await POST('/tenants', full);
+  made.tenants.push(made1.body.id);
+  const id = made1.body.id;
+
+  ok('every field survives the create',
+     Object.keys(full).every(k => made1.body[k] === full[k]),
+     Object.keys(full).filter(k => made1.body[k] !== full[k]).join(','));
+
+  // The reason PUT tests the key rather than reading a value: this route used
+  // to SET every column from the body, so a caller sending one field blanked
+  // the rest. The edit dialog sends all of them, which is what hid it.
+  const partial = await PUT(`/tenants/${id}`, { full_name: full.full_name, phone: '082-000-0000' });
+  ok('a partial update writes the field it was given',
+     partial.body.phone === '082-000-0000', partial.body.phone);
+  ok('and leaves every field it was not given alone',
+     ['id_card','id_card_issued','id_card_expires','address','line_id','vehicle_plate','note']
+       .every(k => partial.body[k] === full[k]),
+     ['id_card','id_card_issued','id_card_expires','address','line_id','vehicle_plate','note']
+       .filter(k => partial.body[k] !== full[k]).join(','));
+
+  // The other side of the same rule: absent keeps, present writes — including
+  // an empty one, or a field could be filled in but never emptied.
+  const cleared = await PUT(`/tenants/${id}`, { full_name: full.full_name, line_id: '', note: '' });
+  ok('an empty string clears the field it names',
+     cleared.body.line_id === null && cleared.body.note === null,
+     `${cleared.body.line_id} / ${cleared.body.note}`);
+  ok('and still leaves the others alone',
+     cleared.body.vehicle_plate === full.vehicle_plate && cleared.body.address === full.address);
+
+  ok('none of it reaches a bill', await (async () => {
+    const u = await newUnit('T20');
+    const l = await POST('/leases', { tenant_id:id, unit_id:u.id, start_date:'2026-01-01', monthly_rent:1000 });
+    await POST('/readings', { unit_id:u.id, period, water_prev:0, water_curr:1, elec_prev:0, elec_curr:1 });
+    const b = await POST('/bills', { lease_id:l.body.id, period });
+    const printed = JSON.stringify((await GET(`/bills/${b.body.id}`)).body);
+    const leaked = ['1103700123456','2027-04-11','กข 1234 กรุงเทพฯ','089-999-1111']
+      .filter(v => printed.includes(v));
+    await DEL(`/bills/${b.body.id}`);
+    await DEL(`/leases/${l.body.id}`);
+    return leaked.length === 0;
+  })());
+
+  ok('the name is still the only required field',
+     (await POST('/tenants', { line_id: 'x' })).status === 400);
+}
+
 // second run then fails on the UNIQUE name rather than on anything real.
 for(const f of (await GET('/fees/types?all=true')).body){
   if(f.name.startsWith('ทดสอบ')) await DEL(`/fees/types/${f.id}`);

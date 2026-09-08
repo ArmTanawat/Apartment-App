@@ -260,6 +260,39 @@ EXISTS` does nothing to a table that already exists, so added columns need a
 guarded `ALTER TABLE`. It is a no-op on a fresh database and on every start
 after the first. Any future column needs it.
 
+### What a tenant record holds
+
+Added 2026-09-09. `tenants` gained `id_card_issued`, `id_card_expires`,
+`line_id` and `vehicle_plate`; `note` was already there but had no field on any
+screen, so nothing ever wrote to it.
+
+**None of it is displayed anywhere.** Only `full_name`, `phone` and `address`
+reach an invoice — the rest is the landlord's own record of who is in the
+building, and it lives in the แก้ข้อมูลผู้เช่า dialog under a `เก็บไว้ดูเอง`
+heading that says so. `smoke:rules` checks that none of it leaks onto a bill.
+
+**The card dates are stored and not watched.** Nothing compares them against
+today and nothing warns when one passes: there is no action the program could
+usefully ask for, and a warning nobody can act on is worse than none.
+
+**The vehicle plate is on the tenant, not the lease.** A car belongs to a
+person, and a tenant renting three rooms has one car between them rather than
+three. One free-text box, so two cars go in it and nothing counts them. The
+parking *fee* is unrelated and stays in `lease_fees`, charged per room.
+
+**`PUT /tenants/:id` stopped being a full replace,** which it had to before the
+column count went up. It used to `SET` every column from the body, so a caller
+sending only a phone number blanked everything beside it — latent until now
+only because `note` was the sole unsent field and nothing wrote it. It now
+tests `k in req.body` the way `end_date` does on `PUT /leases/:id`: an absent
+key keeps its value, a present one is written, and an empty string clears it.
+Both sides are in `smoke:rules`.
+
+**Adding another such field is one line in three places** — the column in
+`db.js`, an `addColumn` beside it, and the name in `OPTIONAL` in
+`routes/tenants.js`, which both the insert and the update build their SQL from.
+Then a field in `TenantExtra` in `TenantModals.jsx`.
+
 ### Fees that are a share of the bill
 
 A fee priced as a percentage of something else — a service charge of 100% of

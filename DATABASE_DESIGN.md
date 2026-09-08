@@ -30,13 +30,25 @@
 | Column | Type | Notes |
 |---|---|---|
 | `id` | INTEGER | Primary key |
-| `full_name` | TEXT | Required |
-| `phone` | TEXT | |
+| `full_name` | TEXT | Required — the only one |
+| `phone` | TEXT | Prints on the bill |
 | `id_card` | TEXT | National ID / passport |
-| `address` | TEXT | Home address — stored for reference only |
+| `id_card_issued` | TEXT | `'YYYY-MM-DD'` |
+| `id_card_expires` | TEXT | `'YYYY-MM-DD'` |
+| `address` | TEXT | Home address — prints on the bill |
+| `line_id` | TEXT | |
+| `vehicle_plate` | TEXT | Free text; several cars go in one box |
 | `note` | TEXT | Free text |
 
 `address` is plain text and is never queried, filtered, or grouped on. Splitting it into street / district / province columns would only pay off if you needed to search by them, which this program does not.
+
+**Three of these print, the rest are kept.** `full_name`, `phone` and `address` reach an invoice. `id_card` and everything after it reach nothing — no bill, no receipt, no report. They are the landlord's own record of who is in the building: wanted at the moment a tenant is standing at the desk, and gone a week later if nobody wrote them down. The form says so under its own heading rather than leaving the distinction to be guessed at.
+
+**The card dates are stored, not watched.** `id_card_issued` and `id_card_expires` are `'YYYY-MM-DD'` like every other date here, but nothing compares them against today and nothing warns when one passes. That is deliberate rather than unfinished — the program does not know what it would want the landlord to *do* about an expired card, and a warning nobody can act on is worse than none. If that changes, the data is already in the right shape for it.
+
+**Why the vehicle plate is on the tenant and not the lease.** A car belongs to a person, not to a room, and a tenant renting three rooms has one car between them rather than three. It is one free-text box, so somebody with two cars types both and nothing counts them — this is a note, not a register. The parking *fee* is a separate thing entirely and lives in `lease_fees`, where it is charged per room.
+
+**Adding another of these is one line in three places.** The column in `db.js`, an `addColumn` beside it for databases that already exist, and the name in `OPTIONAL` in `routes/tenants.js` — the insert and the update both build their SQL from that list, so they cannot drift apart. Then a field in `TenantExtra`.
 
 ### `units`
 

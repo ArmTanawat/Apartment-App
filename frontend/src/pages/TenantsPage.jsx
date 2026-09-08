@@ -39,8 +39,7 @@ export default function TenantsPage(){
       ))}
       <span style={{flex:1}} />
       <div className="search"><span>ค้นหา</span>
-        <input value={tenantSearch} onChange={e => setTenantSearch(e.target.value)}
-          placeholder="ชื่อ หรือ เบอร์โทร" /></div>
+        <input value={tenantSearch} onChange={e => setTenantSearch(e.target.value)} /></div>
     </div>
 
     <table className="ttable">

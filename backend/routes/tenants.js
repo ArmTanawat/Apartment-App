@@ -27,18 +27,23 @@ router.get('/:id', (req, res) => {
   res.json(tenant);
 });
 
+// Everything about a tenant except their name. Listed once so the insert, the
+// update and the columns cannot drift apart as more are added.
+const OPTIONAL = ['phone', 'id_card', 'id_card_issued', 'id_card_expires',
+                  'address', 'line_id', 'vehicle_plate', 'note'];
+
 // POST /tenants — create
 router.post('/', (req, res) => {
-  const { full_name, phone, id_card, address, note } = req.body;
+  const { full_name } = req.body;
 
   if (!full_name || full_name.trim() === '') {
     return res.status(400).json({ error: 'ต้องใส่ชื่อ' });
   }
 
   const result = db.prepare(`
-    INSERT INTO tenants (full_name, phone, id_card, address, note)
-    VALUES (?, ?, ?, ?, ?)
-  `).run(full_name.trim(), phone || null, id_card || null, address || null, note || null);
+    INSERT INTO tenants (full_name, ${OPTIONAL.join(', ')})
+    VALUES (?, ${OPTIONAL.map(() => '?').join(', ')})
+  `).run(full_name.trim(), ...OPTIONAL.map(k => req.body[k] || null));
 
   const created = db.prepare('SELECT * FROM tenants WHERE id = ?').get(result.lastInsertRowid);
   res.status(201).json(created);
@@ -51,17 +56,25 @@ router.put('/:id', (req, res) => {
     return res.status(404).json({ error: 'ไม่พบผู้เช่า' });
   }
 
-  const { full_name, phone, id_card, address, note } = req.body;
+  const { full_name } = req.body;
 
   if (!full_name || full_name.trim() === '') {
     return res.status(400).json({ error: 'ต้องใส่ชื่อ' });
   }
 
+  // A key that is present is written, empty string included, so a field can be
+  // cleared. A key that is absent keeps what is there. The `in` test rather
+  // than `??` is what makes both possible, the same way `end_date` works on
+  // PUT /leases/:id — and it matters more here than it looks: this route used
+  // to SET every column from the body, so a caller sending only a new phone
+  // number silently blanked the note beside it.
+  const value = k => (k in req.body ? (req.body[k] || null) : existing[k]);
+
   db.prepare(`
     UPDATE tenants
-    SET full_name = ?, phone = ?, id_card = ?, address = ?, note = ?
+    SET full_name = ?, ${OPTIONAL.map(k => `${k} = ?`).join(', ')}
     WHERE id = ?
-  `).run(full_name.trim(), phone || null, id_card || null, address || null, note || null, req.params.id);
+  `).run(full_name.trim(), ...OPTIONAL.map(value), req.params.id);
 
   const updated = db.prepare('SELECT * FROM tenants WHERE id = ?').get(req.params.id);
   res.json(updated);

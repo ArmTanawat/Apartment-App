@@ -5,6 +5,39 @@ import Modal from '../Modal.jsx';
 import { useData } from '../../state/DataContext.jsx';
 import { useUi } from '../../state/UiContext.jsx';
 
+/* The part of a tenant's record that is kept rather than used.
+ *
+ * None of it reaches a bill, a receipt or a report — it is the landlord's own
+ * note of who is in the building, wanted at the moment somebody is standing at
+ * the desk and gone a week later if nobody wrote it down. It sits below the
+ * printed fields, under its own heading, so the form still reads top to bottom
+ * as "what goes on the invoice, then what is only for us".
+ *
+ * Every field is optional and free text. เลขทะเบียนรถ is one box rather than a
+ * list because a car belongs to a person, not to a room: somebody with two
+ * cars types both, and nothing counts them. */
+function TenantExtra({ issued, setIssued, expires, setExpires,
+                       lineId, setLineId, plate, setPlate, note, setNote }){
+  return <>
+    <p className="lead" style={{margin:"18px 0 8px",fontWeight:500,color:"var(--ink)"}}>
+      เก็บไว้ดูเอง</p>
+    <p className="lead" style={{marginTop:0,fontSize:"13px"}}>
+      ไม่ขึ้นบนใบแจ้งหนี้ ใบเสร็จ หรือรายงาน กรอกเท่าที่มี เว้นว่างได้ทุกช่อง</p>
+    <div className="field"><label>วันออกบัตร</label>
+      <input type="date" value={issued} onChange={e=>setIssued(e.target.value)} /></div>
+    <div className="field"><label>วันหมดอายุบัตร</label>
+      <input type="date" value={expires} onChange={e=>setExpires(e.target.value)} />
+      <div className="hint">ไม่มีการแจ้งเตือนเมื่อถึงวัน เก็บไว้ให้กลับมาดูเท่านั้น</div></div>
+    <div className="field"><label>ไอดีไลน์</label>
+      <input value={lineId} onChange={e=>setLineId(e.target.value)} /></div>
+    <div className="field"><label>เลขทะเบียนรถ</label>
+      <input value={plate} onChange={e=>setPlate(e.target.value)} />
+      <div className="hint">มีหลายคันพิมพ์รวมกันได้</div></div>
+    <div className="field"><label>หมายเหตุ</label>
+      <input value={note} onChange={e=>setNote(e.target.value)} /></div>
+  </>;
+}
+
 export function AddTenantModal(){
   const { tenants, addTenant } = useData();
   const { closeModal } = useUi();
@@ -12,6 +45,11 @@ export function AddTenantModal(){
   const [phone, setPhone] = useState("");
   const [addr, setAddr] = useState("");
   const [idCard, setIdCard] = useState("");
+  const [issued, setIssued] = useState("");
+  const [expires, setExpires] = useState("");
+  const [lineId, setLineId] = useState("");
+  const [plate, setPlate] = useState("");
+  const [note, setNote] = useState("");
   const { error, busy, run } = useSubmit();
 
   // tenants.full_name is not UNIQUE in the schema — two people really can
@@ -19,7 +57,9 @@ export function AddTenantModal(){
   const save = () => run(
     async () => {
       await addTenant({full_name:name.trim(), phone:phone.trim(),
-        address:addr.trim(), id_card:idCard.trim()});
+        address:addr.trim(), id_card:idCard.trim(),
+        id_card_issued:issued, id_card_expires:expires,
+        line_id:lineId.trim(), vehicle_plate:plate.trim(), note:note.trim()});
       closeModal();
     },
     () => !name.trim() ? "ต้องมีชื่อ"
@@ -34,13 +74,17 @@ export function AddTenantModal(){
       <div className="warn">ชื่อ เบอร์ และที่อยู่จะพิมพ์ลงใบแจ้งหนี้ กรอกให้ครบตั้งแต่ตอนนี้
         จะได้ไม่ต้องกลับมาแก้ตอนออกบิล</div>
       <div className="field"><label>ชื่อ — นามสกุล</label>
-        <input placeholder="สมชาย ใจดี" value={name} onChange={e=>setName(e.target.value)} /></div>
+        <input value={name} onChange={e=>setName(e.target.value)} /></div>
       <div className="field"><label>เบอร์โทร</label>
-        <input className="num" placeholder="081-234-5678" value={phone} onChange={e=>setPhone(e.target.value)} /></div>
+        <input className="num" value={phone} onChange={e=>setPhone(e.target.value)} /></div>
       <div className="field"><label>ที่อยู่</label>
-        <input placeholder="12/3 ถ.สุขุมวิท กรุงเทพฯ" value={addr} onChange={e=>setAddr(e.target.value)} /></div>
+        <input value={addr} onChange={e=>setAddr(e.target.value)} /></div>
       <div className="field"><label>เลขบัตรประชาชน</label>
         <input className="num" value={idCard} onChange={e=>setIdCard(e.target.value)} /></div>
+      <TenantExtra
+        issued={issued} setIssued={setIssued} expires={expires} setExpires={setExpires}
+        lineId={lineId} setLineId={setLineId} plate={plate} setPlate={setPlate}
+        note={note} setNote={setNote} />
       <div className="actions">
         <button className="btn ghost" onClick={closeModal}>ยกเลิก</button>
         <button className="btn" disabled={busy} onClick={save}>เพิ่ม</button>
@@ -62,12 +106,19 @@ export function EditTenantModal({ tenantId }){
   const [phone, setPhone] = useState(t.phone||"");
   const [addr, setAddr] = useState(t.address||"");
   const [idCard, setIdCard] = useState(t.id_card||"");
+  const [issued, setIssued] = useState(t.id_card_issued||"");
+  const [expires, setExpires] = useState(t.id_card_expires||"");
+  const [lineId, setLineId] = useState(t.line_id||"");
+  const [plate, setPlate] = useState(t.vehicle_plate||"");
+  const [note, setNote] = useState(t.note||"");
   const { error, busy, run } = useSubmit();
 
   const save = () => run(
     async () => {
       await updateTenant(tenantId, {full_name:name.trim(), phone:phone.trim(),
-        address:addr.trim(), id_card:idCard.trim()});
+        address:addr.trim(), id_card:idCard.trim(),
+        id_card_issued:issued, id_card_expires:expires,
+        line_id:lineId.trim(), vehicle_plate:plate.trim(), note:note.trim()});
       closeModal();
     },
     () => !name.trim() ? "ต้องมีชื่อ" : null);
@@ -82,11 +133,15 @@ export function EditTenantModal({ tenantId }){
       <div className="field"><label>ชื่อ — นามสกุล</label>
         <input value={name} onChange={e=>setName(e.target.value)} /></div>
       <div className="field"><label>เบอร์โทร</label>
-        <input className="num" value={phone} placeholder="081-234-5678" onChange={e=>setPhone(e.target.value)} /></div>
+        <input className="num" value={phone} onChange={e=>setPhone(e.target.value)} /></div>
       <div className="field"><label>ที่อยู่</label>
-        <input value={addr} placeholder="12/3 ถ.สุขุมวิท กรุงเทพฯ" onChange={e=>setAddr(e.target.value)} /></div>
+        <input value={addr} onChange={e=>setAddr(e.target.value)} /></div>
       <div className="field"><label>เลขบัตรประชาชน</label>
         <input className="num" value={idCard} onChange={e=>setIdCard(e.target.value)} /></div>
+      <TenantExtra
+        issued={issued} setIssued={setIssued} expires={expires} setExpires={setExpires}
+        lineId={lineId} setLineId={setLineId} plate={plate} setPlate={setPlate}
+        note={note} setNote={setNote} />
       <div className="actions">
         <button className="btn ghost" onClick={closeModal}>ยกเลิก</button>
         <button className="btn" disabled={busy} onClick={save}>บันทึก</button>

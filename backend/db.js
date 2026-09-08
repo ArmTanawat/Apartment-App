@@ -21,13 +21,26 @@ const db = new Database(dbPath);
 db.pragma('foreign_keys = ON');
 
 db.exec(`
+  -- Everything below full_name is optional and free text. The four that print
+  -- on a bill are full_name, phone, address and — for a receipt — nothing else;
+  -- the rest are the landlord's own record of who is in the building, kept
+  -- because they are wanted at the moment a tenant is standing there and
+  -- useless a week later if nobody wrote them down.
+  --
+  -- id_card_issued and id_card_expires are 'YYYY-MM-DD' like every other date
+  -- here. They are not checked and nothing warns when one passes: the program
+  -- does not know what it would want the landlord to do about it.
   CREATE TABLE IF NOT EXISTS tenants (
-    id         INTEGER PRIMARY KEY AUTOINCREMENT,
-    full_name  TEXT NOT NULL,
-    phone      TEXT,
-    id_card    TEXT,
-    address    TEXT,
-    note       TEXT
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    full_name       TEXT NOT NULL,
+    phone           TEXT,
+    id_card         TEXT,
+    id_card_issued  TEXT,
+    id_card_expires TEXT,
+    address         TEXT,
+    line_id         TEXT,
+    vehicle_plate   TEXT,
+    note            TEXT
   );
 
   CREATE TABLE IF NOT EXISTS units (
@@ -169,6 +182,13 @@ addColumn('fee_types', 'percent_of', 'TEXT');
 addColumn('fee_types', 'percent', 'REAL');
 addColumn('lease_fees', 'percent_of', 'TEXT');
 addColumn('lease_fees', 'percent', 'REAL');
+
+// Kept about a tenant, printed nowhere. Nullable with no default, so every
+// existing row simply has nothing in them until somebody types it.
+addColumn('tenants', 'id_card_issued', 'TEXT');
+addColumn('tenants', 'id_card_expires', 'TEXT');
+addColumn('tenants', 'line_id', 'TEXT');
+addColumn('tenants', 'vehicle_plate', 'TEXT');
 
 // Receipts used to carry a running number and to hold their bill down. Both
 // are gone: a receipt is now the paper form of a bill, cancellable, and its

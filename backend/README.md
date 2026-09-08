@@ -27,7 +27,7 @@ The database file `apartment.db` is created automatically on first run.
 - `GET /tenants` — list all
 - `GET /tenants/:id` — one tenant
 - `POST /tenants` — create
-- `PUT /tenants/:id` — update
+- `PUT /tenants/:id` — update; a key that is absent from the body keeps its current value, an empty string clears it
 - `DELETE /tenants/:id` — delete (blocked if they have leases)
 
 ### Units

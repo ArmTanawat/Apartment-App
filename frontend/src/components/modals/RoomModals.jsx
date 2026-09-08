@@ -29,7 +29,7 @@ export function AddRoomModal({ floor }){
       <ErrBox>{error}</ErrBox>
       <div className="two">
         <div className="field"><label>เลขห้อง</label>
-          <input className="num" placeholder="108" value={num} onChange={e=>setNum(e.target.value)} /></div>
+          <input className="num" value={num} onChange={e=>setNum(e.target.value)} /></div>
         <div className="field"><label>ชั้น</label>
           <input className="num" value={fl} onChange={e=>setFl(e.target.value)} /></div>
       </div>

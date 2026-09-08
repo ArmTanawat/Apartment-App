@@ -134,7 +134,7 @@ export default function SettingsPage(){
 
         <div className="rateline" style={{alignItems:"flex-start",marginTop:"16px"}}>
           <label style={{paddingTop:"8px"}}>หมายเหตุ</label>
-          <textarea rows={2} placeholder="เขียนอะไรก็ได้ที่อยากให้ขึ้นบนบิลทุกใบ"
+          <textarea rows={2}
             value={shown('bill_note')} onChange={e => setText('bill_note', e.target.value)}
             style={{width:"280px",padding:"7px 10px",border:"1px solid var(--line)",borderRadius:"7px",
                     fontFamily:"inherit",fontSize:"14px",resize:"vertical",background:"var(--surface)",

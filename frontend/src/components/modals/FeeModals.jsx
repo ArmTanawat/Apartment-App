@@ -179,10 +179,10 @@ export function ChargeModal({ leaseId }){
           <div className="hint">เดือนนี้ห้องนี้มีผู้เช่าสองราย เลือกคนที่อยู่ตอนของเสียหาย</div></div>
       ) : null}
       <div className="field"><label>รายการ</label>
-        <input placeholder="ซ่อมประตู Door repair" value={desc} onChange={e=>setDesc(e.target.value)} />
+        <input value={desc} onChange={e=>setDesc(e.target.value)} />
         <div className="hint">พิมพ์ไทยตามด้วยอังกฤษ ข้อความนี้จะขึ้นบนใบแจ้งหนี้ตามที่พิมพ์</div></div>
       <div className="field"><label>จำนวนเงิน (บาท)</label>
-        <input className="num" placeholder="850" value={amt} onChange={e=>setAmt(e.target.value)} /></div>
+        <input className="num" value={amt} onChange={e=>setAmt(e.target.value)} /></div>
       <div className="actions">
         <button className="btn ghost" onClick={closeModal}>ยกเลิก</button>
         <button className="btn" disabled={busy} onClick={save}>บันทึก</button>
@@ -232,7 +232,7 @@ export function FeeTypeModal({ id }){
       <p className="lead">ชื่อนี้จะพิมพ์ลงใบแจ้งหนี้ตามที่กรอก</p>
       <ErrBox>{error}</ErrBox>
       <div className="field"><label>ชื่อรายการ</label>
-        <input value={name} onChange={e=>setName(e.target.value)} placeholder="ค่าส่วนกลาง Facility fee" />
+        <input value={name} onChange={e=>setName(e.target.value)} />
         <div className="hint">พิมพ์ไทยก่อน แล้วตามด้วยอังกฤษ</div></div>
 
       {!isShare && (
@@ -256,8 +256,7 @@ export function FeeTypeModal({ id }){
           {isShare && <>
             <div style={{display:"flex",alignItems:"center",gap:"8px",margin:"10px 0 0"}}>
               <span style={{color:"var(--muted)",fontSize:"13px"}}>คิดตาม</span>
-              <input className="num" value={percent} onChange={e=>setPercent(e.target.value)}
-                placeholder="10" style={{width:"72px"}} />
+              <input className="num" value={percent} onChange={e=>setPercent(e.target.value)} style={{width:"72px"}} />
               <span style={{color:"var(--muted)",fontSize:"13px"}}>% ของ</span>
               <select value={basis} onChange={e=>setBasis(e.target.value)} style={{flex:1}}>
                 {Object.entries(feeBasis).map(([k, label]) =>
