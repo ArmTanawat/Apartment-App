@@ -5,6 +5,40 @@ import Modal from '../Modal.jsx';
 import { useData } from '../../state/DataContext.jsx';
 import { useUi } from '../../state/UiContext.jsx';
 
+/* The two sums taken beside มัดจำ.
+ *
+ * Recorded and read back, never charged: buildBill() takes monthly_rent off a
+ * lease and nothing else, so none of this reaches a bill. They are kept apart
+ * from each other rather than added into one figure because they are settled
+ * differently at move-out, which is the moment anybody looks them up.
+ *
+ * Blank counts as none — the box being empty and the sum being zero are the
+ * same thing here, so neither is made to be typed. */
+function LeaseMoney({ guarantee, setGuarantee, advance, setAdvance }){
+  return <>
+    <div className="two">
+      <div className="field"><label>เงินประกันสัญญาเช่าห้อง</label>
+        <input className="num" value={guarantee} onChange={e=>setGuarantee(e.target.value)} /></div>
+      <div className="field"><label>ค่าเช่าล่วงหน้า</label>
+        <input className="num" value={advance} onChange={e=>setAdvance(e.target.value)} /></div>
+    </div>
+    {/* Inside a .field so it picks up the hint styling the other boxes use. */}
+    <div className="field" style={{marginTop:"-8px"}}>
+      <div className="hint">เก็บไว้ดูเอง ไม่ขึ้นบนบิลและไม่ถูกนำไปคิดเงิน เว้นว่างได้</div>
+    </div>
+  </>;
+}
+
+// Blank, or anything that is not a number, is none. Used for the two sums that
+// are optional; ค่าเช่า and มัดจำ keep their own stricter checks.
+//
+// A negative is not turned into 0 here — that would swallow a typed minus sign
+// and record a figure nobody entered. It comes back as it is and badMoney()
+// below refuses it, the same way มัดจำ is refused.
+const money = v => { const n = parseFloat(v); return isNaN(n) ? 0 : n; };
+const badMoney = (...vs) => vs.some(v => money(v) < 0)
+  ? "เงินประกันและค่าเช่าล่วงหน้าต้องไม่ติดลบ" : null;
+
 export function MoveInModal({ unitId }){
   const { units, tenants, h, addTenant, addLease } = useData();
   const { closeModal } = useUi();
@@ -20,6 +54,8 @@ export function MoveInModal({ unitId }){
   const [start, setStart] = useState(TODAY);
   const [rent, setRent] = useState(String(u.base_rent));
   const [dep, setDep] = useState(String(u.base_rent*2));
+  const [guarantee, setGuarantee] = useState("");
+  const [advance, setAdvance] = useState("");
 
   const picked = sel && sel !== "new" ? tenants.find(x=>x.id===parseInt(sel,10)) : null;
   const missing = picked
@@ -41,12 +77,14 @@ export function MoveInModal({ unitId }){
       } else tid = parseInt(sel,10);
 
       await addLease({tenant_id:tid, unit_id:unitId, start_date:start,
-        end_date:null, monthly_rent:parseFloat(rent), deposit:parseFloat(dep)});
+        end_date:null, monthly_rent:parseFloat(rent), deposit:parseFloat(dep),
+        guarantee:money(guarantee), advance_rent:money(advance)});
       closeModal();
     },
     () => !sel ? "เลือกผู้เช่าก่อน"
       : !start ? "ใส่วันเข้าอยู่"
-      : (sel === "new" && !newName.trim()) ? "ใส่ชื่อผู้เช่าใหม่" : null);
+      : (sel === "new" && !newName.trim()) ? "ใส่ชื่อผู้เช่าใหม่"
+      : badMoney(guarantee, advance));
 
   return (
     <Modal>
@@ -93,6 +131,8 @@ export function MoveInModal({ unitId }){
         <input className="num" value={dep} onChange={e=>setDep(e.target.value)} />
         <div className="hint">คืนเต็มจำนวนตอนย้ายออก ค่าเสียหายคิดแยกเป็นค่าใช้จ่ายครั้งเดียว</div>
       </div>
+      <LeaseMoney guarantee={guarantee} setGuarantee={setGuarantee}
+        advance={advance} setAdvance={setAdvance} />
       <div className="actions">
         <button className="btn ghost" onClick={closeModal}>ยกเลิก</button>
         <button className="btn" disabled={busy} onClick={save}>ย้ายเข้า</button>
@@ -154,6 +194,8 @@ export function EditLeaseModal({ leaseId }){
   const [start, setStart] = useState(l.start_date);
   const [rent, setRent] = useState(String(l.monthly_rent));
   const [dep, setDep] = useState(String(l.deposit));
+  const [guarantee, setGuarantee] = useState(l.guarantee ? String(l.guarantee) : "");
+  const [advance, setAdvance] = useState(l.advance_rent ? String(l.advance_rent) : "");
   const { error, busy, run } = useSubmit();
 
   // PUT /leases/:id now runs the same overlap test POST /leases does, so
@@ -162,13 +204,15 @@ export function EditLeaseModal({ leaseId }){
   // in two places, is how a board comes to disagree with a form.
   const save = () => run(
     async () => {
-      await updateLease(leaseId, {start_date:start, monthly_rent:parseFloat(rent), deposit:parseFloat(dep)});
+      await updateLease(leaseId, {start_date:start, monthly_rent:parseFloat(rent),
+        deposit:parseFloat(dep), guarantee:money(guarantee), advance_rent:money(advance)});
       closeModal();
     },
     () => !start ? "ใส่วันเข้าอยู่"
       : (isNaN(parseFloat(rent)) || parseFloat(rent) < 0) ? "ค่าเช่าต้องเป็นตัวเลข"
       : (isNaN(parseFloat(dep)) || parseFloat(dep) < 0) ? "มัดจำต้องเป็นตัวเลข"
-      : (l.end_date && start >= l.end_date) ? "วันเข้าอยู่ต้องก่อนวันที่ห้องว่าง" : null);
+      : (l.end_date && start >= l.end_date) ? "วันเข้าอยู่ต้องก่อนวันที่ห้องว่าง"
+      : badMoney(guarantee, advance));
 
   return (
     <Modal>
@@ -183,6 +227,8 @@ export function EditLeaseModal({ leaseId }){
         <div className="field"><label>เงินมัดจำ</label>
           <input className="num" value={dep} onChange={e=>setDep(e.target.value)} /></div>
       </div>
+      <LeaseMoney guarantee={guarantee} setGuarantee={setGuarantee}
+        advance={advance} setAdvance={setAdvance} />
       <div className="warn">แก้ค่าเช่าที่นี่มีผลกับบิลที่ออกหลังจากนี้เท่านั้น
         บิลเดือนก่อนที่ออกไปแล้วยังคงยอดเดิม</div>
       {/* Only three things can be corrected here — วันเข้าอยู่, ค่าเช่า, มัดจำ.

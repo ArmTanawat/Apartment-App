@@ -75,7 +75,15 @@ The centre of the schema. One row = one tenant renting one room for a period of 
 | `start_date` | TEXT | `YYYY-MM-DD` |
 | `end_date` | TEXT | `NULL` = still living there |
 | `monthly_rent` | REAL | Copied from `units.base_rent` at move-in |
-| `deposit` | REAL | |
+| `deposit` | REAL | มัดจำ — default 0 |
+| `guarantee` | REAL | เงินประกันสัญญาเช่าห้อง — default 0 |
+| `advance_rent` | REAL | ค่าเช่าล่วงหน้า — default 0 |
+
+**The three sums taken at move-in are three columns, not one.** `deposit` is returned in full at move-out with damage billed separately, `guarantee` is held against the lease itself, and `advance_rent` is rent already paid for a month still to come. Adding them into a single "money taken up front" figure would lose which is which, and which is which is the entire question at the moment somebody moves out — the one moment anybody looks them up.
+
+**None of them is ever charged.** `buildBill()` reads `monthly_rent` off a lease and nothing else; the three sums are recorded and read back, and reach no bill, receipt or report. `smoke:rules` asserts it rather than trusting it, because the failure would be a tenant billed for their own deposit.
+
+**They default to 0, not NULL.** An existing lease from before these columns reads as nothing taken, which is what it means: the figure was never asked for, so none was recorded. A blank box on the form is the same as zero for the same reason, so neither is made to be typed.
 
 **One tenant can have many leases** — someone renting three rooms is simply three rows with the same `tenant_id`. A unit can also have many leases, but *over time* (last year's tenant, then this year's), never simultaneously — see the double-booking rule below.
 

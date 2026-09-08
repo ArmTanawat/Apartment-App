@@ -50,6 +50,16 @@ db.exec(`
     base_rent   REAL NOT NULL
   );
 
+  -- The three sums taken at move-in are separate columns because they are
+  -- separate agreements, settled at different times and in different ways:
+  --   deposit      มัดจำ — returned in full at move-out, damage billed apart
+  --   guarantee    เงินประกันสัญญาเช่าห้อง — held against the lease itself
+  --   advance_rent ค่าเช่าล่วงหน้า — rent already paid, for a month to come
+  -- One "money taken up front" column would lose which is which, and which is
+  -- which is the whole question when somebody moves out.
+  --
+  -- None of them touches a bill. buildBill() reads monthly_rent and nothing
+  -- else here; these three are recorded and read back, never charged.
   CREATE TABLE IF NOT EXISTS leases (
     id           INTEGER PRIMARY KEY AUTOINCREMENT,
     tenant_id    INTEGER NOT NULL REFERENCES tenants(id),
@@ -57,7 +67,9 @@ db.exec(`
     start_date   TEXT NOT NULL,
     end_date     TEXT,
     monthly_rent REAL NOT NULL,
-    deposit      REAL DEFAULT 0
+    deposit      REAL DEFAULT 0,
+    guarantee    REAL DEFAULT 0,
+    advance_rent REAL DEFAULT 0
   );
 
   CREATE TABLE IF NOT EXISTS meter_readings (
@@ -189,6 +201,12 @@ addColumn('tenants', 'id_card_issued', 'TEXT');
 addColumn('tenants', 'id_card_expires', 'TEXT');
 addColumn('tenants', 'line_id', 'TEXT');
 addColumn('tenants', 'vehicle_plate', 'TEXT');
+
+// The two sums taken at move-in beside มัดจำ. DEFAULT 0 matches `deposit`, so
+// an existing lease reads as nothing taken rather than as unknown — which is
+// what it means: the figure was never asked for, so none was recorded.
+addColumn('leases', 'guarantee', 'REAL DEFAULT 0');
+addColumn('leases', 'advance_rent', 'REAL DEFAULT 0');
 
 // Receipts used to carry a running number and to hold their bill down. Both
 // are gone: a receipt is now the paper form of a bill, cancellable, and its

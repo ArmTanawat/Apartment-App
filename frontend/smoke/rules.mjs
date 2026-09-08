@@ -396,6 +396,51 @@ section('numeric settings come back as numbers, not text');
 // ---- clean up ----
 // By name rather than by the ids collected along the way: a case that creates
 // a fee type inline is easy to write and easy to forget to register, and the
+section('the three sums taken at move-in are kept apart, and none is charged');
+{
+  const u = await newUnit('T21');
+  const t = await newTenant('ผู้เช่า เงินประกัน');
+  const l = await POST('/leases', { tenant_id:t.id, unit_id:u.id, start_date:'2026-01-01',
+    monthly_rent:4000, deposit:8000, guarantee:4000, advance_rent:2000 });
+
+  ok('each is stored as its own figure',
+     l.body.deposit === 8000 && l.body.guarantee === 4000 && l.body.advance_rent === 2000,
+     `${l.body.deposit}/${l.body.guarantee}/${l.body.advance_rent}`);
+
+  // PUT /leases/:id already used ?? for deposit; the two new ones follow it.
+  const bumped = await PUT(`/leases/${l.body.id}`, { monthly_rent: 4200 });
+  ok('changing the rent leaves all three alone',
+     bumped.body.deposit === 8000 && bumped.body.guarantee === 4000
+       && bumped.body.advance_rent === 2000,
+     `${bumped.body.deposit}/${bumped.body.guarantee}/${bumped.body.advance_rent}`);
+
+  const zeroed = await PUT(`/leases/${l.body.id}`, { guarantee: 0 });
+  ok('and one can be set to nothing without touching the others',
+     zeroed.body.guarantee === 0 && zeroed.body.deposit === 8000
+       && zeroed.body.advance_rent === 2000);
+
+  // The point of the whole thing: recorded, never charged. buildBill reads
+  // monthly_rent off a lease and nothing else.
+  await POST('/readings', { unit_id:u.id, period, water_prev:0, water_curr:1, elec_prev:0, elec_curr:1 });
+  const b = await POST('/bills', { lease_id:l.body.id, period });
+  const printed = JSON.stringify((await GET(`/bills/${b.body.id}`)).body);
+  ok('none of them reaches the bill',
+     !printed.includes('8000') && !printed.includes('2000') && !printed.includes('guarantee'),
+     printed.slice(0, 120));
+  ok('and the bill charges the rent alone',
+     b.body.rent_amount === 4200, String(b.body.rent_amount));
+  await DEL(`/bills/${b.body.id}`);
+
+  const omitted = await POST('/leases', { tenant_id:t.id, unit_id:(await newUnit('T22')).id,
+    start_date:'2026-01-01', monthly_rent:1000 });
+  ok('a lease that names none of them records zero, not null',
+     omitted.body.deposit === 0 && omitted.body.guarantee === 0
+       && omitted.body.advance_rent === 0,
+     `${omitted.body.deposit}/${omitted.body.guarantee}/${omitted.body.advance_rent}`);
+  await DEL(`/leases/${omitted.body.id}`);
+  await DEL(`/leases/${l.body.id}`);
+}
+
 section('what a tenant record keeps, and what a partial update does to it');
 {
   const full = {

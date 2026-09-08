@@ -260,6 +260,28 @@ EXISTS` does nothing to a table that already exists, so added columns need a
 guarded `ALTER TABLE`. It is a no-op on a fresh database and on every start
 after the first. Any future column needs it.
 
+### The three sums taken at move-in
+
+Added 2026-09-09. `leases` gained `guarantee` (เงินประกันสัญญาเช่าห้อง) and
+`advance_rent` (ค่าเช่าล่วงหน้า) beside the `deposit` (มัดจำ) it already had.
+Both `REAL DEFAULT 0`, edited in ย้ายเข้า and แก้สัญญาเช่า.
+
+**Three columns rather than one** because they are settled differently at
+move-out: มัดจำ comes back in full with damage billed apart, เงินประกัน is held
+against the lease, ค่าเช่าล่วงหน้า is rent already paid for a month to come.
+Summing them would lose the distinction at the only moment anybody needs it.
+
+**Recorded, never charged.** `buildBill()` takes `monthly_rent` off a lease and
+nothing else. `smoke:rules` asserts none of the three appears on a bill rather
+than trusting it — the failure mode is a tenant billed for their own deposit.
+
+**Not shown on the room page either.** มัดจำ is on the ผู้เช่าปัจจุบัน card and
+these two deliberately are not; they live in the dialog, under a line saying
+they are kept and not charged.
+
+**Blank is zero.** The form does not make either be typed, and a lease created
+before the columns existed reads as nothing taken, which is what it means.
+
 ### What a tenant record holds
 
 Added 2026-09-09. `tenants` gained `id_card_issued`, `id_card_expires`,

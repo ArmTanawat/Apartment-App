@@ -90,7 +90,8 @@ router.get('/:id', (req, res) => {
 
 // POST /leases — move a tenant into a room.
 router.post('/', (req, res) => {
-  const { tenant_id, unit_id, start_date, end_date, monthly_rent, deposit } = req.body;
+  const { tenant_id, unit_id, start_date, end_date, monthly_rent,
+          deposit, guarantee, advance_rent } = req.body;
 
   if (!tenant_id || !unit_id || !start_date) {
     return res.status(400).json({ error: 'ต้องระบุผู้เช่า ห้อง และวันเข้าอยู่' });
@@ -141,9 +142,11 @@ router.post('/', (req, res) => {
     : unit.base_rent;
 
   const result = db.prepare(`
-    INSERT INTO leases (tenant_id, unit_id, start_date, end_date, monthly_rent, deposit)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `).run(tenant_id, unit_id, start_date, newEnd, rent, deposit || 0);
+    INSERT INTO leases (tenant_id, unit_id, start_date, end_date, monthly_rent,
+                        deposit, guarantee, advance_rent)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(tenant_id, unit_id, start_date, newEnd, rent,
+         deposit || 0, guarantee || 0, advance_rent || 0);
 
   const created = db.prepare('SELECT * FROM leases WHERE id = ?').get(result.lastInsertRowid);
   res.status(201).json(created);
@@ -179,7 +182,8 @@ router.put('/:id', (req, res) => {
     return res.status(404).json({ error: 'ไม่พบสัญญาเช่า' });
   }
 
-  const { start_date, end_date, monthly_rent, deposit } = req.body;
+  const { start_date, end_date, monthly_rent,
+          deposit, guarantee, advance_rent } = req.body;
 
   if (end_date && end_date < (start_date || lease.start_date)) {
     return res.status(400).json({ error: 'วันที่ห้องว่างต้องไม่ก่อนวันเข้าอยู่' });
@@ -223,13 +227,16 @@ router.put('/:id', (req, res) => {
 
   db.prepare(`
     UPDATE leases
-    SET start_date = ?, end_date = ?, monthly_rent = ?, deposit = ?
+    SET start_date = ?, end_date = ?, monthly_rent = ?,
+        deposit = ?, guarantee = ?, advance_rent = ?
     WHERE id = ?
   `).run(
     start_date   ?? lease.start_date,
     nextEnd,
     monthly_rent ?? lease.monthly_rent,
     deposit      ?? lease.deposit,
+    guarantee    ?? lease.guarantee,
+    advance_rent ?? lease.advance_rent,
     req.params.id
   );
 
