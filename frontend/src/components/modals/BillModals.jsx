@@ -21,7 +21,8 @@ import { useUi } from '../../state/UiContext.jsx';
  * with the old numbers on it — recoverable now, but still a page that has to
  * be printed twice and a tenant who has to be told why. */
 export function IssueReceiptModal({ id }){
-  const { bills, issueReceipt } = useData();
+  const { bills, issueReceipt, settings } = useData();
+  const dev = !!Number(settings.developer_mode);
   const { closeModal, go } = useUi();
   const { error, busy, run } = useSubmit();
   const b = bills.find(x => x.id === id);
@@ -52,10 +53,20 @@ export function IssueReceiptModal({ id }){
           ถ้าต้องการตัวเลขล่าสุด ให้กดออกบิลใหม่ก่อน แล้วค่อยออกใบเสร็จ</div>
       )}
 
+      {/* The last two lines describe what the reader can do from where they
+          are standing, which is not the same question as what the program can
+          do. With the undo hidden, "ยกเลิกได้" would point at a button that is
+          not on the screen, so the wording tells them to fix the bill first —
+          which is the right order anyway, and the only one they have. */}
       <div className="warn">ออกเมื่อผู้เช่าจ่ายเงินแล้วเท่านั้น
         <div style={{marginTop:"6px"}}>· หนึ่งบิลออกใบเสร็จได้ใบเดียว</div>
-        <div>· ยกเลิกได้ ใบเสร็จไม่มีเลขที่กำกับ</div>
-        <div>· ถ้าแก้บิลแล้วออกใหม่ ใบเสร็จจะถูกยกเลิกไปด้วย</div>
+        {dev ? <>
+          <div>· ยกเลิกได้ ใบเสร็จไม่มีเลขที่กำกับ</div>
+          <div>· ถ้าแก้บิลแล้วออกใหม่ ใบเสร็จจะถูกยกเลิกไปด้วย</div>
+        </> : <>
+          <div>· ไม่สามารถยกเลิกได้</div>
+          <div>· ถ้าแก้บิลแล้วออกใหม่ ต้องทำก่อนออกใบเสร็จ</div>
+        </>}
       </div>
 
       <ErrBox>{error}</ErrBox>

@@ -260,6 +260,34 @@ EXISTS` does nothing to a table that already exists, so added columns need a
 guarded `ALTER TABLE`. It is a no-op on a fresh database and on every start
 after the first. Any future column needs it.
 
+### The board's colour note on an empty room
+
+Added 2026-09-10. `units.mark` — `'reserved'`, `'locked'` or NULL — set from two
+small dots in the corner of an empty card on ห้องพัก, through
+`PUT /units/:id/mark`.
+
+**Colour now has four answers to the same one question:** can somebody be put in
+this room today. Green no, red yes, amber promised to somebody (จองแล้ว), black
+cannot be re-let yet after a tenant left without notice (ล็อค). That is a change
+to what `FRONTEND.md` said — it used to say two — but not to the principle: they
+are four answers to one question, not four questions.
+
+**It is a note and no rule reads it.** `/units/vacant`, the overlap guard and the
+batch all ignore it, so a marked room is still vacant and can still be moved
+into; `POST /leases` clears the mark when somebody does. Making it a rule would
+be a second definition of "empty" beside the one lease dates give, which is the
+failure the derived-occupancy rule exists to prevent. `smoke:rules` asserts a
+locked room is still returned by `/units/vacant` and can still be let.
+
+**One column, not two flags,** because a room held for somebody is not a room
+nobody may enter. Setting one replaces the other, and the route refuses any
+other value rather than storing something nothing renders.
+
+**The dots stop the click reaching the card,** so pressing one changes the
+colour and pressing anywhere else opens the room. Only empty cards have them.
+Every empty card also says its state in words, so the black and the red are not
+a distinction anybody has to make by eye.
+
 ### The three sums taken at move-in
 
 Added 2026-09-09. `leases` gained `guarantee` (เงินประกันสัญญาเช่าห้อง) and
@@ -430,6 +458,40 @@ issued or not, because that list is the month's work; an unissued row says
 `ยังไม่ได้ออก` rather than a dash so it reads as something to do. The staleness
 warning is worked out by the dialog itself, not passed in from whichever screen
 opened it.
+
+### โหมดผู้ดูแล, and what the papers say now
+
+Added 2026-09-09.
+
+**The printed pages.** Both now head the document `งวดที่ 2026-09` rather than
+the bare period. A receipt adds `ออกเมื่อ` with the date only underneath it —
+the time was dropped, because the minute a piece of paper was printed is not
+something anybody reads off it. The standing line
+`ได้รับเงินตามรายการข้างต้นเรียบร้อยแล้ว` is gone entirely, which leaves the
+receipt's footer holding only its note; with no note the footer is not rendered
+at all, so an empty rule does not print under the total.
+
+**`settings.developer_mode`,** 0 or 1, off by default and off on a database
+that predates it. Off, the receipt page has no ยกเลิกใบเสร็จ button and no
+paragraph explaining that a receipt can be taken back, and the issue dialog
+reads `· ไม่สามารถยกเลิกได้ / · ถ้าแก้บิลแล้วออกใหม่ ต้องทำก่อนออกใบเสร็จ`.
+On, all three come back. The switch is its own card on ตั้งค่า.
+
+**It hides buttons and nothing else.** `DELETE /receipts/:id` is unchanged and
+still works, and a corrected bill still takes its receipt with it through the
+cascade. The intent is that a receipt reads as final to whoever is issuing them
+while staying correctable by whoever knows where the switch is — so the off
+wording describes the screen, not the program. Worth knowing before treating
+`ไม่สามารถยกเลิกได้` as a rule: it is not one, and `CLAUDE.md` still says a
+receipt can be cancelled, which is still true.
+
+`smoke:receipts` drives both states, and turns the mode on by clicking the
+switch on ตั้งค่า rather than by writing the setting through the API, so the
+card itself is covered.
+
+**ยกเลิกใบเสร็จ is a grey button** (`btn quiet`), not a red one. Cancelling
+spends nothing and destroys nothing — the bill and its figures are untouched —
+so the red it had was overstating it.
 
 ### On the printed page
 

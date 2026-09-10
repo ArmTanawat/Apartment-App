@@ -35,6 +35,7 @@ The database file `apartment.db` is created automatically on first run.
 - `GET /units/vacant` — empty rooms only
 - `GET /units/:id` — one unit
 - `POST /units` — create
+- `PUT /units/:id/mark` — the board's colour note on an empty room: `reserved`, `locked`, or `null` to clear
 - `PUT /units/:id` — update
 - `DELETE /units/:id` — delete (blocked if it has leases)
 

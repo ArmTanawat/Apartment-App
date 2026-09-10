@@ -6,11 +6,19 @@
 :root{
   --paper:#FCFCFC; --surface:#FFFFFF; --ink:#1A1A1A; --muted:#8C8C8C;
   --line:#E4E4E4; --occupied:#2E7D46; --vacant:#B3382C; --soft:#F0F0F0;
-  /* Not a third room state — colour still answers only "is anyone living
-     here". This is the banner that says a saved bill no longer matches its
-     data, which needs to be noticed and is not about a room at all. .stale
-     already asked for --attention and the yellow was hardcoded beside it. */
+  /* Not a room state at all. This is the banner that says a saved bill no
+     longer matches its data, which needs to be noticed and is not about a room.
+     .stale already asked for --attention and the yellow was hardcoded beside
+     it. (--reserved below happens to be the same yellow; that is a coincidence
+     of palette, not a shared meaning, and they are separate tokens so either
+     can move without dragging the other.) */
   --attention:#C9A227; --attention-soft:#FFF8E6;
+  /* The two notes an empty room can carry on the board. Amber for a room
+     somebody has asked for, black for one that cannot be re-let yet. These do
+     colour a room state, which --attention deliberately does not: they answer
+     the same question the red and green answer — can I put somebody in here —
+     rather than a second question laid over it. */
+  --reserved:#C9A227; --locked:#1A1A1A;
 }
 *{box-sizing:border-box}
 body{
@@ -91,13 +99,34 @@ h1{font-size:32px; font-weight:700; margin:0; line-height:1.4}
 .grid{display:grid; grid-template-columns:repeat(10,minmax(0,1fr)); gap:8px}
 @media (max-width:1100px){.grid{grid-template-columns:repeat(auto-fill,minmax(86px,1fr))}}
 
-.room{background:var(--surface); border:1px solid var(--line); border-left:3px solid var(--vacant);
+.room{position:relative;
+  background:var(--surface); border:1px solid var(--line); border-left:3px solid var(--vacant);
   border-radius:8px; padding:9px 9px 8px; cursor:pointer; text-align:left;
   transition:transform .12s, border-color .12s;
   display:flex; flex-direction:column; gap:1px; min-height:76px; overflow:hidden}
 .room:hover{transform:translateY(-1px); border-color:var(--ink)}
 .room.occ{border-left-color:var(--occupied)}
 .room.soon{border-left-style:dashed}
+/* An empty room the landlord has put a note on. The left edge carries it, the
+   same edge that already says occupied or vacant, because it is the same
+   question — whether this room can be given to somebody today. ห้องล็อค takes
+   the whole border, since "nobody may go in" is about the room and not only
+   about its availability. */
+.room.res{border-left-color:var(--reserved)}
+.room.lock{border-color:var(--locked); border-left-color:var(--locked)}
+.room.res .rvac{color:var(--reserved)}
+.room.lock .rvac{color:var(--locked)}
+
+/* The widget. Two dots in the corner of an empty card, one per note, filled
+   when the note is on. Small because the card is small and the room number is
+   what anybody is looking for — but they sit outside the text, so a mis-click
+   opens the room rather than changing a colour by accident. */
+.rmark{position:absolute; top:6px; right:6px; display:flex; gap:4px}
+.mk{width:11px; height:11px; border-radius:50%; cursor:pointer; flex:none;
+  border:1.5px solid var(--line); background:var(--surface); transition:border-color .12s}
+.mk:hover{border-color:var(--muted)}
+.mk.res.on{background:var(--reserved); border-color:var(--reserved)}
+.mk.lock.on{background:var(--locked); border-color:var(--locked)}
 .leaving{color:var(--ink); font-weight:500}
 .rno{font-size:17px; font-weight:500; line-height:1.3}
 .rname{font-size:12px; line-height:1.45; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}

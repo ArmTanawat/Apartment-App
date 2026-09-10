@@ -18,6 +18,7 @@ router.get('/', (req, res) => {
       u.unit_number,
       u.floor,
       u.base_rent,
+      u.mark,
       t.id        AS tenant_id,
       t.full_name AS tenant_name,
       l.id        AS lease_id,
@@ -101,6 +102,33 @@ router.post('/', (req, res) => {
 });
 
 // PUT /units/5
+// The colours a room can be marked with, and the only ones. Anything else is
+// refused rather than stored, because a value nothing renders would show as an
+// ordinary empty room and the landlord would think the note had been taken.
+const MARKS = ['reserved', 'locked'];
+
+// PUT /units/5/mark — the board's colour note. Its own route rather than part
+// of PUT /units/:id, which is the edit-room form and requires a number and a
+// rent; this is one click on a card and should not have to send either.
+//
+// Setting one mark replaces the other. They exclude each other by meaning — a
+// room held for somebody is not a room nobody may enter — so there is no state
+// where both are on to reason about later.
+router.put('/:id/mark', (req, res) => {
+  const unit = db.prepare('SELECT * FROM units WHERE id = ?').get(req.params.id);
+  if (!unit) {
+    return res.status(404).json({ error: 'ไม่พบห้อง' });
+  }
+
+  const { mark } = req.body;
+  if (mark !== null && mark !== undefined && !MARKS.includes(mark)) {
+    return res.status(400).json({ error: `สถานะห้องต้องเป็น ${MARKS.join(' หรือ ')} หรือไม่มี` });
+  }
+
+  db.prepare('UPDATE units SET mark = ? WHERE id = ?').run(mark || null, req.params.id);
+  res.json(db.prepare('SELECT * FROM units WHERE id = ?').get(req.params.id));
+});
+
 router.put('/:id', (req, res) => {
   const existing = db.prepare('SELECT * FROM units WHERE id = ?').get(req.params.id);
   if (!existing) {

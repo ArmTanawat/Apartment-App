@@ -52,6 +52,38 @@ check('and the working survives beside them',
 check('the total is spelled out in Thai',
   /\(.*บาท(ถ้วน|.*สตางค์)\)/.test(body()), text('.pitems tr.total'));
 
+section('with โหมดผู้ดูแล off, which is how the program arrives');
+await click(byText('.btn', 'ออกใบเสร็จ'));
+check('the dialog says the receipt cannot be taken back',
+  $('.modal').textContent.includes('ไม่สามารถยกเลิกได้'), $('.modal').textContent.slice(0,180));
+check('and tells the reader to fix the bill first instead',
+  $('.modal').textContent.includes('ต้องทำก่อนออกใบเสร็จ'));
+check('it does not offer an undo it is hiding',
+  !$('.modal').textContent.includes('ยกเลิกได้ ใบเสร็จไม่มีเลขที่กำกับ'));
+await click(byText('.modal .btn', 'ยกเลิก'), 300);
+
+section('turning โหมดผู้ดูแล on, through the switch rather than the API');
+await nav('ตั้งค่า');
+{
+  const card = $$('.setcard').find(c => c.querySelector('h2').textContent.trim() === 'โหมดผู้ดูแล');
+  check('the card is on ตั้งค่า', !!card, $$('.setcard h2').map(h=>h.textContent.trim()).join(' | '));
+  // The switch carries no words of its own, so its state is the class the
+  // shared Switch sets — the same one every other toggle in the app uses.
+  check('it names what it governs', $('label', card).textContent.trim() === 'ใบเสร็จ',
+    $('label', card).textContent);
+  check('and it starts off', !$('.switch', card).className.includes('on'),
+    $('.switch', card).className);
+  await click($('.switch', card), 600);
+  const again = $$('.setcard').find(c => c.querySelector('h2').textContent.trim() === 'โหมดผู้ดูแล');
+  check('the switch turns on', $('.switch', again).className.includes('on'),
+    $('.switch', again).className);
+}
+await nav('บิล');
+{
+  const card = $$('.setcard').find(c => c.querySelector('h2').textContent.trim() === 'บิลเดือนนี้');
+  await click($$('tbody tr', card)[0], 600);
+}
+
 section('it asks first, though nothing here is one-way');
 await click(byText('.btn', 'ออกใบเสร็จ'));
 check('a dialog stops first', !!$('.modal') && $('.modal h3').textContent === 'ออกใบเสร็จ',
@@ -77,7 +109,12 @@ check('it names the month it settles, where an invoice does',
   text('.phead').includes(period), text('.phead'));
 check('and does not say it twice', !text('.pto').includes('งวด'), text('.pto'));
 check('there is a line to sign', !!$('.sign') && $('.sign').textContent.includes('ผู้รับเงิน'));
-check('it says the money arrived', body().includes('ได้รับเงินตามรายการข้างต้น'));
+check('the standing "money arrived" line is gone',
+  !body().includes('ได้รับเงินตามรายการข้างต้น'));
+check('the header names the period as งวดที่', text('.phead').includes('งวดที่'), text('.phead'));
+check('and carries the day it was issued, without the time',
+  /ออกเมื่อ\s*\d{4}-\d{2}-\d{2}/.test(text('.phead'))
+    && !/\d{2}:\d{2}:\d{2}/.test(text('.phead')), text('.phead'));
 check('and carries no bank details', !$('.paper').textContent.includes('ธนาคารกสิกรไทย'),
   text('.pfoot'));
 check('nor the standing note that belongs on a bill',

@@ -148,6 +148,12 @@ router.post('/', (req, res) => {
   `).run(tenant_id, unit_id, start_date, newEnd, rent,
          deposit || 0, guarantee || 0, advance_rent || 0);
 
+  // The board's colour note on this room, if it had one, has now been answered:
+  // a room held for somebody has been given to somebody, and a room that could
+  // not be re-let has been re-let. Leaving the mark would colour an occupied
+  // room after the thing it was warning about stopped being true.
+  db.prepare('UPDATE units SET mark = NULL WHERE id = ?').run(unit_id);
+
   const created = db.prepare('SELECT * FROM leases WHERE id = ?').get(result.lastInsertRowid);
   res.status(201).json(created);
 });

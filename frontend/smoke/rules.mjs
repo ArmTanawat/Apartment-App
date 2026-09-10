@@ -396,6 +396,35 @@ section('numeric settings come back as numbers, not text');
 // ---- clean up ----
 // By name rather than by the ids collected along the way: a case that creates
 // a fee type inline is easy to write and easy to forget to register, and the
+section('the board mark is a note, not a rule');
+{
+  const u = await newUnit('T23');
+  const t = await newTenant('ผู้เช่า จองห้อง');
+
+  ok('a new room carries no mark', u.mark === null || u.mark === undefined, String(u.mark));
+  ok('it can be marked จอง',
+     (await PUT(`/units/${u.id}/mark`, { mark:'reserved' })).body.mark === 'reserved');
+  ok('setting ล็อค replaces จอง rather than joining it',
+     (await PUT(`/units/${u.id}/mark`, { mark:'locked' })).body.mark === 'locked');
+  ok('null clears it', (await PUT(`/units/${u.id}/mark`, { mark:null })).body.mark === null);
+
+  const bad = await PUT(`/units/${u.id}/mark`, { mark:'purple' });
+  ok('a value nothing renders is refused rather than stored', bad.status === 400, String(bad.status));
+  ok('and the room is left as it was',
+     (await GET(`/units/${u.id}`)).body.mark === null);
+
+  // The point of the whole thing: it colours a card and changes nothing else.
+  await PUT(`/units/${u.id}/mark`, { mark:'locked' });
+  const vac = (await GET('/units/vacant')).body;
+  ok('a locked room is still counted as vacant', vac.some(x => x.id === u.id));
+  const l = await POST('/leases', { tenant_id:t.id, unit_id:u.id,
+    start_date:'2026-01-01', monthly_rent:1000 });
+  ok('and somebody can still be moved into it', l.status === 201, String(l.status));
+  ok('which clears the mark, because what it warned about has happened',
+     (await GET(`/units/${u.id}`)).body.mark === null);
+  await DEL(`/leases/${l.body.id}`);
+}
+
 section('the three sums taken at move-in are kept apart, and none is charged');
 {
   const u = await newUnit('T21');

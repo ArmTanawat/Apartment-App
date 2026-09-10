@@ -151,6 +151,9 @@ export function DataProvider({ children }){
     const actions = {
       // ---- rooms ----
       addUnit: async u => { await post('/units', u); await after(['units']); },
+      // The board's colour note. Its own route because PUT /units/:id is the
+      // edit-room form and wants a number and a rent; this is one click.
+      markUnit: async (id, mark) => { await put(`/units/${id}/mark`, { mark }); await after(['units']); },
       updateUnit: async (id, patch) => { await put(`/units/${id}`, patch); await after(['units','leases']); },
       deleteUnit: async id => { await del(`/units/${id}`); await after(['units']); },
 

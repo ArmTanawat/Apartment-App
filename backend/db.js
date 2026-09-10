@@ -43,11 +43,27 @@ db.exec(`
     note            TEXT
   );
 
+  -- The mark column is a note the landlord puts on an empty room, and the only
+  -- thing in this schema that is a colour rather than a fact:
+  --   'reserved'  someone has asked for it, so do not offer it to anybody else
+  --   'locked'    the tenant left without notice and the room cannot legally
+  --               be re-let yet, so it is empty but not available
+  -- NULL is an ordinary empty room.
+  --
+  -- One column rather than two flags because the two states exclude each other
+  -- — a room being held for somebody is not a room nobody may enter — and a
+  -- single column cannot be set to both by mistake.
+  --
+  -- It is a reminder and nothing else. No rule reads it: the vacancy query, the
+  -- overlap guard and every date comparison ignore it, so a marked room can
+  -- still be moved into. Moving somebody in clears it, because whatever the
+  -- note was for has now happened.
   CREATE TABLE IF NOT EXISTS units (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     unit_number TEXT NOT NULL UNIQUE,
     floor       INTEGER,
-    base_rent   REAL NOT NULL
+    base_rent   REAL NOT NULL,
+    mark        TEXT
   );
 
   -- The three sums taken at move-in are separate columns because they are
@@ -208,6 +224,10 @@ addColumn('tenants', 'vehicle_plate', 'TEXT');
 addColumn('leases', 'guarantee', 'REAL DEFAULT 0');
 addColumn('leases', 'advance_rent', 'REAL DEFAULT 0');
 
+// The board's colour note on an empty room. NULL on every existing room, which
+// is what an unmarked room is.
+addColumn('units', 'mark', 'TEXT');
+
 // Receipts used to carry a running number and to hold their bill down. Both
 // are gone: a receipt is now the paper form of a bill, cancellable, and its
 // figures follow the bill if it is corrected.
@@ -298,6 +318,12 @@ seedSetting.run('electricity_min_amount', 100);
 // it if the meters differ.
 seedSetting.run('water_meter_digits', 4);
 seedSetting.run('electricity_meter_digits', 4);
+
+// Off by default, including on a database that predates it — INSERT OR IGNORE
+// adds the row on the next start and leaves it alone afterwards. Off is the
+// normal state: the undo is for whoever is correcting a mistake, not part of
+// the daily round.
+seedSetting.run('developer_mode', 0);
 
 // Starter fee types so the app is usable immediately. These are ordinary rows —
 // add, rename, or retire them through the UI without touching this file.

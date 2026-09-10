@@ -41,9 +41,14 @@ export default function BillPaper({ bill: b, receipt = null }){
           <div style={{fontWeight:500}}>{isReceipt ? "ใบเสร็จรับเงิน" : "ใบแจ้งหนี้"}</div>
           {/* Both papers name the month here. A receipt used to carry its own
               number in this slot; without one there is nothing that identifies
-              it except the bill it settles, which is the month and the room. */}
+              it except the bill it settles, which is the month and the room.
+              A receipt adds the day it was issued underneath — the date alone,
+              because the minute a piece of paper was printed is not something
+              anybody reads off it. */}
           <div className="small">{isReceipt ? "Receipt" : "Invoice"}<br />
-            <span className="num">{b.period}</span></div>
+            งวดที่ <span className="num">{b.period}</span>
+            {isReceipt ? <><br />ออกเมื่อ{" "}
+              <span className="num">{String(receipt.issued_at || "").slice(0, 10)}</span></> : null}</div>
         </div>
       </div>
 
@@ -88,12 +93,11 @@ export default function BillPaper({ bill: b, receipt = null }){
       </table>
 
       {isReceipt ? <>
-        <div className="pfoot">
-          <b>ได้รับเงินตามรายการข้างต้นเรียบร้อยแล้ว</b>
-          {receipt.note ? <div style={{marginTop:"10px"}}>{receipt.note}</div> : null}
-          <div style={{marginTop:"12px",fontSize:"12px"}}>ออกใบเสร็จเมื่อ{" "}
-            <span className="num">{receipt.issued_at}</span></div>
-        </div>
+        {/* Only the note, and only when there is one. The date moved up to the
+            header and the standing "ได้รับเงินตามรายการข้างต้นเรียบร้อยแล้ว"
+            line is gone, so on a receipt with no note there is nothing left to
+            put here and the empty rule above it would be all that showed. */}
+        {receipt.note ? <div className="pfoot">{receipt.note}</div> : null}
         <div className="sign">
           <div><i /><span>ผู้รับเงิน</span></div>
         </div>

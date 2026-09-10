@@ -18,7 +18,7 @@ It answers the program's first job (which rooms are free) at a glance, and doubl
 
 ### Colour
 
-Black and white carries the interface. Exactly two colours carry meaning, and nothing else is coloured.
+Black and white carries the interface. Colour carries one question and nothing else is coloured.
 
 | Token | Hex | Use |
 |---|---|---|
@@ -29,19 +29,27 @@ Black and white carries the interface. Exactly two colours carry meaning, and no
 | `--line` | `#E4E4E4` | Borders, dividers |
 | `--occupied` | `#2E7D46` | Room has a tenant |
 | `--vacant` | `#B3382C` | Room is empty |
+| `--reserved` | `#C9A227` | Empty room somebody has asked for — จองแล้ว |
+| `--locked` | `#1A1A1A` | Empty room that cannot be re-let yet — ล็อค |
 | `--attention` | `#C9A227` | Border of the banner saying a saved bill no longer matches its data |
 | `--attention-soft` | `#FFF8E6` | That banner's background |
 
-The last two are not a third room state. Colour still answers one question
-about a room and only that one. The banner they belong to is about a bill that
-was issued before its data changed — it has to be noticed, and it says nothing
-about whether anyone is living anywhere. It appears at most a few times a month.
+The last two are not a room state at all. The banner they belong to is about a
+bill that was issued before its data changed — it has to be noticed, and it says
+nothing about whether anyone is living anywhere. It appears at most a few times
+a month. `--reserved` happens to be the same yellow as `--attention`; that is a
+coincidence of palette, not a shared meaning, and they are separate tokens so
+either can move without dragging the other.
 
-Earlier drafts gave three separate meanings to colour — occupied, vacant, and not-yet-metered — and the board became a code to decode rather than a thing to read. Colour now answers one question only: is anyone living here.
+Earlier drafts gave three separate meanings to colour — occupied, vacant, and not-yet-metered — and the board became a code to decode rather than a thing to read. Colour answers one question only, and the four room colours are four answers to it rather than four questions: **can somebody be put in this room today.** Green, no — somebody lives here. Red, yes. Amber, no — it is promised to somebody. Black, no — the last tenant left without notice and the room cannot legally be re-let yet.
+
+The two extra answers are the landlord's own note, set from the board and stored on the room. No rule reads them: a marked room is still vacant to `/units/vacant`, still billable, and can still be moved into — moving somebody in simply clears the note. Anything that made them a rule would be a second definition of "empty" sitting beside the one the lease dates give, which is the mistake `CLAUDE.md` spends four paragraphs on.
 
 Red for vacant is deliberate. In a booking system green would mean available, but the reader here is the owner, and an empty room is lost income. It also puts the loudest colour on exactly what the owner is scanning for.
 
-Colour is never the only signal. A vacant card also says ว่าง in words, so red-green colour blindness costs nothing.
+Colour is never the only signal. Every empty card says its state in words — ว่าง, จองแล้ว, ล็อค — so red-green colour blindness costs nothing, and black against red is not a distinction anybody should have to make by eye.
+
+The widget that sets the note is two dots in the corner of an empty card, filled when on. They stop the click from reaching the card, so pressing a dot changes the colour and pressing anywhere else opens the room. They are only on empty cards, because neither note means anything about a room somebody is living in.
 
 Everything a room still needs — a meter reading, a bill — is a small grey note, not a colour. It is secondary information and should read that way.
 

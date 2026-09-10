@@ -9,7 +9,7 @@ import { useUi } from '../state/UiContext.jsx';
  * follows the shared working month, and the page says so in words, because
  * mixing the two frames silently is how someone trusts the wrong number. */
 export default function BoardPage(){
-  const { units, h } = useData();
+  const { units, h, markUnit } = useData();
   const { period, setPeriod, editMode, setEditMode, filter, setFilter, go, openModal } = useUi();
 
   // is_occupied and leaving_on come straight from GET /units.
@@ -39,7 +39,8 @@ export default function BoardPage(){
               leaving={u.leaving_on}
               metered={h.metered(u.id, period)}
               billed={h.billed(u.id, period)}
-              onClick={() => go({name:"room", id:u.id})} />
+              onClick={() => go({name:"room", id:u.id})}
+              onMark={mark => markUnit(u.id, mark).catch(() => {})} />
           ))}
           {editMode && (
             <button className="addcard" title={`เพิ่มห้องชั้น ${fl}`}

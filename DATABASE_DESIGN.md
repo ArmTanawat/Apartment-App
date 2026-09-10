@@ -58,10 +58,19 @@
 | `unit_number` | TEXT | e.g. "201" |
 | `floor` | INTEGER | |
 | `base_rent` | REAL | Standard price for this room (e.g. 3800) |
+| `mark` | TEXT | `'reserved'`, `'locked'`, or NULL — the board's colour note |
 
 `base_rent` is the current asking price. It is copied onto a lease when a tenant moves in, so raising it later does not change existing tenants or past bills.
 
 There is deliberately **no** `status` or `is_occupied` column. Occupancy is derived from `leases` — a column would drift out of sync every time someone forgot to update it.
+
+**`mark` is a note, and the exception that proves that rule.** It is stored rather than derived because nothing can derive it: `'reserved'` means somebody has asked for the room, and `'locked'` means the last tenant left without notice and it cannot legally be re-let yet. Neither is visible anywhere in the data — they exist only in the landlord's head until they are written down, which is the whole reason the column exists.
+
+**Nothing reads it.** `/units/vacant`, the overlap guard in `POST /leases`, `POST /bills/batch` and every date comparison ignore it entirely, so a marked room is still vacant, still billable, and can still be moved into. That is deliberate: making it a rule would create a second definition of "empty" beside the one the lease dates give, and the two would eventually disagree — the exact failure the derived-occupancy rule exists to prevent. It colours a card and does nothing else.
+
+**Moving somebody in clears it,** in `POST /leases`. A room held for somebody has been given to somebody, and one that could not be re-let has been re-let; either way the note has been answered and leaving it would colour an occupied room for a reason that stopped being true.
+
+**One column rather than two flags,** because the two states exclude each other — a room being held for somebody is not a room nobody may enter — and a single column cannot be set to both by mistake. `routes/units.js` refuses any value that is not one of the two, because a value nothing renders would show as an ordinary empty room and the landlord would think the note had been taken.
 
 ### `leases`
 
@@ -239,8 +248,13 @@ A key–value table. All values are stored as TEXT so one table can hold both a 
 | `electricity_min_amount` | Flat amount for that first block | 100 |
 | `water_meter_digits` | Digits on the dial, for rollover | 4 |
 | `electricity_meter_digits` | Digits on the dial, for rollover | 4 |
+| `developer_mode` | 0 or 1 — shows the receipt undo on screen | 0 |
 
 Water and electricity have entirely separate figures. They are not required to match.
+
+**`developer_mode` hides buttons, it does not change rules.** With it off — which is how the program arrives, and how it stays for ordinary use — the receipt screen has no ยกเลิกใบเสร็จ button and the issue dialog says a receipt cannot be taken back. `DELETE /receipts/:id` is untouched and still works, and correcting a bill still cancels its receipt through the cascade exactly as before.
+
+The wording it swaps in ("ไม่สามารถยกเลิกได้") describes what the reader can do from the screen in front of them, which is not the same claim as what the program can do. That was the intent: a receipt should read as final to whoever is handing them out, and stay correctable by whoever knows where the switch is. Anyone changing this should know they are looking at a screen setting and not a rule — the rules are in `CLAUDE.md` and none of them moved.
 
 Key–value was kept rather than one row with six columns because the set of settings will keep growing, and adding a setting should be an `INSERT` rather than an `ALTER TABLE`.
 

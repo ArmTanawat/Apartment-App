@@ -19,12 +19,51 @@ for(const label of ['ว่าง','ยังไม่จดมิเตอร�
   const shown = $$('.room').length;
   check(`"${label}" says ${claimed} and shows ${shown}`, claimed === shown);
 }
-check('colour is only ever occupied or vacant',
+// Colour answers one question — can somebody be put in this room today — and
+// these are the only four answers. res and lock are the landlord's own note on
+// an empty room; nothing else may colour a card.
+check('colour is only ever one of the four states',
   $$('.room').every(r => r.className.split(' ').every(c =>
-    ['room','occ','soon'].includes(c))),
-  $$('.room').map(r => r.className).find(c => !/^room( occ)?( soon)?$/.test(c)));
-check('a vacant card says so in words too, not only in colour',
-  $$('.room:not(.occ)').every(r => r.textContent.includes('ว่าง')));
+    ['room','occ','soon','res','lock'].includes(c))),
+  $$('.room').map(r => r.className).find(c => !/^room( occ)?( soon)?( res)?( lock)?$/.test(c)));
+check('an occupied card is never marked',
+  !$$('.room.occ').some(r => /\b(res|lock)\b/.test(r.className)));
+check('every empty card says its state in words too, not only in colour',
+  $$('.room:not(.occ)').every(r => /ว่าง|จองแล้ว|ล็อค/.test(r.textContent)),
+  $$('.room:not(.occ)').map(r => r.textContent).find(t => !/ว่าง|จองแล้ว|ล็อค/.test(t)));
+
+section('ห้องพัก — the two notes an empty room can carry');
+await nav('ห้องพัก');
+await click(byText('.chip', 'ทั้งหมด'));
+{
+  const empty = $$('.room:not(.occ)')[0];
+  const no = empty.querySelector('.rno').textContent;
+  check('an empty card carries the widget', !!empty.querySelector('.rmark .mk.res'));
+  check('and an occupied one does not',
+    !$$('.room.occ')[0].querySelector('.rmark'));
+
+  await click(empty.querySelector('.mk.res'), 500);
+  const after = byText('.room', no);
+  check('pressing จอง colours the card and does not open the room',
+    after.className.includes('res') && !!$('.grid'), after.className);
+  check('and the card says จองแล้ว', after.textContent.includes('จองแล้ว'));
+
+  await click(byText('.room', no).querySelector('.mk.lock'), 500);
+  const locked = byText('.room', no);
+  check('pressing ล็อค replaces จอง rather than adding to it',
+    locked.className.includes('lock') && !locked.className.includes('res'), locked.className);
+
+  await click(byText('.room', no).querySelector('.mk.lock'), 500);
+  const cleared = byText('.room', no);
+  check('pressing it again clears the note',
+    !/\b(res|lock)\b/.test(cleared.className) && cleared.textContent.includes('ว่าง'),
+    cleared.className);
+
+  await click(byText('.room', no), 500);
+  check('the card still opens the room when pressed anywhere else',
+    body().includes('ผู้เช่าปัจจุบัน'), body().slice(0, 80));
+  await nav('ห้องพัก');
+}
 
 section('ผู้เช่า — same question of its own chips');
 await nav('ผู้เช่า');

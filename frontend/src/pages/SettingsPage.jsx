@@ -24,6 +24,7 @@ export default function SettingsPage(){
 
   const shown = key => drafts[key] ?? String(settings[key] ?? "");
   const text = key => (drafts[key] ?? settings[key] ?? "");
+  const dev = !!Number(settings.developer_mode);
 
   // The write follows shortly behind the typing rather than going out per
   // character. A failure is said once, at the top of the page.
@@ -160,6 +161,19 @@ export default function SettingsPage(){
       <RateBlock kind="electricity" label="ค่าไฟ" shown={shown} setNumber={setNumber}
         settings={settings} units={exampleUnits.electricity} drafts={drafts} setDrafts={setDrafts}
         setUnits={v => setExampleUnits(x => ({ ...x, electricity: v }))} />
+
+      {/* Sits below the everyday settings because it is not one. Nothing here
+          changes a figure or what prints — it decides whether the screens admit
+          that a receipt can be taken back. The route stays open either way, so
+          this is about who is told, not about what is possible. */}
+      <div className="setcard">
+        <h2>โหมดผู้ดูแล</h2>
+        <p className="lead">เปิดไว้เมื่อต้องแก้ของที่ออกไปแล้ว ปิดไว้ตอนใช้งานปกติ</p>
+        <div className="rateline" style={{marginTop:"14px"}}>
+          <label>ใบเสร็จ</label>
+          <Switch on={dev} onClick={() => patchSettings({ developer_mode: dev ? 0 : 1 })} />
+        </div>
+      </div>
 
       <div className="setcard">
         <h2>ประเภทค่าธรรมเนียม <button className="linkbtn" style={{float:"right",fontSize:"13px"}}

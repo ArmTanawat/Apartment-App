@@ -16,7 +16,13 @@ const NUMERIC_KEYS = [
   'electricity_min_units',
   'electricity_min_amount',
   'water_meter_digits',
-  'electricity_meter_digits'
+  'electricity_meter_digits',
+  // 0 or 1. Shows the parts of the receipt screens that undo something —
+  // ยกเลิกใบเสร็จ and the wording explaining that a receipt can be taken back.
+  // It hides buttons and nothing else: DELETE /receipts/:id is unchanged and
+  // still works, because the point is to keep the correction available to
+  // whoever knows about it rather than to remove it.
+  'developer_mode'
 ];
 
 const TEXT_KEYS = [
