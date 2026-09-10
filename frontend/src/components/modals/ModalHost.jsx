@@ -3,7 +3,7 @@ import { useUi } from '../../state/UiContext.jsx';
 import Modal from '../Modal.jsx';
 import { AddRoomModal, DeleteRoomModal, EditRoomModal } from './RoomModals.jsx';
 import { DeleteLeaseModal, EditLeaseModal, MoveInModal, MoveOutModal } from './LeaseModals.jsx';
-import { EditPrevModal, MeterModal } from './MeterModals.jsx';
+import { EditPrevModal, MeterModal, RoomYearModal } from './MeterModals.jsx';
 import { ChargeModal, DeleteFeeModal, DeleteFeeTypeModal, FeeModal, FeeTypeModal } from './FeeModals.jsx';
 import { AddTenantModal, DeleteTenantModal, EditTenantModal } from './TenantModals.jsx';
 import { CancelReceiptModal, DeleteBillModal, IssueReceiptModal } from './BillModals.jsx';
@@ -37,6 +37,7 @@ const SUBJECT = {
   deleteBill:    ['id',       'bills'],
   issueReceipt:  ['id',       'bills'],
   cancelReceipt: ['id',       'bills'],
+  roomYear:      ['unitId',   'units'],
 };
 
 /* The prototype's openModal(html) wrote a string into #modalRoot. Here the
@@ -82,6 +83,7 @@ export default function ModalHost(){
     case "deleteBill":    return <DeleteBillModal id={modal.id} />;
     case "issueReceipt":  return <IssueReceiptModal id={modal.id} />;
     case "cancelReceipt": return <CancelReceiptModal id={modal.id} />;
+    case "roomYear":      return <RoomYearModal unitId={modal.unitId} year={modal.year} />;
     default: return null;
   }
 }

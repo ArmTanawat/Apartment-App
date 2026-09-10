@@ -1,6 +1,6 @@
 {
   "name": "apartment-app",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "private": true,
   "description": "Local software for managing a small apartment building",
   "main": "electron/main.js",

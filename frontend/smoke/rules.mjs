@@ -396,6 +396,46 @@ section('numeric settings come back as numbers, not text');
 // ---- clean up ----
 // By name rather than by the ids collected along the way: a case that creates
 // a fee type inline is easy to write and easy to forget to register, and the
+section('a year of meters, in one request');
+{
+  const u = await newUnit('T24');
+  const yr = period.slice(0, 4);
+  await POST('/readings', { unit_id:u.id, period:`${yr}-03`,
+    water_prev:100, water_curr:118, elec_prev:1000, elec_curr:1146 });
+  // A dial that wrapped. usage() is the only place that knows what to do with
+  // this, and the year endpoint has to be going through it rather than
+  // subtracting the two numbers itself.
+  await POST('/readings', { unit_id:u.id, period:`${yr}-04`,
+    water_prev:9995, water_curr:12, water_rollover:10000,
+    elec_prev:1146, elec_curr:1200 });
+  // Entered but not finished — the checklist counts this as still to do.
+  await POST('/readings', { unit_id:u.id, period:`${yr}-05`,
+    water_prev:12, water_curr:null, elec_prev:1200, elec_curr:null });
+
+  const y = await GET(`/readings/year/${yr}`);
+  const room = y.body.rooms.find(r => r.unit_id === u.id);
+
+  ok('every room is present', y.body.rooms.length >= 1);
+  ok('and every month has a figure', room.water.length === 12 && room.elec.length === 12,
+     `${room.water.length}/${room.elec.length}`);
+  ok('a month that was read carries its usage', room.water[2] === 18 && room.elec[2] === 146,
+     `${room.water[2]}/${room.elec[2]}`);
+  ok('a wrapped dial is 17 units, not 12 — the rollover rule is not reimplemented',
+     room.water[3] === 17, String(room.water[3]));
+  ok('a half-entered month is 0 rather than null or negative',
+     room.water[4] === 0 && room.elec[4] === 0, `${room.water[4]}/${room.elec[4]}`);
+  ok('a month never read is 0', room.water[0] === 0 && room.elec[11] === 0);
+
+  ok('the years on offer include this one', y.body.years.includes(yr), y.body.years.join(','));
+  const empty = await GET('/readings/year/1999');
+  ok('a year with nothing in it still answers, all zeros',
+     empty.status === 200 && empty.body.rooms.every(r => r.water.every(v => v === 0)));
+  ok('a year that is not a year is refused',
+     (await GET('/readings/year/26')).status === 400);
+
+  for(const r of (await GET(`/readings/history/${u.id}`)).body) await DEL(`/readings/${r.id}`);
+}
+
 section('the board mark is a note, not a rule');
 {
   const u = await newUnit('T23');

@@ -270,4 +270,53 @@ check('previous, current and units for both utilities',
   text('.rtable thead').includes('ก่อนหน้า') && text('.rtable thead').includes('หน่วย'));
 check('and it counts what is still outstanding', text('.rnote').includes('ยังไม่ได้จด'));
 
+section('รายงานมิเตอร์รายปี');
+await nav('รายงาน');
+await click(byText('.chip', 'รายงานมิเตอร์รายปี'), 800);
+check('the year picker replaces the month picker',
+  text('.monthlabel').includes('ปี') && !text('.monthlabel').includes('งวด'),
+  text('.monthlabel'));
+check('the header names the year, not a month',
+  /ปี/.test(text('.phead')) && !/มกราคม|กันยายน/.test(text('.phead')), text('.phead'));
+check('twelve month columns plus ห้อง, มิเตอร์ and รวม',
+  $$('.ytable thead th').length === 15,
+  $$('.ytable thead th').map(t => t.textContent).join(','));
+check('ม.ค. first and ธ.ค. last',
+  $$('.ytable thead th')[2].textContent === 'ม.ค.'
+    && $$('.ytable thead th')[13].textContent === 'ธ.ค.');
+check('two rows per room, น้ำ then ไฟ',
+  $$('.ytable tbody tr').length === $$('.room').length * 2
+    || $$('.ytable tbody tr').length % 2 === 0,
+  `${$$('.ytable tbody tr').length}`);
+check('every cell has a number, none blank',
+  $$('.ytable tbody td.num.r').every(td => /^[\d,]+$/.test(td.textContent.trim())),
+  $$('.ytable tbody td.num.r').map(td => td.textContent).find(t => !/^[\d,]+$/.test(t.trim())));
+
+section('one room\'s year, as two charts');
+await click($('.ytable tbody tr.yrow'), 800);
+check('a dialog opens', !!$('.modal'), body().slice(0, 80));
+check('it names the room and the year', /ห้อง .* · ปี \d{4}/.test($('.modal h3').textContent),
+  $('.modal h3').textContent);
+check('with a chart for each meter', $$('.modal .chart').length === 2,
+  `${$$('.modal .chart').length}`);
+check('น้ำ and ไฟ are both labelled',
+  $('.modal').textContent.includes('มิเตอร์น้ำ') && $('.modal').textContent.includes('มิเตอร์ไฟ'));
+check('each chart says its own peak, so the scale is not a guess',
+  $$('.modal .charthead .num').length === 2
+    && $$('.modal .charthead .num').every(e => /สูงสุด/.test(e.textContent)));
+check('twelve points are plotted on each',
+  $$('.modal .chart')[0].querySelectorAll('circle').length === 12,
+  `${$$('.modal .chart')[0].querySelectorAll('circle').length}`);
+check('and the two are drawn in different colours',
+  $$('.modal .chart path[fill]')[0].getAttribute('fill')
+    !== $$('.modal .chart path[fill]')[2].getAttribute('fill'),
+  $$('.modal .chart path[fill]').map(p => p.getAttribute('fill')).join(' / '));
+await click(byText('.modal .btn', 'ปิด'), 400);
+check('closing leaves the report behind it', !$('.modal') && !!$('.ytable'));
+
+check('the monthly meter report is untouched by any of this',
+  (await (async () => { await click(byText('.chip', 'รายงานมิเตอร์'), 700);
+    return !$('.ytable') && !!$('.rtable') && text('.phead').includes('งวด'); })()),
+  text('.phead'));
+
 done();

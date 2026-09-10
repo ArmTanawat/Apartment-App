@@ -52,6 +52,7 @@ The database file `apartment.db` is created automatically on first run.
 - `GET /readings?period=2026-08` — all rooms for a month (null = not entered yet)
 - `GET /readings/previous/:unitId/:period` — last month's numbers, for auto-fill
 - `GET /readings/history/:unitId` — every reading for one room
+- `GET /readings/year/2026` — a year of usage for every room: `{ year, years, rooms:[{unit_id, unit_number, floor, water:[12], elec:[12]}] }`. Months with no reading, or one entered but unfinished, are `0`. `years` lists the years that have readings, so the picker needs no second call
 - `POST /readings` — record a month (send `water_rollover`/`elec_rollover` when a dial wrapped)
 - `PUT /readings/:id` — correct a reading (send `water_curr: null` / `elec_curr: null` explicitly to clear one)
 - `DELETE /readings/:id`

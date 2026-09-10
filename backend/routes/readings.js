@@ -61,6 +61,68 @@ router.get('/', (req, res) => {
   res.json(withUsage);
 });
 
+// GET /readings/year/2026 — a year of usage, every room, for the yearly report.
+//
+// One request rather than twelve, and the arithmetic stays here: usage() knows
+// about rollovers and meter replacements, and a second copy of it on the client
+// would be the same mistake buildBill() was moved off the frontend to avoid.
+//
+// Every room appears and every month has a number. A month with no reading, or
+// one entered but not yet finished, is 0 rather than null — the report is a
+// grid to scan down a column of, and a blank would read as "look into this"
+// when the answer is simply that nothing was recorded.
+//
+// `years` comes back alongside so the picker can offer the years that have
+// something in them without a second call.
+router.get('/year/:year', (req, res) => {
+  const year = String(req.params.year);
+  if (!/^\d{4}$/.test(year)) {
+    return res.status(400).json({ error: 'ปีต้องเป็นตัวเลขสี่หลัก เช่น 2026' });
+  }
+
+  const rows = db.prepare(`
+    SELECT
+      u.id AS unit_id, u.unit_number, u.floor,
+      r.period,
+      r.water_prev, r.water_curr, r.water_rollover,
+      r.elec_prev,  r.elec_curr,  r.elec_rollover
+    FROM units u
+    LEFT JOIN meter_readings r
+      ON r.unit_id = u.id AND r.period LIKE ?
+    ORDER BY u.floor, u.unit_number
+  `).all(`${year}-%`);
+
+  const rooms = new Map();
+  for (const r of rows) {
+    if (!rooms.has(r.unit_id)) {
+      rooms.set(r.unit_id, {
+        unit_id: r.unit_id, unit_number: r.unit_number, floor: r.floor,
+        water: Array(12).fill(0), elec: Array(12).fill(0),
+      });
+    }
+    if (!r.period) continue;
+
+    // period is 'YYYY-MM', so the month is the last two characters. Stored
+    // Gregorian everywhere, which is why this is a slice and not a conversion.
+    const m = Number(r.period.slice(5, 7)) - 1;
+    if (m < 0 || m > 11) continue;
+
+    const room = rooms.get(r.unit_id);
+    room.water[m] = usage(r.water_prev, r.water_curr, r.water_rollover) ?? 0;
+    room.elec[m]  = usage(r.elec_prev,  r.elec_curr,  r.elec_rollover)  ?? 0;
+  }
+
+  const years = db.prepare(`
+    SELECT DISTINCT substr(period, 1, 4) AS y FROM meter_readings ORDER BY y DESC
+  `).all().map(x => x.y);
+
+  // The current year is always offered, even before anything is entered in it.
+  const thisYear = db.prepare(`SELECT strftime('%Y', 'now', 'localtime') AS y`).get().y;
+  if (!years.includes(thisYear)) years.unshift(thisYear);
+
+  res.json({ year, years, rooms: [...rooms.values()] });
+});
+
 // GET /readings/previous/:unitId/:period — what last month's meter ended at.
 //
 // The UI calls this to prefill the "previous" boxes so only one number is typed.

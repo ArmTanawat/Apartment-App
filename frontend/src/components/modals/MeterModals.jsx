@@ -1,7 +1,10 @@
 import { useState } from 'react';
 import { useSubmit } from '../../lib/useSubmit.js';
+import { get, messageOf } from '../../lib/api.js';
+import { useApi } from '../../lib/useApi.js';
 import ErrBox from '../ErrBox.jsx';
 import Modal from '../Modal.jsx';
+import UsageChart from '../UsageChart.jsx';
 import { useData } from '../../state/DataContext.jsx';
 import { useUi } from '../../state/UiContext.jsx';
 
@@ -169,6 +172,50 @@ export function EditPrevModal({ unitId }){
         <button className="btn ghost" onClick={closeModal}>ยกเลิก</button>
         <button className="btn" disabled={busy} onClick={save}>บันทึก</button>
       </div>
+    </Modal>
+  );
+}
+
+/* One room's year, as two charts.
+ *
+ * Opened from a row of the yearly meter report. It re-asks the year endpoint
+ * rather than being handed the numbers, so it cannot show a different figure
+ * from the table it was opened from by holding an older copy — the request is
+ * one round trip on localhost.
+ *
+ * There is nothing else in it. The table behind already carries the figures;
+ * what this adds is the shape of them over the year, which is the thing a
+ * column of numbers is worst at showing. */
+export function RoomYearModal({ unitId, year }){
+  const { closeModal } = useUi();
+  const req = useApi(() => get(`/readings/year/${year}`), [year]);
+
+  if(req.loading) return <Modal><p className="lead">กำลังโหลด…</p></Modal>;
+  if(req.error) return (
+    <Modal>
+      <h3>ดูไม่ได้</h3>
+      <ErrBox>{messageOf(req.error)}</ErrBox>
+      <div className="actions"><button className="btn ghost" onClick={closeModal}>ปิด</button></div>
+    </Modal>
+  );
+
+  const room = req.data.rooms.find(r => r.unit_id === unitId);
+  if(!room) return (
+    <Modal>
+      <h3>ห้องนี้ไม่มีข้อมูล</h3>
+      <div className="actions"><button className="btn ghost" onClick={closeModal}>ปิด</button></div>
+    </Modal>
+  );
+
+  return (
+    <Modal wide>
+      <h3>ห้อง {room.unit_number} · ปี {year}</h3>
+      <p className="lead">หน่วยที่ใช้ในแต่ละเดือน · เดือนที่ไม่ได้จดมิเตอร์นับเป็น 0</p>
+      <UsageChart values={room.water} label="มิเตอร์น้ำ"
+        colour="var(--water-line)" fill="var(--water-fill)" />
+      <UsageChart values={room.elec} label="มิเตอร์ไฟ"
+        colour="var(--elec-line)" fill="var(--elec-fill)" />
+      <div className="actions"><button className="btn ghost" onClick={closeModal}>ปิด</button></div>
     </Modal>
   );
 }

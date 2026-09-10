@@ -180,11 +180,19 @@ The bill line records the working, for example "11 of 30 days". Nothing changes 
 | 10.2 | The summary accounts for rooms it does not list, and names them | Done |
 | 10.3 | A meter report for the month, every room, columns lined up | Done |
 | 10.4 | The meter report includes rooms read but not yet billed, and marks rooms not read at all | Done |
-| 10.5 | Both reports print like an invoice, on the working month | Done |
+| 10.5 | Both monthly reports print like an invoice, on the working month | Done |
+| 10.6 | A yearly meter report: every room, two rows (น้ำ, ไฟ), twelve columns ม.ค.–ธ.ค. | Done |
+| 10.7 | Months with no reading, or one entered but unfinished, show 0 rather than blank | Done |
+| 10.8 | The year is chosen separately from the working month | Done |
+| 10.9 | A room opens as two charts, one per meter, to show usage over the year | Done |
 
 Both are built from what the API already returns for other screens — `GET /bills?period=` and `GET /readings?period=` — and needed no endpoint of their own.
 
 A room missing from a month's takings is the thing the summary exists to make visible, so the rooms it leaves out are counted and named at the foot rather than silently absent. The meter report is for spotting a meter that has gone wrong, which is why it lists every room including the ones nothing has been entered for.
+
+The yearly report answers the question a single month cannot: whether a room's water or electricity is behaving oddly over time. A column of twelve figures shows it poorly, so pressing a room draws its year as two charts — one per meter, on separate scales, because a room using 18 units of water against 146 of electricity would flatten the water line to nothing on a shared axis. It is the one report with an endpoint of its own, `GET /readings/year/:year`, because a year of every room is twelve requests otherwise and the usage arithmetic belongs on the server with the rollover rule.
+
+There is still no automatic "this looks unusual" flag, for the reason given under 10.2: usage here doubles between seasons, and any threshold that catches a broken meter in November fires on every room in April. The charts let a person see it instead.
 
 ## Receipts
 

@@ -11,6 +11,11 @@ export const daysInPeriod = period => {
   return new Date(y, m, 0).getDate();
 };
 
+// The abbreviations a Thai column heading uses. Twelve narrow columns have no
+// room for มกราคม, and these are what anybody reading a calendar expects.
+export const MONTHS_SHORT = ["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.",
+  "ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];
+
 export const THAI_MONTHS = ["มกราคม","กุมภาพันธ์","มีนาคม","เมษายน","พฤษภาคม","มิถุนายน",
   "กรกฎาคม","สิงหาคม","กันยายน","ตุลาคม","พฤศจิกายน","ธันวาคม"];
 

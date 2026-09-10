@@ -43,6 +43,12 @@ export function UiProvider({ children }){
   const [exampleUnits, setExampleUnits] = useState({ water: 8, electricity: 8 });
   // reports
   const [reportKind, setReportKind] = useState('summary');
+  // The yearly meter report has its own frame. It is not the working month
+  // narrowed to a year — that month can be any month of any year, and moving
+  // one would move the other, which is the two-frames-on-one-page problem the
+  // room page already had to say out loud.
+  const [reportYear, setReportYear] = useState(String(new Date().getFullYear()));
+  const [yearOpen, setYearOpen] = useState(false);
 
   const [modal, setModal] = useState(null);
 
@@ -88,12 +94,13 @@ export function UiProvider({ children }){
     lastResult, setLastResult,
     exampleUnits, setExampleUnits,
     reportKind, setReportKind,
+    reportYear, setReportYear, yearOpen, setYearOpen,
     meterRevision, bumpMeter,
     detailRevision, bumpDetail,
     modal, openModal: setModal, closeModal: () => setModal(null),
   }), [view, go, period, setPeriod, shiftMonth, monthOpen, editMode, filter,
        meterFilter, showVacant, tenantSearch, tenantFilter, picked, prorateOn,
-       prorateDays, lastResult, exampleUnits, reportKind, meterRevision, bumpMeter, detailRevision, bumpDetail, modal]);
+       prorateDays, lastResult, exampleUnits, reportKind, reportYear, yearOpen, meterRevision, bumpMeter, detailRevision, bumpDetail, modal]);
 
   return <UiContext.Provider value={value}>{children}</UiContext.Provider>;
 }

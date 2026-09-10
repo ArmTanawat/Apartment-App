@@ -19,6 +19,12 @@
      the same question the red and green answer — can I put somebody in here —
      rather than a second question laid over it. */
   --reserved:#C9A227; --locked:#1A1A1A;
+  /* The two meters on the yearly report's charts. Pastel because the chart is
+     a shape to read, not a warning — these say "this is water" and "this is
+     electricity", nothing about whether a figure is good or bad. The line is a
+     darker version of the same hue so it stays visible against its own fill. */
+  --water-line:#4A90B8; --water-fill:#D6EAF5;
+  --elec-line:#D2894A;  --elec-fill:#FAE3CD;
 }
 *{box-sizing:border-box}
 body{
@@ -410,6 +416,30 @@ h1{font-size:32px; font-weight:700; margin:0; line-height:1.4}
 .rtable tr.sum td{border-bottom:0; border-top:2px solid var(--ink);
   font-weight:700; padding-top:11px}
 .rtable td.gap{color:var(--muted)}
+/* Twelve months across. The figures shrink and the padding goes, because the
+   alternative is a table that scrolls sideways and cannot be printed on one
+   sheet — and a year of one building is exactly what somebody wants on paper. */
+.ytable{font-size:12px}
+.ytable th, .ytable td{padding:5px 0}
+.ytable td.r, .ytable th.r{padding-left:8px}
+.ytable td.ykind{color:var(--muted); padding-right:10px; white-space:nowrap}
+/* A room is two rows, so the rule goes under the pair rather than between the
+   two halves of one room. */
+.ytable tbody tr td{border-bottom:0}
+.ytable tbody tr.yrow-last td{border-bottom:1px solid var(--line)}
+.yrow{cursor:pointer}
+.yrow:hover td{background:var(--soft)}
+@media print{ .yrow{cursor:auto} .yrow:hover td{background:none} }
+
+/* The charts in the room's year dialog. */
+.chart{margin-bottom:18px}
+.charthead{display:flex; justify-content:space-between; align-items:baseline;
+  font-size:13px; color:var(--ink); margin-bottom:2px}
+.charthead .num{color:var(--muted); font-size:12px}
+.chartsvg{width:100%; height:auto; display:block}
+.gridline{stroke:var(--line); stroke-width:1}
+.gridnum{font-size:9px; fill:var(--muted); font-family:"Roboto Mono",monospace}
+
 .rnote{margin-top:16px; padding-top:14px; border-top:1px solid var(--line);
   font-size:12px; color:var(--muted); line-height:1.8}
 .rnote b{color:var(--ink); font-weight:500}
@@ -443,6 +473,8 @@ h1{font-size:32px; font-weight:700; margin:0; line-height:1.4}
   align-items:center; justify-content:center; padding:24px; z-index:20}
 .modal{background:var(--surface); border-radius:10px; padding:24px; width:100%;
   max-width:440px; max-height:88vh; overflow:auto}
+/* The one dialog holding charts rather than a form. */
+.modal.wide{max-width:640px}
 .modal h3{margin:0 0 4px; font-size:19px; font-weight:700}
 .modal .lead{color:var(--muted); font-size:14px; margin:0 0 18px; line-height:1.6}
 .modal .actions{justify-content:flex-end; margin-top:20px}

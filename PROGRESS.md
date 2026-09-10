@@ -260,6 +260,47 @@ EXISTS` does nothing to a table that already exists, so added columns need a
 guarded `ALTER TABLE`. It is a no-op on a fresh database and on every start
 after the first. Any future column needs it.
 
+### The yearly meter report
+
+Added 2026-09-10, beside the two monthly reports rather than changing either.
+
+**It is the one report with an endpoint of its own,** `GET /readings/year/:year`.
+The other two are built from collections the screens already hold; a year of
+every room would be twelve requests, and the usage behind each figure has the
+rollover rule in it. Returning finished numbers keeps that rule in `usage()` in
+`routes/readings.js`, where `GET /readings` and `/history` already read it — a
+second copy on the client would be the mistake `buildBill()` was moved off the
+frontend to avoid. `smoke:rules` feeds it a wrapped dial and checks the answer
+is 17 units rather than 12, which is the check that would catch a reimplementation.
+
+The response is `{ year, years, rooms:[{unit_id, unit_number, floor, water:[12],
+elec:[12]}] }`. `years` lists the years that have readings so the picker needs
+no second call, with the current year always included.
+
+**Nothing was added to the schema.** The report is a different arrangement of
+`meter_readings`, not new data.
+
+**Every cell is a number, 0 included.** A month with no reading and a month
+entered but unfinished both come back as 0. A blank would read as something to
+look into when the answer is that nothing was recorded.
+
+**Its own year, not the working month narrowed.** `reportYear` is separate state
+in `UiContext`; the month picker is swapped for a year picker while this report
+shows. The working month belongs to บันทึกมิเตอร์ and บิล and moving one would
+move the other, which is the two-frames-on-one-page problem the room page
+already had to say out loud.
+
+**A row opens two charts, one per meter,** hand-drawn SVG in `UsageChart.jsx` —
+twelve points and one shape, where a charting library would be the largest
+dependency in the app. Separate scales per meter because 18 units of water
+against 146 of electricity flattens the water line to nothing on a shared axis;
+each chart names its own peak so the scale is never guessed at. Pastel blue for
+water, pastel orange for electricity, as `--water-line/-fill` and
+`--elec-line/-fill`.
+
+`Modal` gained a `wide` variant for it — a chart at form width is unreadable,
+and widening every dialog to suit one would make the forms worse.
+
 ### The board's colour note on an empty room
 
 Added 2026-09-10. `units.mark` — `'reserved'`, `'locked'` or NULL — set from two

@@ -312,6 +312,26 @@ A regenerated bill has a new id. If the old one was already printed and handed o
 
 **Editing anything for a month that already has bills shows the same warning**, wherever it happens. On the meter page: *เดือนนี้ออกบิลไปแล้ว 1 ใบ การแก้นี้จะยังไม่เปลี่ยนบิล*, with a link to it. Same for a one-time charge added from the room page.
 
+### 8. รายงาน — the three reports
+
+Chips choose which one. All three print as the same paper an invoice does, with the building's header at the top and everything else marked `.noprint`.
+
+| Report | Frame | Built from |
+|---|---|---|
+| สรุปยอดรวมประจำเดือน | the working month | `GET /bills?period=` |
+| รายงานมิเตอร์ | the working month | `GET /readings?period=` |
+| รายงานมิเตอร์รายปี | its own year | `GET /readings/year/:year` |
+
+**The yearly report has its own frame, and its own picker.** It is not the working month widened — that month belongs to บันทึกมิเตอร์ and บิล, and moving one would move the other. The month picker is swapped for a year picker while this report is showing, built from the same markup so it is not a second thing to learn, and capped forward at the current year for the reason the month picker caps at the current month.
+
+**One room is two rows, น้ำ above ไฟ, and twelve columns ม.ค. to ธ.ค.** Every room appears and every cell holds a number. A month nobody read is `0`, never blank: the report is a grid to run an eye down, and a gap reads as "look into this" when the answer is that nothing was recorded. The rule under a room goes below the pair, not between its two halves.
+
+**Pressing a row opens that room's year as two charts** — an area under a line, water in pastel blue and electricity in pastel orange. The table answers "what did 203 use in March"; the shape across twelve months is what shows a leak, or a meter that stopped, and that is what a row of figures is worst at.
+
+The two meters get a chart each rather than sharing one, because a room using 18 units of water against 146 of electricity flattens the water line to nothing on a shared axis — and the water line is exactly what somebody is looking at when they wonder whether a tap is running. Each chart names its own peak, so the scale is never guessed at. The charts are hand-drawn SVG: twelve points and one shape, where a charting library would be the largest dependency in the app.
+
+---
+
 ## Rules that apply everywhere
 
 **Show the API's error text.** The backend returns sentences meant for a person — `Unit 203 is already rented to สมชาย (ถึง 2026-09-15)`. Passing them through beats inventing generic wording.
