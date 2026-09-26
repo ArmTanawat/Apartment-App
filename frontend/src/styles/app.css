@@ -495,14 +495,40 @@ h1{font-size:32px; font-weight:700; margin:0; line-height:1.4}
 .diff b{color:var(--ink); font-family:"Roboto Mono",monospace}
 
 @media print{
+  /* The sheet's own margin, which the Print dialog's Margins setting starts
+     from. It applies to every physical page, including the second one a long
+     bill runs onto — which is why it is here and not only as padding. */
+  @page{ margin:12mm; }
+
   .rail, .head, .sub, .stale, .noprint{display:none !important}
   .app{display:block}
   .main{padding:0; max-width:none}
-  .paper{border:0; padding:0; max-width:none}
+  /* Padding on top of the page margin, because a bill is handed to somebody
+     and gets folded, and text that runs to the edge reads as though it were
+     cut off. This half cannot be overridden from the Print dialog, so it is
+     the part that is actually guaranteed. */
+  .paper{border:0; padding:6mm 12mm; max-width:none}
   /* One invoice per sheet when several print together. Saving the result as a
      PDF is the browser's own Print dialog, not something built here. */
   .paper + .paper{page-break-before:always}
   body{background:#fff}
+
+  /* What happens when one bill does not fit on one sheet.
+     Nothing stops it from running onto a second — it should — but a break may
+     not land anywhere that reads as an error:
+
+       a line item split in half, its label on one page and its amount on the
+       next, is a bill that cannot be checked;
+       รวมทั้งสิ้น alone at the top of page two reads as a second total;
+       a signature line away from what is being signed for is worth nothing.
+
+     The column headings repeat on the second page instead, which is what
+     table-header-group is for. */
+  .pitems thead{display:table-header-group}
+  .pitems tr{break-inside:avoid; page-break-inside:avoid}
+  .phead, .pto, .pfoot, .sign{break-inside:avoid; page-break-inside:avoid}
+  /* The total belongs with the last line above it, not stranded. */
+  .pitems tr.total{break-before:avoid; page-break-before:avoid}
 }
 
 /* ---------- form + modal ---------- */

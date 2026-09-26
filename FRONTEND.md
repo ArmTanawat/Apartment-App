@@ -358,6 +358,8 @@ The two meters get a chart each rather than sharing one, because a room using 18
 
 **Money is right-aligned with thousands separators, two decimals, tabular figures.**
 
+**The printed sheet has a margin, and a bill may run onto a second.** 12mm of page margin plus 6mm/8mm of padding inside the paper — the first is the real page margin and reaches a second sheet, the second is inside the document and cannot be overridden from the Print dialog. A bill that does not fit runs on rather than being squeezed, but a break may not land inside a line item, between รวมทั้งสิ้น and the line above it, or inside the signature block; the column headings repeat on the continued page. About two more fee lines fit on a sheet before that happens.
+
 **The typefaces are files in this project, never fetched.** Noto Sans Thai and Roboto Mono live in `frontend/public/fonts/` and are declared in `src/styles/fonts.css`. They used to come from Google Fonts, which made an offline program depend on the internet for how it looks — and it failed weeks in rather than at once, because Google's stylesheet expires long before its font files do. The fallback is a different width, so the printed bill moves with it. `npm test` runs `check-fonts` to keep it that way.
 
 **Dates are stored `'2026-09-15'` and shown `15/09/2026`.** A date is never typed into a bare `<input type="date">`: that box takes its format from the browser's locale and reads `mm/dd/yyyy` on an English machine, where `05/06` is a date either way round and nothing on the screen says which. `DateField` shows and accepts วัน/เดือน/ปี and opens the same native calendar from the button beside it. Nothing about what is sent changes.

@@ -8,9 +8,8 @@
     "setup": "npm install && npm --prefix backend install && npm --prefix frontend install",
     "check-runtime": "node electron/check-runtime.js",
     "start": "npm --prefix frontend run build && electron .",
-    "dist": "npm run setup && npm run check && npm --prefix frontend run build && electron-builder",
+    "dist": "npm run setup && npm run check && npm --prefix frontend run build && electron-builder --win",
     "dist:win": "npm run setup && npm run check && npm --prefix frontend run build && electron-builder --win",
-    "dist:mac": "npm run setup && npm run check && npm --prefix frontend run build && electron-builder --mac",
     "check-error-page": "node electron/check-error-page.js",
     "check": "npm run check-runtime && npm run check-error-page",
     "test": "node scripts/run-tests.js",
@@ -58,18 +57,6 @@
       "oneClick": false,
       "perMachine": false,
       "allowToChangeInstallationDirectory": true
-    },
-    "mac": {
-      "target": [
-        {
-          "target": "dmg",
-          "arch": [
-            "arm64",
-            "x64"
-          ]
-        }
-      ],
-      "identity": null
     },
     "linux": {
       "target": [

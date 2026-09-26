@@ -629,6 +629,40 @@ so the red it had was overstating it.
 
 ### On the printed page
 
+**The sheet has a 12mm margin and the paper 6mm/8mm of padding on top of it.**
+Changed 2026-09-26; before, print set `.paper{padding:0}` and there was no
+`@page` rule at all, so the only gap was whatever the Print dialog defaulted to
+and the text read as though it had been cut off. The two are doing different
+jobs and both are wanted: `@page` is the real page margin, so it applies to the
+second sheet a long bill runs onto, but the dialog's Margins setting can
+override it; the padding is inside the document and cannot be, so it is the
+part that is actually guaranteed.
+
+**It costs headroom, and that is the trade.** A4 at 12mm leaves 1032px of
+printable height. A bill with rent, both utilities, two recurring fees and one
+charge measures 903px, so about two more lines fit before it runs onto a second
+sheet — it was three or four before the padding went in.
+
+**A bill longer than one sheet runs onto a second, and nothing is lost.**
+Measured with thirteen line items: 1212px against 1032px of page, with the
+total and the footer both still on the page and no clipping. What the print
+rules add is where the break is allowed to land:
+
+- `.pitems tr{break-inside:avoid}` — a line item is never cut in half, its
+  label on one page and its amount on the next, which is a bill nobody can
+  check.
+- `.pitems tr.total{break-before:avoid}` — รวมทั้งสิ้น stays with the last line
+  above it. Alone at the top of page two it reads as a second total.
+- `.pitems thead{display:table-header-group}` — the column headings repeat on
+  the second page, so a continued list still says which column is the money.
+- `.phead, .pto, .pfoot, .sign{break-inside:avoid}` — a signature line away
+  from what is being signed for is worth nothing.
+
+Chromium honours all of these; they were read back from `getComputedStyle`
+under emulated print media. Real pagination could not be photographed here
+because Electron disables `Page.printToPDF` over the devtools protocol — Ctrl+P
+on the bill screen shows it in one look.
+
 **`bahtText()` is display only** — derived from the number already on the page,
 because storing it would give one document two places to disagree with itself.
 The rule a generic implementation gets wrong is เอ็ด, and it reaches across
@@ -803,10 +837,22 @@ source; the packaged app is correct.
 architecture of the machine running it, and the first Windows build came out
 arm64 — an installer that would not run on the building's PC.
 
+**Windows is the only target now.** Dropped the macOS build 2026-09-26: every
+machine the program runs on is a PC. The `mac` block and `dist:mac` are gone,
+and plain `npm run dist` builds Windows too — a bare `electron-builder` targets
+whatever machine it is run on, which here is a dmg nobody will install. The old
+block is in git history if a Mac ever needs one again. `linux` is still in the
+config and has never been built.
+
 **Left alone deliberately:** no icon file (the default Electron one is used), no
-auto-update, no telemetry, no crash reporting, and no signing certificate.
-macOS is built unsigned; Windows is built unsigned and will warn on first run
-until it is signed.
+auto-update, no telemetry, no crash reporting, and no signing certificate. The
+installer is unsigned and Windows will warn on first run — SmartScreen, then
+More info, then Run anyway. Signing it means an OV certificate at roughly
+$200-400 a year whose key has to live on a hardware token (the CA/Browser
+Forum stopped allowing a .pfx on disk in June 2023), and an OV certificate
+still warns until the download count earns SmartScreen's trust, which three
+machines will never do. Not worth it at this size; revisit if it is ever handed
+to people who do not know who wrote it.
 
 ---
 
