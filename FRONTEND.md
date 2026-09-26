@@ -166,7 +166,13 @@ Not in the nav. A full page rather than a panel, because there is too much here 
 
 **One-time charges belong to a lease, not a room.** In a handover month a room has two: the tenant who left and the one who arrived. A repair on the 10th is the departing tenant's. So the form asks who is being charged whenever the month holds more than one lease, and skips the question when there is only one.
 
+**← → step to the room beside this one.** In `.pagebar` beside the back button, stuck to the top of the window so it is still reachable from the bottom of a page three screens tall. The order is the board's — floor, then room number — and both ends disable rather than wrap. บิล and ใบเสร็จ carry the same pair, stepping through the month's bills in the order บิลเดือนนี้ lists them; ใบเสร็จ steps only through bills that have a receipt.
+
 **Moving in is rejected when the dates overlap an existing lease.** The API returns the current tenant's name and the date they leave. Show that sentence.
+
+**เพิ่มผู้เช่าใหม่ is the first line of the tenant list, above every name.** Filling a building is one room at a time and most ย้ายเข้า are somebody's first, so the line wanted most often must not be the one that gets further to scroll to as the list grows. The names that follow sit under a heading of their own.
+
+**The new-tenant form here is the whole tenant record,** the same `TenantExtra` block เพิ่มผู้เช่า uses. Somebody registered while moving in is not a thinner record than somebody added from the ผู้เช่า page.
 
 ---
 
@@ -222,6 +228,10 @@ Never a plain success message when rooms were skipped.
 
 **A handover month produces two bills for one room.** Both appear in the result, each with its tenant's name. This is correct, not a duplicate.
 
+**ออกใบเสร็จทุกห้อง sits beside พิมพ์ทั้งหมด,** and goes when there is nothing left to issue. It asks the same question the single dialog asks — has this tenant paid — once, for the month, and says so in words: pressing it asserts every room on the list has paid, and a room that has not should be issued on its own. Before the press it prints the count and the total, so the button can be checked against the money counted, and it names any room whose bill has been overtaken since it was made. A bill that already has a receipt is skipped, never given a second one.
+
+**บิลเดือนนี้ and ใบเสร็จเดือนนี้ fold away.** Open when the screen arrives, so a small building never meets this; forty rooms puts eighty rows between the generate card and the bottom of the page, and most visits are about one of the two. A folded card keeps its summary on the heading line — `4 ใบ · 21,882.00` — because the count and the total are most of what the scroll was for. Which is folded survives leaving the screen and coming back, like every other per-screen switch.
+
 | Action | Call |
 |---|---|
 | Preview | `GET /bills/preview/:leaseId/:period` |
@@ -251,6 +261,10 @@ Deleting warns that regenerating is the only way back, and that this is how a mi
 | ลบ | `DELETE /tenants/:id` |
 
 Name, phone, and address print on the bill, so the edit form should say so.
+
+**Two cards: what prints, and what is kept.** วันออกบัตร, วันหมดอายุบัตร, ไอดีไลน์, เลขทะเบียนรถ and หมายเหตุ reach no invoice, no receipt and no report, so they are read back under a `เก็บไว้ดูเอง` heading of their own rather than as more rows under a heading that promises what an invoice carries. Both cards edit through the same dialog.
+
+**A name another tenant already has is refused,** on เพิ่มผู้เช่า and on แก้ไข alike — `tenants.full_name` is not `UNIQUE` in the schema, because two people really can share a name, so this warning is the screen's. Blocking it only on the add form left the same clash one rename away.
 
 Deleting a tenant who holds leases is refused by design. Show the reason and offer ย้ายออก instead.
 
@@ -344,6 +358,10 @@ The two meters get a chart each rather than sharing one, because a room using 18
 
 **Money is right-aligned with thousands separators, two decimals, tabular figures.**
 
+**The typefaces are files in this project, never fetched.** Noto Sans Thai and Roboto Mono live in `frontend/public/fonts/` and are declared in `src/styles/fonts.css`. They used to come from Google Fonts, which made an offline program depend on the internet for how it looks — and it failed weeks in rather than at once, because Google's stylesheet expires long before its font files do. The fallback is a different width, so the printed bill moves with it. `npm test` runs `check-fonts` to keep it that way.
+
+**Dates are stored `'2026-09-15'` and shown `15/09/2026`.** A date is never typed into a bare `<input type="date">`: that box takes its format from the browser's locale and reads `mm/dd/yyyy` on an English machine, where `05/06` is a date either way round and nothing on the screen says which. `DateField` shows and accepts วัน/เดือน/ปี and opens the same native calendar from the button beside it. Nothing about what is sent changes.
+
 ---
 
 ## Screen behaviour rules
@@ -373,6 +391,10 @@ These strings land in `bill_items` and are never touched again. Editing a label 
 **The total in Thai words is display only.** `bahtText()` derives it from the number already on the document. Storing it would give one piece of paper two places to disagree with itself, and a rounding fix would then have to be applied twice. The rules it exists for — สิบ not หนึ่งสิบ, ยี่สิบ not สองสิบ, a trailing 1 becoming เอ็ด once anything precedes it, across group boundaries as well as inside one — have a test table in `frontend/smoke/text.mjs`. Change the table before the function.
 
 **The meter figures on a printed line are read out of the stored working, not out of the reading.** `meterFields()` lifts previous, current and units used out of `bill_items.detail` so they can be printed as labelled fields. Taking them from `meter_readings` instead would print today's numbers on an old bill the moment a reading was corrected — the same mistake as recomputing an amount. Anything that does not parse falls back to printing the sentence as it always was, which is what keeps bills issued before this existed readable.
+
+**The sentence itself is not printed under the line.** `ก่อนหน้า`, `ปัจจุบัน` and `ใช้ไป` are what a tenant reads to see whether a charge is theirs; `38 หน่วย — 100 บาท สำหรับ 5 หน่วยแรก แล้ว 33 × 9` beneath them restates the price list in the one place nobody checks a rate, and two of them on a sheet is most of what made a bill look busy. The parse-failure fallback above is the exception, and only because it is the sole way those figures reach the page at all.
+
+**The building's own lines print black.** Its address and phone in the header, and everything in the footer — how to pay, the standing note, a receipt's note. Grey is a screen convention for what may be skimmed past, and this is a page that goes through a home printer and gets folded into a pocket. The tenant block's labels and the column headings stay grey: they label the page rather than say anything.
 
 **Label the move-out date for what it is.** Not วันย้ายออก, which is ambiguous about whether the room is free that day, but ห้องว่างตั้งแต่วันที่. The stored value is the day the room becomes available, and the label should say so rather than leaving the user to guess. Offer ว่างวันนี้ and สิ้นเดือนนี้ as shortcuts, since those are almost every case.
 

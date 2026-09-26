@@ -85,6 +85,7 @@ The database file `apartment.db` is created automatically on first run.
 ### Receipts
 - `GET /receipts?period=2026-08` — receipts for a month, by the month the bill is for
 - `POST /receipts` — issue one for a bill; returns the existing receipt if the bill already has one
+- `POST /receipts/batch` — issue one for every bill of a month that has none; reports issued and skipped by room, and never gives a bill a second receipt
 - `PUT /receipts/:id` — the note only
 - `DELETE /receipts/:id` — cancel one; the bill goes back to unissued
 

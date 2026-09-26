@@ -64,8 +64,18 @@ export default function BillPaper({ bill: b, receipt = null }){
         <tbody>
           {b.items.map((i, n) => {
             // A utility line buries its three checkable figures inside a
-            // sentence. They are lifted out and labelled; the sentence stays,
-            // because it is what lets a tenant follow the arithmetic.
+            // sentence. They are lifted out and labelled, and the sentence
+            // itself is not printed: ก่อนหน้า, ปัจจุบัน and ใช้ไป are what a
+            // tenant reads to see whether the charge is theirs, and the rate
+            // working beneath them — 100 บาท สำหรับ 5 หน่วยแรก แล้ว 33 × 9 —
+            // restates the price list in a place nobody was checking it. The
+            // rates are the same every month and belong on the wall, not
+            // under every line of every bill.
+            //
+            // A line whose sentence does not parse still prints it whole,
+            // below. That is not the working being let back in: it is the
+            // only way the meter figures reach the page at all when they
+            // cannot be lifted out.
             const m = meterFields(i.detail);
             return (
               <tr key={n}>
@@ -78,7 +88,6 @@ export default function BillPaper({ bill: b, receipt = null }){
                       <span><b>ใช้ไป</b>{m.used} หน่วย</span>
                       {m.rolled ? <span><b>มิเตอร์</b>ครบรอบ</span> : null}
                     </span>
-                    <small>{m.working}</small>
                   </> : (i.detail ? <small>{i.detail}</small> : null)}
                 </td>
                 <td className="r">{baht(i.amount)}</td>

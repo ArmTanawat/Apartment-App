@@ -1,4 +1,4 @@
-import { baht, missingForBill } from '../lib/helpers.js';
+import { baht, dmy, missingForBill } from '../lib/helpers.js';
 import { useData } from '../state/DataContext.jsx';
 import { useUi } from '../state/UiContext.jsx';
 
@@ -37,6 +37,23 @@ export default function TenantPage({ id }){
           <div className="warn" style={{margin:"14px 0 0",borderColor:"var(--vacant)",color:"var(--vacant)"}}>
             ยังไม่มี {miss.join(" และ ")} ซึ่งจะเป็นช่องว่างบนใบแจ้งหนี้</div>
         )}
+      </div>
+
+      {/* Entered on both tenant forms and, until now, readable on neither —
+          the only way back to a หมายเหตุ or a วันหมดอายุบัตร was to open the
+          edit dialog and look. Its own card rather than more rows on the one
+          above, because that card's heading is a promise about what prints on
+          an invoice and none of this does. */}
+      <div className="card">
+        <h2>เก็บไว้ดูเอง <button className="linkbtn"
+          onClick={() => openModal({kind:"editTenant", tenantId:t.id})}>แก้ไข</button></h2>
+        <dl className="kv">
+          <dt>วันออกบัตร</dt><dd className="num">{dmy(t.id_card_issued) || "—"}</dd>
+          <dt>วันหมดอายุบัตร</dt><dd className="num">{dmy(t.id_card_expires) || "—"}</dd>
+          <dt>ไอดีไลน์</dt><dd>{t.line_id || "—"}</dd>
+          <dt>เลขทะเบียนรถ</dt><dd>{t.vehicle_plate || "—"}</dd>
+          <dt>หมายเหตุ</dt><dd>{t.note || "—"}</dd>
+        </dl>
       </div>
 
       <div className="card">

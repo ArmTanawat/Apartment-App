@@ -564,6 +564,19 @@ section('what a tenant record keeps, and what a partial update does to it');
      (await POST('/tenants', { line_id: 'x' })).status === 400);
 }
 
+section('ออกใบเสร็จทุกห้อง refuses what it cannot do');
+{
+  ok('a period that is not a period is refused',
+     (await POST('/receipts/batch', { period: 'กันยายน' })).status === 400);
+  ok('and a missing one too',
+     (await POST('/receipts/batch', {})).status === 400);
+  // A month with no bills has nothing to issue against. Saying so names the
+  // month, rather than reporting a successful run of nothing.
+  const empty = await POST('/receipts/batch', { period: '2019-03' });
+  ok('a month with no bills is refused by name', empty.status === 400
+     && empty.body.error.includes('2019-03'), JSON.stringify(empty.body));
+}
+
 // second run then fails on the UNIQUE name rather than on anything real.
 for(const f of (await GET('/fees/types?all=true')).body){
   if(f.name.startsWith('ทดสอบ')) await DEL(`/fees/types/${f.id}`);

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import ErrBox from '../components/ErrBox.jsx';
 import MonthPicker from '../components/MonthPicker.jsx';
+import Pager from '../components/Pager.jsx';
 import { get, messageOf } from '../lib/api.js';
 import { baht } from '../lib/helpers.js';
 import { useApi } from '../lib/useApi.js';
@@ -48,8 +49,15 @@ export default function RoomPage({ id }){
 
   const missing = t ? [!t.phone?"เบอร์โทร":null,!t.address?"ที่อยู่":null].filter(Boolean) : [];
 
+  // `units` arrives ordered by floor then unit_number — the board's own order
+  // — so stepping through it is stepping across the board left to right.
+  const rooms = units.map(x => ({ id: x.id, label: x.unit_number, title: `ห้อง ${x.unit_number}` }));
+
   return <>
-    <button className="back" onClick={() => go({name:"board"})}>← ห้องพัก</button>
+    <div className="pagebar noprint">
+      <button className="back" onClick={() => go({name:"board"})}>← ห้องพัก</button>
+      <Pager items={rooms} current={u.id} onGo={rid => go({name:"room", id:rid})} />
+    </div>
     <div className="roomhead">
       <div className="roomtitle">
         <h1 className="num">{u.unit_number}</h1>

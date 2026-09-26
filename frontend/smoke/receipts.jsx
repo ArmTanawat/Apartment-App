@@ -47,8 +47,11 @@ section('the two things the invoice gained');
 check('the meter figures are labelled, not only inside the sentence',
   body().includes('ก่อนหน้า') && body().includes('ปัจจุบัน') && body().includes('ใช้ไป'),
   text('.pitems'));
-check('and the working survives beside them',
-  body().includes('หน่วยแรก') || body().includes('หน่วย ×'), text('.pitems'));
+// The other side of the same rule: the figures are printed, the sentence they
+// were lifted out of is not. Asserting only the first would pass on a bill
+// that prints both, which is what this replaced.
+check('and the rate working is not printed beside them',
+  !body().includes('หน่วยแรก') && !body().includes('หน่วย ×'), text('.pitems'));
 check('the total is spelled out in Thai',
   /\(.*บาท(ถ้วน|.*สตางค์)\)/.test(body()), text('.pitems tr.total'));
 
@@ -318,5 +321,55 @@ check('the monthly meter report is untouched by any of this',
   (await (async () => { await click(byText('.chip', 'รายงานมิเตอร์'), 700);
     return !$('.ytable') && !!$('.rtable') && text('.phead').includes('งวด'); })()),
   text('.phead'));
+
+section('ออกใบเสร็จทุกห้อง — the whole month in one press');
+await nav('บิล');
+{
+  const card = () => $$('.setcard').find(c =>
+    c.querySelector('h2').textContent.includes('ใบเสร็จเดือนนี้'));
+  const unissued = () => $$('tbody tr', card()).filter(r => r.textContent.includes('ยังไม่ได้ออก'));
+
+  const before = unissued().length;
+  check('there are bills waiting for a receipt to begin with', before > 0, `${before}`);
+  const batchBtn = byText('.btn', 'ออกใบเสร็จทุกห้อง');
+  check('the button sits in the receipts card beside the print-all',
+    !!batchBtn && card().contains(batchBtn));
+  check('and says how many it is about to issue',
+    batchBtn.textContent.includes(String(before)), batchBtn.textContent.trim());
+
+  await click(batchBtn, 900);
+  check('it asks first, like the single one does',
+    !!$('.modal') && $('.modal h3').textContent === 'ออกใบเสร็จทุกห้อง',
+    $('.modal') && $('.modal h3').textContent);
+  check('naming the count and the money before the press',
+    $('.modal .lead').textContent.includes(String(before)), text('.modal .lead'));
+  check('and still asking the one question the program cannot answer',
+    $('.modal').textContent.includes('ออกเมื่อผู้เช่าจ่ายเงินแล้วเท่านั้น'));
+
+  // Cancelling has to leave the month exactly as it was — this button writes
+  // to every bill at once, so a dialog that acted on the way out would be the
+  // worst one in the program to get wrong.
+  await click(byText('.modal .btn', 'ยกเลิก'), 500);
+  check('cancelling issues nothing', unissued().length === before, `${unissued().length}`);
+
+  await click(byText('.btn', 'ออกใบเสร็จทุกห้อง'), 900);
+  await click(byText('.modal .btn', 'ออกใบเสร็จ'), 1200);
+  check('pressing it clears the month', unissued().length === 0,
+    unissued().map(r => r.textContent).join(' | '));
+  // The receipts list is the screen's own fetch, not part of `bills`, so this
+  // is the check that the batch told it to look again.
+  const tally = card().textContent.match(/ออกแล้ว (\d+) จาก (\d+) ใบ/);
+  check('and the card\'s own tally caught up without a reload',
+    !!tally && tally[1] === tally[2], tally ? tally[0] : card().textContent.slice(0, 120));
+  check('and the button goes when there is nothing left to issue',
+    !byText('.btn', 'ออกใบเสร็จทุกห้อง'));
+
+  // Nobody gets two pieces of paper for one bill.
+  const rs = await api('GET', `/receipts?period=${period}`);
+  const bills = await api('GET', `/bills?period=${period}`);
+  check('one receipt per bill, never two',
+    new Set(rs.map(r => r.bill_id)).size === rs.length && rs.length === bills.length,
+    `${rs.length} receipts for ${bills.length} bills`);
+}
 
 done();

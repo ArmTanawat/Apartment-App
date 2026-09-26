@@ -207,7 +207,8 @@ section('open a saved bill');
 await click($('.blist tbody tr'), 400);
 check('invoice from GET /bills/:id', !!$('.paper'));
 check('bilingual labels', body().includes('ค่าเช่า Rent') && body().includes('ค่าน้ำ Water'));
-check('the working is printed under a line', body().includes('หน่วย'));
+check('the meter figures are printed under a line, without the rate working',
+  body().includes('ใช้ไป') && !body().includes('หน่วยแรก'), text('.pitems'));
 check('total line', body().includes('รวมทั้งสิ้น Total'));
 check('footer from settings', body().includes('ธนาคารกสิกรไทย'));
 

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useSubmit } from '../../lib/useSubmit.js';
+import DateField from '../DateField.jsx';
 import ErrBox from '../ErrBox.jsx';
 import Modal from '../Modal.jsx';
 import { useData } from '../../state/DataContext.jsx';
@@ -16,7 +17,7 @@ import { useUi } from '../../state/UiContext.jsx';
  * Every field is optional and free text. เลขทะเบียนรถ is one box rather than a
  * list because a car belongs to a person, not to a room: somebody with two
  * cars types both, and nothing counts them. */
-function TenantExtra({ issued, setIssued, expires, setExpires,
+export function TenantExtra({ issued, setIssued, expires, setExpires,
                        lineId, setLineId, plate, setPlate, note, setNote }){
   return <>
     <p className="lead" style={{margin:"18px 0 8px",fontWeight:500,color:"var(--ink)"}}>
@@ -24,9 +25,9 @@ function TenantExtra({ issued, setIssued, expires, setExpires,
     <p className="lead" style={{marginTop:0,fontSize:"13px"}}>
       ไม่ขึ้นบนใบแจ้งหนี้ ใบเสร็จ หรือรายงาน กรอกเท่าที่มี เว้นว่างได้ทุกช่อง</p>
     <div className="field"><label>วันออกบัตร</label>
-      <input type="date" value={issued} onChange={e=>setIssued(e.target.value)} /></div>
+      <DateField value={issued} onChange={setIssued} /></div>
     <div className="field"><label>วันหมดอายุบัตร</label>
-      <input type="date" value={expires} onChange={e=>setExpires(e.target.value)} />
+      <DateField value={expires} onChange={setExpires} />
       <div className="hint">ไม่มีการแจ้งเตือนเมื่อถึงวัน เก็บไว้ให้กลับมาดูเท่านั้น</div></div>
     <div className="field"><label>ไอดีไลน์</label>
       <input value={lineId} onChange={e=>setLineId(e.target.value)} /></div>
@@ -121,7 +122,9 @@ export function EditTenantModal({ tenantId }){
         line_id:lineId.trim(), vehicle_plate:plate.trim(), note:note.trim()});
       closeModal();
     },
-    () => !name.trim() ? "ต้องมีชื่อ" : null);
+    () => !name.trim() ? "ต้องมีชื่อ"
+      : tenants.some(t => t.id !== tenantId && t.full_name === name.trim())
+        ? `มีผู้เช่าอีกรายชื่อ "${name.trim()}" อยู่แล้ว` : null);
 
   return (
     <Modal>

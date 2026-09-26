@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import BillPaper from '../components/BillPaper.jsx';
 import ErrBox from '../components/ErrBox.jsx';
+import Pager from '../components/Pager.jsx';
 import { get, messageOf } from '../lib/api.js';
 import { useApi } from '../lib/useApi.js';
 import { useData } from '../state/DataContext.jsx';
@@ -17,7 +18,7 @@ import { useUi } from '../state/UiContext.jsx';
  * cancelling spends nothing and issuing again is the same act as the first
  * time. It is still worth asking, because a tenant may be holding the page. */
 export default function ReceiptPage({ id }){
-  const { updateReceiptNote, settings } = useData();
+  const { bills, updateReceiptNote, settings } = useData();
   // Off is the normal state. The undo still exists and the route still works —
   // this hides the way in, so a receipt reads as final to whoever is issuing
   // them and stays correctable by whoever knows where the switch is.
@@ -28,6 +29,14 @@ export default function ReceiptPage({ id }){
   const [error, setError] = useState(null);
 
   const req = useApi(() => get(`/bills/${id}`), [id]);
+
+  // Which bills of this month have a receipt, so ← → steps between receipts
+  // rather than onto bills that have none. Stepping onto one would land on
+  // "บิลใบนี้ยังไม่ได้ออกใบเสร็จ" — a page with nothing on it to read, and
+  // early in the month most of the list is that.
+  const period = req.data ? req.data.period : null;
+  const issuedReq = useApi(() => get(`/receipts?period=${period}`),
+    [period], { skip: !period });
 
   if(req.loading) return <p className="sub">กำลังโหลด…</p>;
   if(req.error) return <>
@@ -50,8 +59,15 @@ export default function ReceiptPage({ id }){
     finally { setSaving(false); }
   };
 
+  const withReceipt = new Set((issuedReq.data || []).map(r => r.bill_id));
+  const siblings = bills.filter(x => x.period === b.period && withReceipt.has(x.id))
+    .map(x => ({ id: x.id, label: x.unit_number, title: `ใบเสร็จห้อง ${x.unit_number}` }));
+
   return <>
-    <button className="back noprint" onClick={() => go({name:"bills"})}>← บิล</button>
+    <div className="pagebar noprint">
+      <button className="back" onClick={() => go({name:"bills"})}>← บิล</button>
+      <Pager items={siblings} current={b.id} onGo={bid => go({name:"receipt", id:bid})} />
+    </div>
     <ErrBox>{error}</ErrBox>
 
     <BillPaper bill={b} receipt={{ ...b.receipt, note: shown.trim() || null }} />

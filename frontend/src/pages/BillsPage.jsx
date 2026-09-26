@@ -16,20 +16,42 @@ import { useUi } from '../state/UiContext.jsx';
 export default function BillsPage(){
   const { units, bills, h, generateBills, setApplyMinimum } = useData();
   const { period, go, openModal, picked, setPicked, prorateOn, setProrateOn,
-          prorateDays, setProrateDays, lastResult, setLastResult } = useUi();
+          prorateDays, setProrateDays, lastResult, setLastResult,
+          billsOpen, setBillsOpen, receiptsOpen, setReceiptsOpen,
+          detailRevision } = useUi();
 
   const rgfrom = useRef(null), rgto = useRef(null);
   // The days box holds its own text so clearing it leaves it empty rather than
   // snapping back to the month length under the caret.
   const [daysText, setDaysText] = useState(null);
 
+  // A folding card's heading. The whole title is the button — a chevron alone
+  // is a target the size of a full stop — and the summary stays on the line
+  // when the list is away, because the count and the total are most of what
+  // anybody was scrolling to the bottom for.
+  const cardHead = (title, open, setOpen, summary) => (
+    <h2 className="cardhead">
+      <button className="toggle" aria-expanded={open} onClick={() => setOpen(!open)}>
+        <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor"
+          strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M2 4l4 4 4-4" />
+        </svg>
+        {title}
+      </button>
+      {!open && summary ? <span className="sum">{summary}</span> : null}
+    </h2>
+  );
+
   const monthBills = bills.filter(b => b.period === period);
   const monthTotal = monthBills.reduce((s, b) => s + b.total, 0);
   // Which of them have had a receipt issued, so the list can say so and the
   // print-all knows how many pages it is about to produce.
-  const receipts = useApi(() => get(`/receipts?period=${period}`), [period, bills]);
+  // detailRevision because the batch issue writes receipts without touching
+  // `bills`, so nothing else on this screen would know to look again.
+  const receipts = useApi(() => get(`/receipts?period=${period}`), [period, bills, detailRevision]);
   const receiptFor = billId => (receipts.data || []).find(r => r.bill_id === billId);
   const issued = monthBills.filter(b => receiptFor(b.id));
+  const pending = monthBills.filter(b => !receiptFor(b.id));
   const issuedTotal = issued.reduce((t, b) => t + b.total, 0);
   const totalDays = daysInPeriod(period);
 
@@ -259,8 +281,9 @@ export default function BillsPage(){
       </div>
 
       <div className="setcard">
-        <h2>บิลเดือนนี้</h2>
-        {monthBills.length ? <>
+        {cardHead("บิลเดือนนี้", billsOpen, setBillsOpen,
+          monthBills.length ? `${monthBills.length} ใบ · ${baht(monthTotal)}` : null)}
+        {billsOpen && (monthBills.length ? <>
           <div className="actions" style={{margin:"0 0 14px"}}>
             <button className="btn quiet" onClick={() => go({name:"printall"})}>พิมพ์ทั้งเดือน {monthBills.length} ใบ</button>
           </div>
@@ -280,7 +303,7 @@ export default function BillsPage(){
                 <td className="r num" style={{fontWeight:500,borderBottom:0,paddingTop:"11px"}}>{baht(monthTotal)}</td></tr>
             </tbody>
           </table>
-        </> : <p className="none">ยังไม่ได้ออกบิลเดือนนี้</p>}
+        </> : <p className="none">ยังไม่ได้ออกบิลเดือนนี้</p>)}
       </div>
 
       {/* Receipts get their own card rather than living inside a bill.
@@ -289,13 +312,24 @@ export default function BillsPage(){
           days after the bills go out. A row leads to its receipt either way:
           straight there if it has one, through the confirmation first if not. */}
       <div className="setcard">
-        <h2>ใบเสร็จเดือนนี้</h2>
-        {monthBills.length ? <>
+        {cardHead("ใบเสร็จเดือนนี้", receiptsOpen, setReceiptsOpen,
+          monthBills.length ? `ออกแล้ว ${issued.length} จาก ${monthBills.length} ใบ` : null)}
+        {receiptsOpen && (monthBills.length ? <>
           <p className="lead">ออกใบเสร็จเมื่อผู้เช่าจ่ายเงินแล้ว กดที่แถวเพื่อดูหรือออกใบเสร็จ</p>
-          {issued.length > 0 && (
+          {/* Issuing them all sits beside printing them all, because both are
+              the same act done once for the month rather than room by room.
+              It goes when there is nothing left to issue. */}
+          {(pending.length > 0 || issued.length > 0) && (
             <div className="actions" style={{margin:"0 0 14px"}}>
-              <button className="btn quiet" onClick={() => go({name:"printallreceipts"})}>
-                พิมพ์ทั้งหมด {issued.length} ใบ</button>
+              {pending.length > 0 && (
+                <button className="btn quiet"
+                  onClick={() => openModal({kind:"issueAllReceipts", period})}>
+                  ออกใบเสร็จทุกห้อง {pending.length} ใบ</button>
+              )}
+              {issued.length > 0 && (
+                <button className="btn quiet" onClick={() => go({name:"printallreceipts"})}>
+                  พิมพ์ทั้งหมด {issued.length} ใบ</button>
+              )}
             </div>
           )}
           <table className="blist">
@@ -326,7 +360,7 @@ export default function BillsPage(){
                   {baht(issuedTotal)}</td></tr>
             </tbody>
           </table>
-        </> : <p className="none">ยังไม่ได้ออกบิลเดือนนี้ จึงยังไม่มีใบเสร็จ</p>}
+        </> : <p className="none">ยังไม่ได้ออกบิลเดือนนี้ จึงยังไม่มีใบเสร็จ</p>)}
       </div>
     </div>
   </>;

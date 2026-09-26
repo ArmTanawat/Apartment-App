@@ -155,6 +155,52 @@ that under the caret. The meter inputs, the settings boxes and the prorate-days
 box display a local string and write the parsed number, so the stored value and
 the displayed text are allowed to differ.
 
+**Every date is typed into `DateField`, never a bare `<input type="date">`.**
+Added 2026-09-26. The stored value is unchanged and must stay `YYYY-MM-DD`;
+what moved is the display. A native date box takes its format from the
+browser's locale, so on a machine set to US English it reads `mm/dd/yyyy`, and
+on a Thai form `05/06` is a real date read either way round with nothing on
+screen to say which. The component shows and accepts `dd/mm/yyyy` in a text box
+of its own and keeps the native input beside it, one pixel wide and invisible,
+purely so `showPicker()` has something to open — the calendar that appears is
+still Chromium's. A wrong or half-typed date is not written and the box snaps
+back to what is saved when it loses focus, so it can never show one date while
+the form holds another. `31/02` is refused rather than rolled forward to
+3 March, which is what `new Date()` does on its own. If `showPicker` is ever
+missing the plain native box comes back whole.
+
+**← → to the thing beside this one, on ห้อง, บิล and ใบเสร็จ.** Added
+2026-09-26. `Pager` takes the list it is to walk, rather than working one out:
+rooms in `units` order, which is the board's; bills in `bills` order, which is
+`ORDER BY period DESC, unit_number` and so is the order บิลเดือนนี้ prints. A
+second ordering here is how a pager comes to disagree with the list the user
+came from.
+
+It rides in `.pagebar` beside the back button, stuck to the top of the window.
+`position:fixed` was tried first and taken out: the window opens at 1280 wide,
+which leaves the content column reaching within 30px of the right edge, so a
+floating button sits on top of a figure. Sticky stays inside the column and
+still never scrolls away, which is the whole point on a page three screens tall.
+
+Both ends disable rather than wrap or disappear — a control that moves is one
+that gets mis-clicked — and the empty `.num` holds its width so the pair does
+not resize at the ends.
+
+**ใบเสร็จ pages between receipts, not between bills.** It fetches
+`/receipts?period=` and steps only through bills that have one. Stepping
+through all of them would land on `บิลใบนี้ยังไม่ได้ออกใบเสร็จ`, and early in
+the month that is most of the list.
+
+**บิลเดือนนี้ and ใบเสร็จเดือนนี้ fold away,** open on arrival, held in
+`UiContext` like every other per-screen bit so leaving for one bill and coming
+back keeps them as they were. A folded card keeps its summary on the heading
+line — `4 ใบ · 21,882.00`, `ออกแล้ว 0 จาก 4 ใบ` — because the count and the
+total are most of what the scroll to the bottom was for. The whole title is the
+button; a chevron on its own is a target the size of a full stop.
+
+`smoke:screens` covers both: the pager's two ends and that one card folding
+leaves the other alone.
+
 **`UiContext.meterRevision` replaces the prototype's `render()`** on the meter
 page. It is bumped by the writes that do not come from typing — a rollover, a
 replaced meter, a corrected previous figure — and keys the row block.
@@ -357,10 +403,16 @@ Added 2026-09-09. `tenants` gained `id_card_issued`, `id_card_expires`,
 `line_id` and `vehicle_plate`; `note` was already there but had no field on any
 screen, so nothing ever wrote to it.
 
-**None of it is displayed anywhere.** Only `full_name`, `phone` and `address`
-reach an invoice — the rest is the landlord's own record of who is in the
-building, and it lives in the แก้ข้อมูลผู้เช่า dialog under a `เก็บไว้ดูเอง`
-heading that says so. `smoke:rules` checks that none of it leaks onto a bill.
+**None of it reaches an invoice.** Only `full_name`, `phone` and `address` do
+— the rest is the landlord's own record of who is in the building, gathered
+under a `เก็บไว้ดูเอง` heading that says so. `smoke:rules` checks that none of
+it leaks onto a bill.
+
+**It is read back on the tenant page,** in a card of its own below the invoice
+one. Until 2026-09-26 it was written on three forms and displayed on none, so
+the only way back to a หมายเหตุ or a วันหมดอายุบัตร was to open the edit dialog
+and look. Its own card rather than more rows on the one above, because that
+card's heading is a promise about what prints on an invoice.
 
 **The card dates are stored and not watched.** Nothing compares them against
 today and nothing warns when one passes: there is no action the program could
@@ -382,7 +434,10 @@ Both sides are in `smoke:rules`.
 **Adding another such field is one line in three places** — the column in
 `db.js`, an `addColumn` beside it, and the name in `OPTIONAL` in
 `routes/tenants.js`, which both the insert and the update build their SQL from.
-Then a field in `TenantExtra` in `TenantModals.jsx`.
+Then a field in `TenantExtra` in `TenantModals.jsx`, which เพิ่มผู้เช่า,
+แก้ข้อมูลผู้เช่า and the new-tenant half of ย้ายเข้าห้อง all render, so one
+edit reaches all three. A row on the `เก็บไว้ดูเอง` card in `TenantPage.jsx` if
+it is worth reading back.
 
 ### Fees that are a share of the bill
 
@@ -530,6 +585,44 @@ receipt can be cancelled, which is still true.
 switch on ตั้งค่า rather than by writing the setting through the API, so the
 card itself is covered.
 
+**ออกใบเสร็จทุกห้อง — a month of receipts in one press.** Added 2026-09-26,
+beside พิมพ์ทั้งหมด in the ใบเสร็จเดือนนี้ card, and gone once there is nothing
+left to issue. A building's rent is collected in one sitting and answering the
+same dialog forty times was most of an afternoon.
+
+`POST /receipts/batch` takes a period and issues one receipt for every bill of
+that month that has none. It follows the batch rule `POST /bills/batch` set:
+one room failing does not stop the rest, and every skip is named by room. The
+only ordinary skip reason is `ออกใบเสร็จไปแล้ว` — a bill never gets a second
+receipt. A month with no bills is a 400 naming the month, not a successful run
+of nothing.
+
+**No note is written by the batch.** A note describes one payment, and there is
+nothing true of all of them. They are typed afterwards on the receipts that
+need one.
+
+**The dialog costs a request per bill, on purpose.** It runs the same staleness
+check `IssueReceiptModal` runs, for every pending bill, and names the rooms
+whose figures have been overtaken. That is the warning worth multiplying: a
+mis-press here hands out forty pieces of paper, not one. It also prints the
+count and the total before the press, so the number on the button can be
+checked against the money actually counted.
+
+What it cannot check is whether anybody paid — that is the question the program
+has never been able to answer, so the dialog says in words that pressing it
+asserts every room on the list has, and that a room which has not should be
+issued singly.
+
+**A clean run closes the dialog;** the list's own tally catches up. Anything
+skipped keeps it open and names the rooms. The receipts list is the screen's
+own fetch rather than part of `bills`, so the batch calls `bumpDetail()` and
+`BillsPage` has `detailRevision` in that fetch's deps — without it the table
+would still read ยังไม่ได้ออก on receipts that exist.
+
+`smoke:receipts` presses it end to end, including that cancelling issues
+nothing and that no bill ends up with two receipts; `smoke:rules` covers the
+three things the route refuses.
+
 **ยกเลิกใบเสร็จ is a grey button** (`btn quiet`), not a red one. Cancelling
 spends nothing and destroys nothing — the bill and its figures are untouched —
 so the red it had was overstating it.
@@ -548,7 +641,68 @@ would print today's figures on an old bill the moment a reading was corrected.
 Anything that does not parse falls back to the sentence as it always was, which
 is what keeps older bills readable.
 
+**The rate working under a utility line is no longer printed.** Removed
+2026-09-26. `ก่อนหน้า 112 · ปัจจุบัน 150 · ใช้ไป 38 หน่วย` stayed; the sentence
+beneath it — `38 หน่วย — 100 บาท สำหรับ 5 หน่วยแรก แล้ว 33 × 9` — went. It
+restated the price list under every utility line of every bill, in the one place
+nobody goes to check a rate, and two of them on a page is most of what made a
+bill look busy. `meterFields()` still returns `working`, so `check-text` keeps
+asserting the whole sentence is accounted for; only the paper dropped it. The
+fallback for a line that does not parse is untouched and still prints the
+sentence whole — that is not the working coming back, it is the only way those
+figures reach the page at all when they cannot be lifted out.
+
+`smoke:receipts` and `smoke` check both sides: the labelled figures are there,
+and `หน่วยแรก` is not.
+
+**The building's own lines print black,** not muted grey — its address and
+phone in the header, and the whole footer: how to pay, `settings.bill_note`,
+and a receipt's own note. Muted is a screen convention for what can be skimmed
+past, and a bill goes through a home printer and into somebody's pocket. The
+tenant block's labels (`.pto dt`) and the column headings stay grey; they label
+the page rather than say anything.
+
 ---
+
+### The typefaces are files in this project
+
+Added 2026-09-26, after the app changed typeface on a machine it had been
+running on for weeks.
+
+**They used to be loaded from Google Fonts** — one `<link>` in `index.html`.
+A program whose premise is that it runs offline was asking the internet how it
+should look. The way that failed is why this is worth the words: not at once,
+but weeks in. Google serves the stylesheet with a cache life of about a day and
+the `.woff2` files with one of about a year, so a machine that went offline
+kept the font files and lost the `@font-face` rules that name them. The page
+still rendered, in whatever the system had.
+
+**What it fell to is not Sarabun,** although the stack names it — Sarabun is a
+Google font too, not one Windows or macOS ships. It fell past that to
+`system-ui`: Leelawadee UI on Windows, Thonburi on macOS. Both are a different
+width from Noto Sans Thai, so the printed bill's columns moved with the screen,
+which is the part that mattered.
+
+**`src/styles/fonts.css` is Google's own css2 output** with the URLs pointed at
+`frontend/public/fonts/`. The `unicode-range` lines are theirs and still do
+their job: opening the board fetches three of the five files, not all five.
+132KB in total, inside `frontend/dist`, which `electron-builder` already
+packages.
+
+**Only thai, latin and latin-ext are kept.** Roboto Mono's cyrillic, greek and
+vietnamese subsets were dropped — it dresses `.num` alone, which is room
+numbers, dates and money. Anything outside those ranges falls to the next font
+in the stack, exactly as it did before.
+
+**Both are variable fonts,** so the three Noto weights name one file and the
+browser instances it. That is why 400, 500 and 700 point at the same `.woff2`
+and it is not a copy-paste mistake.
+
+**`check-fonts` is a build-time guard,** in `npm test`. Nothing on a screen can
+catch this class of fault — the page renders, just wrong — so it is checked
+where re-adding the link or losing a file fails a build instead of surfacing as
+a phone call a month later. Both sides are covered: the check was watched to
+fail on a restored Google link and on a deleted `.woff2`.
 
 ## The desktop app
 

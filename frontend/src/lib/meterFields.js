@@ -6,9 +6,15 @@
  *
  * which explains the charge but buries the three figures anyone actually
  * checks. A receipt needs previous, current and units used readable at a
- * glance, so they are lifted out and printed as their own fields, with the
- * explanation kept beside them — it is what lets a tenant follow the
- * arithmetic rather than trust it.
+ * glance, so they are lifted out and printed as their own fields.
+ *
+ * `working` is what is left of the sentence once they are out. BillPaper
+ * stopped printing it in 2026-09: it restated the price list under every
+ * utility line on every bill, which is not where anybody checks a rate. It is
+ * still returned, because a parser that does not account for the whole of its
+ * input cannot be checked against it — `check-text` asserts the split, and a
+ * change to how the sentence is worded shows up there rather than as a figure
+ * going quietly missing from a bill.
  *
  * Read from the stored sentence rather than from the meter reading itself,
  * deliberately. A bill records what it charged: if the reading was corrected

@@ -208,6 +208,9 @@ export function DataProvider({ children }){
       //
       // Cancelling is an ordinary delete, because a receipt spends nothing.
       issueReceipt: (bill_id, note) => post('/receipts', { bill_id, note }),
+      // Nothing in `bills` changes, so there is no collection to refetch here.
+      // The receipts list is the screen's own, and the screen refreshes it.
+      issueAllReceipts: period => post('/receipts/batch', { period }),
       updateReceiptNote: (id, note) => put(`/receipts/${id}`, { note }),
       cancelReceipt: id => del(`/receipts/${id}`),
 

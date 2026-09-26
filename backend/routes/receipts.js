@@ -77,6 +77,81 @@ router.post('/', (req, res) => {
   res.status(201).json(db.prepare(`${withBill} WHERE r.id = ?`).get(result.lastInsertRowid));
 });
 
+// POST /receipts/batch — issue one for every bill of a month that has none.
+//
+// Declared before the '/:id' routes below. Nothing routed by POST would catch
+// 'batch' as an id today, but the literal-before-parameterised rule is cheap
+// to keep and silent to break.
+//
+// A month's rent is usually collected in one sitting, and issuing forty
+// receipts one dialog at a time is the whole of an afternoon. What the batch
+// does not do is decide anything the single route would not: a bill that
+// already has a receipt is skipped rather than given a second one, and the
+// skipped list says so by room.
+//
+// No note is written. A note describes one payment — "จ่ายสดที่สำนักงาน" —
+// and there is nothing a batch could put there that would be true of all of
+// them. They are typed afterwards on the receipts that need one.
+//
+// Whether the tenant has actually paid is not a question this route can ask.
+// It is asked on the screen, once, before the button is pressed.
+router.post('/batch', (req, res) => {
+  const { period } = req.body;
+
+  if (!period || !/^\d{4}-\d{2}$/.test(period)) {
+    return res.status(400).json({ error: 'งวดต้องอยู่ในรูปแบบ 2026-09' });
+  }
+
+  // Ordered by room, like GET above and like the list the button sits under.
+  const bills = db.prepare(`
+    SELECT b.id, b.total,
+           u.unit_number  AS unit_number,
+           t.full_name    AS tenant_name,
+           r.id           AS receipt_id
+    FROM bills b
+    JOIN leases l   ON l.id = b.lease_id
+    JOIN tenants t  ON t.id = l.tenant_id
+    JOIN units u    ON u.id = l.unit_id
+    LEFT JOIN receipts r ON r.bill_id = b.id
+    WHERE b.period = ?
+    ORDER BY u.unit_number
+  `).all(period);
+
+  if (bills.length === 0) {
+    return res.status(400).json({ error: `งวด ${period} ยังไม่มีบิล จึงยังออกใบเสร็จไม่ได้` });
+  }
+
+  const issued = [];
+  const skipped = [];
+  const insert = db.prepare('INSERT INTO receipts (bill_id, note) VALUES (?, NULL)');
+
+  // One room failing must not stop the rest — eighteen receipts and two named
+  // problems beats nothing at all and one error message.
+  for (const b of bills) {
+    const row = { bill_id: b.id, unit_number: b.unit_number, tenant_name: b.tenant_name };
+
+    if (b.receipt_id) {
+      skipped.push({ ...row, reason: 'ออกใบเสร็จไปแล้ว', receipt_id: b.receipt_id });
+      continue;
+    }
+
+    try {
+      const result = insert.run(b.id);
+      issued.push({ ...row, receipt_id: result.lastInsertRowid, total: b.total });
+    } catch (err) {
+      skipped.push({ ...row, reason: err.message });
+    }
+  }
+
+  res.status(201).json({
+    period,
+    issued_count: issued.length,
+    skipped_count: skipped.length,
+    issued,
+    skipped
+  });
+});
+
 // PUT /receipts/:id — the note only.
 //
 // Not the bill and not the date. Everything else on a receipt is read off the

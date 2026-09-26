@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import BillPaper from '../components/BillPaper.jsx';
 import ErrBox from '../components/ErrBox.jsx';
+import Pager from '../components/Pager.jsx';
 import { get, messageOf } from '../lib/api.js';
 import { billDiff, wasProrated } from '../lib/bills.js';
 import { baht } from '../lib/helpers.js';
@@ -11,7 +12,7 @@ import { useUi } from '../state/UiContext.jsx';
 /* One saved bill, with a check against what the same inputs would produce now.
  * The comparison is line by line, never on the total. */
 export default function BillPage({ id }){
-  const { deleteBill, generateBill } = useData();
+  const { bills, deleteBill, generateBill } = useData();
   const { go, openModal } = useUi();
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -54,8 +55,19 @@ export default function BillPage({ id }){
     } finally { setBusy(false); }
   };
 
+  // The month this bill is for, not the working month: a bill opened from a
+  // room's history belongs to its own month's list, and paging out of it into
+  // a month the user is not looking at would be a jump, not a step. `bills`
+  // arrives ordered by unit_number within a period, which is the order
+  // บิลเดือนนี้ prints, so this is that list.
+  const siblings = bills.filter(x => x.period === b.period)
+    .map(x => ({ id: x.id, label: x.unit_number, title: `บิลห้อง ${x.unit_number}` }));
+
   return <>
-    <button className="back noprint" onClick={() => go({name:"bills"})}>← บิล</button>
+    <div className="pagebar noprint">
+      <button className="back" onClick={() => go({name:"bills"})}>← บิล</button>
+      <Pager items={siblings} current={b.id} onGo={bid => go({name:"bill", id:bid})} />
+    </div>
     <ErrBox>{error}</ErrBox>
     {stale && (
       <div className="stale noprint">

@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { useSubmit } from '../../lib/useSubmit.js';
+import DateField from '../DateField.jsx';
 import ErrBox from '../ErrBox.jsx';
 import Modal from '../Modal.jsx';
 import { useData } from '../../state/DataContext.jsx';
 import { useUi } from '../../state/UiContext.jsx';
+import { TenantExtra } from './TenantModals.jsx';
 
 /* The two sums taken beside มัดจำ.
  *
@@ -51,6 +53,11 @@ export function MoveInModal({ unitId }){
   const [newPhone, setNewPhone] = useState("");
   const [newAddr, setNewAddr] = useState("");
   const [newIdCard, setNewIdCard] = useState("");
+  const [newIssued, setNewIssued] = useState("");
+  const [newExpires, setNewExpires] = useState("");
+  const [newLineId, setNewLineId] = useState("");
+  const [newPlate, setNewPlate] = useState("");
+  const [newNote, setNewNote] = useState("");
   const [start, setStart] = useState(TODAY);
   const [rent, setRent] = useState(String(u.base_rent));
   const [dep, setDep] = useState(String(u.base_rent*2));
@@ -72,7 +79,9 @@ export function MoveInModal({ unitId }){
         // Written into the shared tenant list, so the ผู้เช่า page shows this
         // person immediately — no separate step to register them.
         const made = await addTenant({ full_name:newName.trim(), phone:newPhone.trim(),
-          address:newAddr.trim(), id_card:newIdCard.trim() });
+          address:newAddr.trim(), id_card:newIdCard.trim(),
+          id_card_issued:newIssued, id_card_expires:newExpires,
+          line_id:newLineId.trim(), vehicle_plate:newPlate.trim(), note:newNote.trim() });
         tid = made.id;
       } else tid = parseInt(sel,10);
 
@@ -94,8 +103,16 @@ export function MoveInModal({ unitId }){
       <div className="field"><label>ผู้เช่า</label>
         <select value={sel} onChange={e=>setSel(e.target.value)}>
           <option value="">— เลือกผู้เช่า —</option>
-          {tenants.map(t=><option key={t.id} value={t.id}>{t.full_name}</option>)}
+          {/* Above the names rather than after them. Filling a building is one
+              room at a time and most ย้ายเข้า are somebody's first, so this is
+              the line reached for most often — and the one that kept getting
+              longer to scroll to as the list of tenants grew. */}
           <option value="new">+ เพิ่มผู้เช่าใหม่</option>
+          {tenants.length > 0 && (
+            <optgroup label="ผู้เช่าที่มีอยู่แล้ว">
+              {tenants.map(t=><option key={t.id} value={t.id}>{t.full_name}</option>)}
+            </optgroup>
+          )}
         </select>
       </div>
       {picked && (
@@ -119,11 +136,19 @@ export function MoveInModal({ unitId }){
             <input value={newAddr} onChange={e=>setNewAddr(e.target.value)} /></div>
           <div className="field"><label>เลขบัตรประชาชน</label>
             <input className="num" value={newIdCard} onChange={e=>setNewIdCard(e.target.value)} /></div>
+          {/* The same block the ผู้เช่า form uses, so a tenant registered here
+              is not a thinner record than one added from that page. */}
+          <TenantExtra
+            issued={newIssued} setIssued={setNewIssued}
+            expires={newExpires} setExpires={setNewExpires}
+            lineId={newLineId} setLineId={setNewLineId}
+            plate={newPlate} setPlate={setNewPlate}
+            note={newNote} setNote={setNewNote} />
         </div>
       )}
       <div className="two">
         <div className="field"><label>วันเข้าอยู่</label>
-          <input type="date" value={start} onChange={e=>setStart(e.target.value)} /></div>
+          <DateField value={start} onChange={setStart} /></div>
         <div className="field"><label>ค่าเช่า/เดือน</label>
           <input className="num" value={rent} onChange={e=>setRent(e.target.value)} /></div>
       </div>
@@ -170,7 +195,7 @@ export function MoveOutModal({ unitId }){
       {/* Not วันย้ายออก, which is ambiguous about whether the room is free that
           day. The stored value is the day the room becomes available. */}
       <div className="field"><label>ห้องว่างตั้งแต่วันที่</label>
-        <input type="date" value={end} onChange={e=>setEnd(e.target.value)} />
+        <DateField value={end} onChange={setEnd} />
         <div className="hint">ใส่วันนี้ = ห้องว่างทันที ให้คนใหม่เข้าวันเดียวกันได้เลย</div>
       </div>
       <div className="actions" style={{marginTop:"-4px"}}>
@@ -220,7 +245,7 @@ export function EditLeaseModal({ leaseId }){
       <p className="lead">{t.full_name}</p>
       <ErrBox>{error}</ErrBox>
       <div className="field"><label>วันเข้าอยู่</label>
-        <input type="date" value={start} onChange={e=>setStart(e.target.value)} /></div>
+        <DateField value={start} onChange={setStart} /></div>
       <div className="two">
         <div className="field"><label>ค่าเช่า/เดือน</label>
           <input className="num" value={rent} onChange={e=>setRent(e.target.value)} /></div>

@@ -39,6 +39,12 @@ export function UiProvider({ children }){
   const [prorateOn, setProrateOn] = useState(false);
   const [prorateDays, setProrateDays] = useState(null);
   const [lastResult, setLastResult] = useState(null);
+  // The two long lists on บิล, open or folded away. A building of forty rooms
+  // puts eighty rows between the generate card and the bottom of the page, and
+  // most visits to that screen are about one of the two. Open is how the screen
+  // arrives, so a small building never meets this.
+  const [billsOpen, setBillsOpen] = useState(true);
+  const [receiptsOpen, setReceiptsOpen] = useState(true);
   // settings
   const [exampleUnits, setExampleUnits] = useState({ water: 8, electricity: 8 });
   // reports
@@ -92,6 +98,7 @@ export function UiProvider({ children }){
     tenantSearch, setTenantSearch, tenantFilter, setTenantFilter,
     picked, setPicked, prorateOn, setProrateOn, prorateDays, setProrateDays,
     lastResult, setLastResult,
+    billsOpen, setBillsOpen, receiptsOpen, setReceiptsOpen,
     exampleUnits, setExampleUnits,
     reportKind, setReportKind,
     reportYear, setReportYear, yearOpen, setYearOpen,
@@ -100,7 +107,7 @@ export function UiProvider({ children }){
     modal, openModal: setModal, closeModal: () => setModal(null),
   }), [view, go, period, setPeriod, shiftMonth, monthOpen, editMode, filter,
        meterFilter, showVacant, tenantSearch, tenantFilter, picked, prorateOn,
-       prorateDays, lastResult, exampleUnits, reportKind, reportYear, yearOpen, meterRevision, bumpMeter, detailRevision, bumpDetail, modal]);
+       prorateDays, lastResult, billsOpen, receiptsOpen, exampleUnits, reportKind, reportYear, yearOpen, meterRevision, bumpMeter, detailRevision, bumpDetail, modal]);
 
   return <UiContext.Provider value={value}>{children}</UiContext.Provider>;
 }

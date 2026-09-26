@@ -6,7 +6,7 @@ import { DeleteLeaseModal, EditLeaseModal, MoveInModal, MoveOutModal } from './L
 import { EditPrevModal, MeterModal, RoomYearModal } from './MeterModals.jsx';
 import { ChargeModal, DeleteFeeModal, DeleteFeeTypeModal, FeeModal, FeeTypeModal } from './FeeModals.jsx';
 import { AddTenantModal, DeleteTenantModal, EditTenantModal } from './TenantModals.jsx';
-import { CancelReceiptModal, DeleteBillModal, IssueReceiptModal } from './BillModals.jsx';
+import { CancelReceiptModal, DeleteBillModal, IssueAllReceiptsModal, IssueReceiptModal } from './BillModals.jsx';
 
 /* Which record each dialog is about.
  *
@@ -82,6 +82,9 @@ export default function ModalHost(){
     case "deleteTenant":  return <DeleteTenantModal id={modal.id} />;
     case "deleteBill":    return <DeleteBillModal id={modal.id} />;
     case "issueReceipt":  return <IssueReceiptModal id={modal.id} />;
+    // A month, not a record — so it has no entry in SUBJECT above. What it is
+    // about is worked out inside, against the server, when it opens.
+    case "issueAllReceipts": return <IssueAllReceiptsModal period={modal.period} />;
     case "cancelReceipt": return <CancelReceiptModal id={modal.id} />;
     case "roomYear":      return <RoomYearModal unitId={modal.unitId} year={modal.year} />;
     default: return null;

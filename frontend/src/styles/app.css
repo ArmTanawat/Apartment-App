@@ -29,6 +29,10 @@
 *{box-sizing:border-box}
 body{
   margin:0; background:var(--paper); color:var(--ink);
+  /* Noto Sans Thai is shipped with this app (src/styles/fonts.css), so the
+     rest of this line is now only for a face that fails to decode. It is kept
+     because that is what a fallback is for — and because the months this app
+     spent silently wearing it are the reason the font is a file now. */
   font-family:"Noto Sans Thai","Sarabun",system-ui,sans-serif;
   line-height:1.75; font-size:15px;
 }
@@ -153,6 +157,29 @@ h1{font-size:32px; font-weight:700; margin:0; line-height:1.4}
   border-top:1px solid var(--line); padding-top:16px}
 .legend span{display:flex; align-items:center; gap:7px}
 .swatch{width:10px; height:10px; border-radius:2px}
+
+/* ---------- pager ---------- */
+/* The back button and the ← → pair on one row, stuck to the top of the window
+   as the page scrolls. The bar's own background is the page's, so the cards
+   pass underneath it rather than showing through. */
+.pagebar{position:sticky; top:0; z-index:9; display:flex; align-items:center;
+  justify-content:space-between; gap:12px; background:var(--paper);
+  padding:4px 0 10px; margin-bottom:6px}
+.pagebar .back{margin-bottom:0}
+.pagergroup{display:flex; gap:8px}
+/* ← to the room, bill or receipt beside this one. Each carries where it goes,
+   because an arrow on its own asks to be pressed to find out. */
+.pager{display:flex; align-items:center; gap:7px; padding:6px 11px;
+  background:var(--surface); border:1px solid var(--line); border-radius:8px;
+  color:var(--muted); font-family:inherit; font-size:14px; cursor:pointer}
+.pager:hover:not(:disabled){color:var(--ink); border-color:var(--ink)}
+/* Kept on the row at the ends rather than hidden: removing one would move the
+   other, and a control that moves is a control that gets mis-clicked. */
+.pager:disabled{opacity:.35; cursor:default}
+.pager .arrow{font-size:15px; line-height:1}
+.pager .num{font-family:"Roboto Mono",ui-monospace,monospace;
+  font-variant-numeric:tabular-nums; color:var(--ink); min-width:1.6em; text-align:center}
+.pager:disabled .num{color:var(--muted)}
 
 /* ---------- room page ---------- */
 .back{border:0; background:none; color:var(--muted); cursor:pointer; font-size:14px;
@@ -280,6 +307,17 @@ h1{font-size:32px; font-weight:700; margin:0; line-height:1.4}
   padding:20px 22px; margin-bottom:16px}
 .setcard h2{font-size:16px; font-weight:500; margin:0 0 4px}
 .setcard .lead{color:var(--muted); font-size:13px; margin:0 0 16px; line-height:1.6}
+/* A card heading that folds its card away. The whole title is the hit area,
+   not the chevron — a chevron on its own is a target the size of a full stop.
+   The summary appears on the right only when the list is closed, so a reader
+   who folded บิลเดือนนี้ away still has the count and the total. */
+.cardhead{display:flex; align-items:center; justify-content:space-between; gap:12px}
+.cardhead .toggle{display:flex; align-items:center; gap:8px; border:0; background:none;
+  padding:0; font:inherit; color:inherit; cursor:pointer; text-align:left}
+.cardhead .toggle svg{flex:0 0 auto; color:var(--muted); transition:transform .12s}
+.cardhead .toggle:hover svg{color:var(--ink)}
+.cardhead .toggle[aria-expanded="false"] svg{transform:rotate(-90deg)}
+.cardhead .sum{font-size:13px; font-weight:400; color:var(--muted); white-space:nowrap}
 .rateline{display:flex; align-items:center; gap:10px; margin-bottom:10px; font-size:14px}
 .rateline label{color:var(--muted); min-width:120px}
 .rateline input{width:84px; padding:7px 10px; border:1px solid var(--line); border-radius:7px;
@@ -354,7 +392,12 @@ h1{font-size:32px; font-weight:700; margin:0; line-height:1.4}
 .phead{display:flex; justify-content:space-between; gap:24px; border-bottom:2px solid var(--ink);
   padding-bottom:16px; margin-bottom:18px}
 .phead h2{margin:0 0 4px; font-size:20px; font-weight:700}
-.phead .small{font-size:13px; color:var(--muted); line-height:1.7}
+/* Black, not muted. Everything in this block and in .pfoot below is the
+   building speaking — its address, how to pay it, what it wants the tenant to
+   know — and grey text on a page that goes through a home printer and gets
+   folded into a pocket is the first thing to stop being readable. Muted is a
+   screen convention for what can be skimmed past; none of this can. */
+.phead .small{font-size:13px; color:var(--ink); line-height:1.7}
 /* Who the bill is addressed to. Smaller than the lines it introduces: the
    tenant already knows their own name and room, so this is a label on the
    document rather than something to be read, and the height it gives back
@@ -370,9 +413,9 @@ h1{font-size:32px; font-weight:700; margin:0; line-height:1.4}
    recurring fees and both utilities has to fit on one sheet beside the header
    and the signature, so the height came out of the padding — 9px to 4px, which
    is most of what there was to take. Taking the rules out as well was tried and
-   put back: a utility line's working sits directly above the next line's label,
-   and with nothing between them the muted grey was not enough on its own. The
-   rule costs 1px and does the separating the spacing used to do. */
+   put back: a utility line's meter figures sit directly above the next line's
+   label, and with nothing between them the two read as one block. The rule
+   costs 1px and does the separating the spacing used to do. */
 .pitems td{padding:4px 0; border-bottom:1px solid var(--line); vertical-align:top}
 .pitems td small{display:block; color:var(--muted); font-size:12px; line-height:1.5}
 .pitems td.r{text-align:right; font-family:"Roboto Mono",monospace;
@@ -395,8 +438,10 @@ h1{font-size:32px; font-weight:700; margin:0; line-height:1.4}
 .sign i{display:block; border-bottom:1px dotted var(--ink); height:36px}
 .sign span{font-size:13px; color:var(--muted)}
 .pfoot{margin-top:24px; padding-top:16px; border-top:1px solid var(--line);
-  font-size:13px; color:var(--muted); line-height:1.8}
-.pfoot b{color:var(--ink); font-weight:500}
+  font-size:13px; color:var(--ink); line-height:1.8}
+/* Now only a weight: the footer is black throughout, and ชำระเงิน is its
+   heading rather than the one dark line in a grey block. */
+.pfoot b{font-weight:500}
 .papers .paper{margin-bottom:20px}
 /* A report is the same paper as an invoice, but a table of every room needs
    more width than a document addressed to one of them. */
@@ -467,6 +512,17 @@ h1{font-size:32px; font-weight:700; margin:0; line-height:1.4}
   border-radius:8px; font-size:15px; font-family:inherit; background:var(--surface); color:var(--ink)}
 .field input:focus,.field select:focus{outline:2px solid var(--ink); outline-offset:-1px; border-color:transparent}
 .field .hint{font-size:12px; color:var(--muted); margin-top:4px; line-height:1.5}
+/* The วัน/เดือน/ปี box and its calendar button. The native date input beside
+   them is the calendar itself — kept in the page, shown to nobody. */
+.datefield{position:relative; display:flex; gap:8px; align-items:stretch}
+.datefield .dtext{flex:1; min-width:0}
+.datefield .daybtn{flex:0 0 40px; display:flex; align-items:center; justify-content:center;
+  padding:0; border:1px solid var(--line); border-radius:8px; background:var(--surface);
+  color:var(--muted); cursor:pointer}
+.datefield .daybtn:hover{color:var(--ink); border-color:var(--ink)}
+.datefield .dpick{position:absolute; right:0; bottom:0; width:1px; height:1px;
+  padding:0; border:0; opacity:0; pointer-events:none}
+
 .two{display:grid; grid-template-columns:1fr 1fr; gap:12px}
 
 .veil{position:fixed; inset:0; background:rgba(0,0,0,.28); display:flex;

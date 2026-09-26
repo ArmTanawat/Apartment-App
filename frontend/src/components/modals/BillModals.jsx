@@ -1,7 +1,8 @@
+import { useState } from 'react';
 import ErrBox from '../ErrBox.jsx';
 import Modal from '../Modal.jsx';
 import { useSubmit } from '../../lib/useSubmit.js';
-import { get } from '../../lib/api.js';
+import { get, messageOf } from '../../lib/api.js';
 import { billDiff } from '../../lib/bills.js';
 import { baht } from '../../lib/helpers.js';
 import { useApi } from '../../lib/useApi.js';
@@ -78,6 +79,130 @@ export function IssueReceiptModal({ id }){
             closeModal();
             go({name:"receipt", id});
           })}>ออกใบเสร็จ</button>
+      </div>
+    </Modal>
+  );
+}
+
+/* The same question as IssueReceiptModal, asked once for a whole month.
+ *
+ * Collecting a building's rent is one sitting at the desk, and answering the
+ * same dialog forty times is most of an afternoon. So the question is asked
+ * once — and it is still the only question that matters, because it is the one
+ * the program cannot answer: has everybody paid.
+ *
+ * That is also what makes this dialog worth more care than the single one. A
+ * mis-press here issues forty receipts, not one. Two things follow:
+ *
+ *   It says how many and for how much before the press, so the number on the
+ *   button can be checked against the money actually counted.
+ *
+ *   It names the rooms whose bills have been overtaken, which is the single
+ *   dialog's loudest warning multiplied by however many there are. Working
+ *   that out costs a request per bill, which on a local server is nothing next
+ *   to handing somebody paper with the wrong figure on it.
+ *
+ * Receipts issued here carry no note. A note is about one payment; there is
+ * nothing a batch could write that would be true of all of them.
+ */
+export function IssueAllReceiptsModal({ period }){
+  const { bills, issueAllReceipts, settings } = useData();
+  const dev = !!Number(settings.developer_mode);
+  const { closeModal, bumpDetail } = useUi();
+  const { error, busy, run } = useSubmit();
+  const [result, setResult] = useState(null);
+
+  // Which bills of the month have no receipt, and which of those have been
+  // overtaken. Read from the server rather than from the screen's copy: this
+  // is the list about to be written to.
+  const check = useApi(async () => {
+    const receipts = await get(`/receipts?period=${period}`);
+    const have = new Set(receipts.map(r => r.bill_id));
+    const pending = bills.filter(b => b.period === period && !have.has(b.id));
+
+    const stale = [];
+    for(const b of pending){
+      const d = await billDiff(await get(`/bills/${b.id}`));
+      if(d.changes && d.changes.length) stale.push(b.unit_number);
+    }
+    return { pending, stale };
+  }, [period, bills]);
+
+  if(check.loading) return <Modal><p className="lead">กำลังตรวจสอบบิลทั้งเดือน…</p></Modal>;
+
+  // The check is what the numbers on this dialog are made of. Without it there
+  // is nothing honest to put on the button, so it is not offered.
+  if(check.error) return (
+    <Modal>
+      <h3>ออกใบเสร็จทุกห้อง</h3>
+      <ErrBox>{messageOf(check.error)}</ErrBox>
+      <p className="lead">ตรวจสอบบิลของเดือนนี้ไม่สำเร็จ ลองปิดแล้วเปิดใหม่
+        หรือออกใบเสร็จทีละห้องจากรายการ</p>
+      <div className="actions"><button className="btn ghost" onClick={closeModal}>ปิด</button></div>
+    </Modal>
+  );
+
+  // Already done, or done between opening the dialog and now.
+  if(check.data.pending.length === 0) return (
+    <Modal>
+      <h3>ออกใบเสร็จทุกห้อง</h3>
+      <p className="lead">บิลงวด {period} ออกใบเสร็จครบทุกใบแล้ว</p>
+      <div className="actions"><button className="btn ghost" onClick={closeModal}>ปิด</button></div>
+    </Modal>
+  );
+
+  // What actually happened, when it was not simply everything. Skipping
+  // because a receipt already existed is not a problem worth a screen — the
+  // count covers it — but anything else is, and it is named by room.
+  if(result) return (
+    <Modal>
+      <h3>ออกใบเสร็จแล้ว</h3>
+      <p className="lead">ออกใบเสร็จ <span className="num">{result.issued_count}</span> ใบ
+        {result.skipped_count > 0 ? <> · ข้าม <span className="num">{result.skipped_count}</span> ใบ</> : null}</p>
+      <div className="warn">
+        {result.skipped.map(r => (
+          <div key={r.bill_id}>ห้อง {r.unit_number} — {r.reason}</div>
+        ))}
+      </div>
+      <div className="actions"><button className="btn" onClick={closeModal}>ปิด</button></div>
+    </Modal>
+  );
+
+  const { pending, stale } = check.data;
+  const total = pending.reduce((s, b) => s + b.total, 0);
+
+  return (
+    <Modal>
+      <h3>ออกใบเสร็จทุกห้อง</h3>
+      <p className="lead">งวด {period} · <span className="num">{pending.length}</span> ใบ ·
+        รวม <span className="num">{baht(total)}</span> บาท</p>
+
+      {stale.length > 0 && (
+        <div className="warn" style={{borderColor:"var(--vacant)",color:"var(--vacant)"}}>
+          ข้อมูลของบิลห้อง {stale.join(", ")} เปลี่ยนไปหลังออกบิล
+          ถ้าออกใบเสร็จตอนนี้ ผู้เช่าห้องนั้นจะถือกระดาษที่เป็นยอดเดิม
+          ถ้าต้องการตัวเลขล่าสุด ให้กดยกเลิก ออกบิลห้องนั้นใหม่ก่อน แล้วค่อยกลับมา</div>
+      )}
+
+      <div className="warn">ออกเมื่อผู้เช่าจ่ายเงินแล้วเท่านั้น
+        <div style={{marginTop:"6px"}}>· ปุ่มนี้ถือว่าทุกห้องในรายการจ่ายแล้ว ห้องที่ยังไม่จ่ายให้ออกทีละห้องแทน</div>
+        <div>· ใบที่ออกไปแล้วจะถูกข้าม ไม่มีใครได้ใบเสร็จสองใบ</div>
+        <div>· หมายเหตุบนใบเสร็จเว้นว่างไว้ พิมพ์เพิ่มทีหลังได้ที่ใบนั้น</div>
+        {dev ? <div>· ยกเลิกได้ทีละใบ ใบเสร็จไม่มีเลขที่กำกับ</div>
+             : <div>· ไม่สามารถยกเลิกได้</div>}
+      </div>
+
+      <ErrBox>{error}</ErrBox>
+      <div className="actions">
+        <button className="btn ghost" onClick={closeModal}>ยกเลิก</button>
+        <button className="btn" disabled={busy}
+          onClick={() => run(async () => {
+            const r = await issueAllReceipts(period);
+            bumpDetail();
+            // A clean run has nothing to report that the list will not show
+            // by itself a moment later.
+            if(r.skipped_count === 0) closeModal(); else setResult(r);
+          })}>ออกใบเสร็จ {pending.length} ใบ</button>
       </div>
     </Modal>
   );

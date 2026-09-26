@@ -33,6 +33,14 @@ export const shiftPeriod = (p, by) => {
 export const thaiDate = iso => { const [y,m,d] = iso.split("-").map(Number);
   return d + " " + ["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.","ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."][m-1]; };
 
+// วัน/เดือน/ปี — what the date boxes on the forms show, and what a date read
+// back off a page shows, so the two never disagree. Blank for a date that was
+// never filled in; the caller decides what to print instead.
+export const dmy = iso => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || "");
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : "";
+};
+
 const p2 = n => String(n).padStart(2, "0");
 
 // The machine's local date, as YYYY-MM-DD.

@@ -171,4 +171,48 @@ await click(byText('.switch', 'แสดงห้องว่าง'), 300);
 check('แสดงห้องว่าง adds the empty rooms rather than replacing anything',
   $$('.mno').length >= before, `${before} -> ${$$('.mno').length}`);
 
+section('ห้อง — ← → step to the room beside this one');
+await nav('ห้องพัก');
+await click(byText('.chip', 'ทั้งหมด'));
+// DOM order on the board is the order GET /units returns — floor, then unit
+// number — and the pager has to walk that same order, not one of its own.
+const board = $$('.room .rno').map(e => e.textContent.trim());
+await click($$('.room')[0], 400);
+check('the first room opened', text('.roomtitle h1') === board[0], text('.roomtitle h1'));
+check('has nothing to its left', $('.pager.prev').disabled);
+check('and names the next room on the board to its right',
+  $('.pager.next').textContent.includes(board[1]), text('.pagergroup'));
+await click($('.pager.next'), 400);
+check('pressing it lands on that room', text('.roomtitle h1') === board[1], text('.roomtitle h1'));
+check('and ← now names the one it came from',
+  $('.pager.prev').textContent.includes(board[0]), text('.pagergroup'));
+// Both ends of the rule: an end must be refused, not silently wrapped round.
+await nav('ห้องพัก');
+await click(byText('.chip', 'ทั้งหมด'));
+await click($$('.room')[board.length - 1], 400);
+check('the last room has nothing to its right', $('.pager.next').disabled);
+check('but still has a way back to the one before it', !$('.pager.prev').disabled);
+
+section('บิล — the two long lists fold away');
+await nav('บิล');
+{
+  const head = byText('.cardhead', 'บิลเดือนนี้');
+  const card = head.closest('.setcard');
+  const toggle = head.querySelector('.toggle');
+  check('the list is open when the screen arrives',
+    toggle.getAttribute('aria-expanded') === 'true' && !!$('.blist', card));
+  await click(toggle, 300);
+  check('folding it takes the table away', !$('.blist', card), text('.setcard'));
+  check('and leaves the count and the total on the line',
+    /\d+ ใบ/.test(head.textContent), head.textContent.trim());
+  await click(toggle, 300);
+  check('opening it brings the table back', !!$('.blist', card));
+  // Each card folds on its own; one closing must not take the other with it.
+  const other = byText('.cardhead', 'ใบเสร็จเดือนนี้');
+  await click(head.querySelector('.toggle'), 300);
+  check('the receipts list is untouched by the bills list folding',
+    !!$('.blist', other.closest('.setcard')));
+  await click(head.querySelector('.toggle'), 300);
+}
+
 done();
