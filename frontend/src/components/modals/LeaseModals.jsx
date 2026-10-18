@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { todayLocal } from '../../lib/helpers.js';
 import { useSubmit } from '../../lib/useSubmit.js';
 import DateField from '../DateField.jsx';
 import ErrBox from '../ErrBox.jsx';
@@ -296,7 +297,10 @@ export function DeleteLeaseModal({ leaseId }){
   // lets the way out be offered instead of an error.
   const held = bills.filter(b => b.lease_id === leaseId);
 
-  const back = () => openModal({kind:"editLease", leaseId});
+  // An ended lease is reached from the tenant page, not from แก้สัญญา, so
+  // there is no edit form to go back to.
+  const ended = l.end_date && l.end_date <= todayLocal();
+  const back = () => ended ? closeModal() : openModal({kind:"editLease", leaseId});
 
   return (
     <Modal>

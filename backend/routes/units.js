@@ -172,7 +172,13 @@ router.delete('/:id', (req, res) => {
     });
   }
 
-  const result = db.prepare('DELETE FROM units WHERE id = ?').run(req.params.id);
+  // With no lease left, no bill was ever worked out from these readings, so
+  // they are only the room's own meter history and go with the room. Left in
+  // place they would make the delete fail on the foreign key.
+  const result = db.transaction(id => {
+    db.prepare('DELETE FROM meter_readings WHERE unit_id = ?').run(id);
+    return db.prepare('DELETE FROM units WHERE id = ?').run(id);
+  })(req.params.id);
 
   if (result.changes === 0) {
     return res.status(404).json({ error: 'ไม่พบห้อง' });

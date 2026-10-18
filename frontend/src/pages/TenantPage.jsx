@@ -65,7 +65,12 @@ export default function TenantPage({ id }){
                 <small>{r.lease.start_date} {r.lease.end_date ? `ถึง ${r.lease.end_date}` : "— อยู่ต่อ"}</small></span>
               <span><span className="num">{baht(r.lease.monthly_rent)}</span>
                 <button className="linkbtn" style={{marginLeft:"10px"}}
-                  onClick={() => go({name:"room", id:r.unit.id})}>ดูห้อง</button></span>
+                  onClick={() => go({name:"room", id:r.unit.id})}>ดูห้อง</button>
+                {/* A lease that has ended no longer shows on the room page, so
+                    แก้สัญญา — and the ลบสัญญานี้ inside it — is out of reach
+                    there. This is the only way left to it. */}
+                {!r.current && <button className="linkbtn danger" style={{marginLeft:"6px"}}
+                  onClick={() => openModal({kind:"deleteLease", leaseId:r.lease.id})}>ลบสัญญา</button>}</span>
             </div>
           ))}</div>
         ) : <p className="none">ยังไม่เคยเช่าห้องไหน</p>}

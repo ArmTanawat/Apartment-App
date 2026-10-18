@@ -375,6 +375,14 @@ colour and pressing anywhere else opens the room. Only empty cards have them.
 Every empty card also says its state in words, so the black and the red are not
 a distinction anybody has to make by eye.
 
+### Deleting a room that once had a tenant
+
+Bills first (on the bill page), then the lease, then the room. Once a lease has
+ended, the room page stops showing it, so its ลบสัญญา link is on the tenant page
+under ห้องที่เช่า, on past leases only. `DELETE /units/:id` still refuses while
+any lease exists. Once none does, it removes the room's meter readings in the
+same transaction; without that step the delete failed on the foreign key.
+
 ### The three sums taken at move-in
 
 Added 2026-09-09. `leases` gained `guarantee` (เงินประกันสัญญาเช่าห้อง) and
