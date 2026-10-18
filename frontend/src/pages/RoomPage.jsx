@@ -89,7 +89,22 @@ export default function RoomPage({ id }){
           <dt>ชั้น</dt><dd className="num">{u.floor}</dd>
           <dt>ค่าเช่ามาตรฐาน</dt><dd className="num">{baht(u.base_rent)}</dd>
         </dl>
-        {hasHistory && <div className="warn" style={{margin:"14px 0 0"}}>ห้องนี้มีประวัติสัญญาเช่าแล้ว ลบไม่ได้</div>}
+        {/* Saying only "cannot be deleted" left the user hunting this page for
+            a ลบสัญญา that is not here: an ended lease is deleted from its
+            tenant's page. So each lease is named with the way to it. */}
+        {hasHistory && <div className="warn" style={{margin:"14px 0 0"}}>
+          ห้องนี้มีสัญญาเช่าอยู่ ต้องลบสัญญาก่อนถึงจะลบห้องได้
+          {leases.filter(x => x.unit_id === u.id).map(x => {
+            const who = h.tenantOf(x.id);
+            const held = bills.filter(b => b.lease_id === x.id).length;
+            return <div key={x.id} style={{marginTop:"6px"}}>
+              <button className="linkbtn" onClick={() => go({name:"tenant", id:who.id})}>{who.full_name}</button>
+              {" — ลบสัญญาที่หน้าผู้เช่า หัวข้อห้องที่เช่า"}
+              {x.id === l?.id && " หรือปุ่มแก้สัญญาด้านล่าง"}
+              {held > 0 && <> · ลบบิลก่อน <span className="num">{held}</span> ใบ</>}
+            </div>;
+          })}
+        </div>}
       </div>
 
       <div className="card">

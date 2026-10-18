@@ -378,8 +378,10 @@ a distinction anybody has to make by eye.
 ### Deleting a room that once had a tenant
 
 Bills first (on the bill page), then the lease, then the room. Once a lease has
-ended, the room page stops showing it, so its ลบสัญญา link is on the tenant page
-under ห้องที่เช่า, on past leases only. `DELETE /units/:id` still refuses while
+ended (or before one booked ahead has started), the room page does not show it,
+so every lease has a ลบสัญญา link on the tenant page under ห้องที่เช่า. The room
+page's warning names each lease's tenant, links to them, and counts the bills
+to delete first. `DELETE /units/:id` still refuses while
 any lease exists. Once none does, it removes the room's meter readings in the
 same transaction; without that step the delete failed on the foreign key.
 
