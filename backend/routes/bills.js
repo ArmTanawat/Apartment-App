@@ -124,7 +124,8 @@ router.get('/:id', (req, res) => {
 router.get('/preview/:leaseId/:period', (req, res) => {
   const built = buildBill(req.params.leaseId, req.params.period, {
     prorate: req.query.prorate === 'true',
-    prorateDays: req.query.days ? Number(req.query.days) : null
+    prorateDays: req.query.days ? Number(req.query.days) : null,
+    waiveRent: req.query.waive_rent === 'true'
   });
 
   if (built.error) {
@@ -144,7 +145,8 @@ router.post('/', (req, res) => {
 
   const built = buildBill(lease_id, period, {
     prorate: req.body.prorate === true,
-    prorateDays: req.body.prorate_days ?? null
+    prorateDays: req.body.prorate_days ?? null,
+    waiveRent: req.body.waive_rent === true
   });
   if (built.error) {
     return res.status(400).json({ error: built.error });
@@ -205,9 +207,15 @@ router.post('/', (req, res) => {
 router.post('/batch', (req, res) => {
   const { period, unit_ids, prorate } = req.body;
   const prorateDays = req.body.prorate_days ?? null;
+  const waiveRent = req.body.waive_rent === true;
 
   if (!period || !/^\d{4}-\d{2}$/.test(period)) {
     return res.status(400).json({ error: 'งวดต้องอยู่ในรูปแบบ 2026-09' });
+  }
+  // Refused for the whole run rather than room by room: every room would fail
+  // for the same reason, and twenty identical skips say it worse than one line.
+  if (waiveRent && prorate === true) {
+    return res.status(400).json({ error: BOTH_RENT_OPTIONS });
   }
   if (!Array.isArray(unit_ids) || unit_ids.length === 0) {
     return res.status(400).json({ error: 'เลือกห้องอย่างน้อยหนึ่งห้อง' });
@@ -266,7 +274,7 @@ router.post('/batch', (req, res) => {
         continue;
       }
 
-      const built = buildBill(lease.id, period, { prorate: prorate === true, prorateDays });
+      const built = buildBill(lease.id, period, { prorate: prorate === true, prorateDays, waiveRent });
 
       if (built.error) {
         skipped.push({ unit_id: unitId, unit_number: unit.unit_number, reason: built.error });
@@ -382,8 +390,16 @@ router.delete('/:id', (req, res) => {
 // Gathers everything a bill needs and returns the finished figures.
 // Used by both the preview and the save route so the two can never disagree —
 // if this logic lived in both places, one would eventually drift.
+// Printed on the rent line of a bill made with ไม่คิดค่าเช่าห้อง.
+const RENT_PAID_NOTE = 'ชำระล่วงหน้าแล้ว Paid in advance';
+const BOTH_RENT_OPTIONS = 'เลือกได้อย่างเดียว ระหว่างไม่คิดค่าเช่ากับคิดค่าเช่าตามวันที่อยู่จริง';
+
 function buildBill(leaseId, period, options = {}) {
-  const { prorate = false, prorateDays = null } = options;
+  const { prorate = false, prorateDays = null, waiveRent = false } = options;
+
+  if (prorate && waiveRent) {
+    return { error: BOTH_RENT_OPTIONS };
+  }
 
   if (!/^\d{4}-\d{2}$/.test(period)) {
     return { error: 'งวดต้องอยู่ในรูปแบบ 2026-08' };
@@ -470,6 +486,21 @@ function buildBill(leaseId, period, options = {}) {
 
     rent_amount = money(lease.monthly_rent / totalDays * days);
     rentDetail = `ห้อง ${lease.unit_number} — คิด ${days} จาก ${totalDays} วัน`;
+  }
+
+  // No rent this month — the tenant paid it at move-in. Only the rent line
+  // goes to 0: water, electricity and every fee are charged as usual. A share
+  // fee on rent therefore comes to 0 too, and one on the subtotal is smaller,
+  // because both are shares of figures on this bill.
+  //
+  // The line stays on the bill, at 0, so the tenant sees the rent was not
+  // forgotten. Its detail is also the only record that the bill was made this
+  // way — a bill stores amounts, not options — and the screen reads it back
+  // (rentOptionsOf in frontend/src/lib/bills.js) when it checks a bill for
+  // staleness and when it regenerates one. Change the wording in both places.
+  if (waiveRent) {
+    rent_amount = 0;
+    rentDetail = `ห้อง ${lease.unit_number} — ${RENT_PAID_NOTE}`;
   }
 
   const allRecurring = db.prepare(`

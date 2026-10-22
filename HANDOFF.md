@@ -88,7 +88,7 @@ A number below last month is a typo, a replaced meter, or a dial that wrapped. T
 
 ### บิล — `billsHTML()`, `billHTML(id)`, `printAllHTML()`
 
-Room selection by floor, by range, or all. Two switches live here rather than in settings, because both are decisions about this month's bills: the minimum charge, and charging rent by the day.
+Room selection by floor, by range, or all. Three switches live here rather than in settings, because all are decisions about this month's bills: the minimum charge, charging rent by the day, and charging no rent this month.
 
 Preview is computed live from the selection. Generating reports both sides — how many were made, and each room that was skipped with its reason.
 

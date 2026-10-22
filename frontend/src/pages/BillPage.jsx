@@ -3,7 +3,7 @@ import BillPaper from '../components/BillPaper.jsx';
 import ErrBox from '../components/ErrBox.jsx';
 import Pager from '../components/Pager.jsx';
 import { get, messageOf } from '../lib/api.js';
-import { billDiff, wasProrated } from '../lib/bills.js';
+import { billDiff, rentOptionsOf } from '../lib/bills.js';
 import { baht } from '../lib/helpers.js';
 import { useApi } from '../lib/useApi.js';
 import { useData } from '../state/DataContext.jsx';
@@ -47,8 +47,10 @@ export default function BillPage({ id }){
     setBusy(true); setError(null);
     try {
       await deleteBill(b.id);
+      // Made the way the old one was: the same day count, or rent left off.
+      const { prorate, days, waiveRent } = rentOptionsOf(b);
       const fresh = await generateBill({ lease_id: b.lease_id, period: b.period,
-        prorate: wasProrated(b) });
+        prorate, prorate_days: days, waive_rent: waiveRent });
       go({name:"bill", id:fresh.id});
     } catch (e) {
       setError(messageOf(e));

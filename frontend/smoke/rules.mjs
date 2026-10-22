@@ -232,6 +232,48 @@ section('rent by the day');
   await DEL(`/leases/${l.body.id}`);
 }
 
+section('no rent this month (paid at move-in)');
+{
+  const u = await newUnit('T41', 3000);
+  const t = await newTenant('ผู้เช่า W');
+  const l = await POST('/leases', { tenant_id:t.id, unit_id:u.id, start_date:'2026-01-01', monthly_rent:3000 });
+  await POST('/readings', { unit_id:u.id, period, water_prev:0, water_curr:8, elec_prev:0, elec_curr:8 });
+  const ft = (await GET('/fees/types')).body[0];
+  await POST('/fees/lease', { lease_id:l.body.id, fee_type_id: ft.id, amount: 500 });
+
+  const normal = (await GET(`/bills/preview/${l.body.id}/${period}`)).body;
+  const waived = await GET(`/bills/preview/${l.body.id}/${period}?waive_rent=true`);
+  ok('the preview is made', waived.status === 200, JSON.stringify(waived.body));
+  ok('rent is 0', waived.body.rent_amount === 0, String(waived.body.rent_amount));
+  ok('the rent line stays on the bill, saying why',
+     waived.body.items[0].amount === 0 && waived.body.items[0].detail.includes('ชำระล่วงหน้าแล้ว'),
+     JSON.stringify(waived.body.items[0]));
+  ok('water is charged as usual', waived.body.water_amount === normal.water_amount && normal.water_amount > 0);
+  ok('electricity is charged as usual', waived.body.elec_amount === normal.elec_amount && normal.elec_amount > 0);
+  ok('the monthly fee is charged as usual',
+     waived.body.items.find(i => i.label === ft.name)?.amount === 500);
+  ok('the total is the usual total less the rent', waived.body.total === normal.total - 3000,
+     `${waived.body.total} vs ${normal.total}`);
+  ok('without the switch, rent is charged', normal.rent_amount === 3000);
+
+  ok('a preview with both rent switches is refused',
+     (await GET(`/bills/preview/${l.body.id}/${period}?waive_rent=true&prorate=true&days=10`)).status === 400);
+  ok('so is a bill', (await POST('/bills', { lease_id:l.body.id, period, waive_rent:true, prorate:true, prorate_days:10 })).status === 400);
+  const both = await POST('/bills/batch', { period, unit_ids:[u.id], waive_rent:true, prorate:true, prorate_days:10 });
+  ok('and a batch, once for the run rather than per room', both.status === 400 && !both.body.generated,
+     JSON.stringify(both.body));
+
+  const one = await POST('/bills', { lease_id:l.body.id, period, waive_rent:true });
+  ok('a single bill honours it', one.body.rent_amount === 0, JSON.stringify(one.body).slice(0, 120));
+  await DEL(`/bills/${one.body.id}`);
+  const batch = await POST('/bills/batch', { period, unit_ids:[u.id], waive_rent:true });
+  const made = (await GET(`/bills/${batch.body.generated[0].bill_id}`)).body;
+  ok('the batch honours it', made.rent_amount === 0 && made.water_amount === normal.water_amount,
+     `${made.rent_amount} / ${made.water_amount}`);
+  await DEL(`/bills/${made.id}`);
+  await DEL(`/leases/${l.body.id}`);
+}
+
 section('a meter that reads lower than last month');
 {
   const u = await newUnit('T11');

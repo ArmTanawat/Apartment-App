@@ -22,8 +22,7 @@ import { useUi } from '../../state/UiContext.jsx';
  * with the old numbers on it — recoverable now, but still a page that has to
  * be printed twice and a tenant who has to be told why. */
 export function IssueReceiptModal({ id }){
-  const { bills, issueReceipt, settings } = useData();
-  const dev = !!Number(settings.developer_mode);
+  const { bills, issueReceipt } = useData();
   const { closeModal, go } = useUi();
   const { error, busy, run } = useSubmit();
   const b = bills.find(x => x.id === id);
@@ -61,13 +60,8 @@ export function IssueReceiptModal({ id }){
           which is the right order anyway, and the only one they have. */}
       <div className="warn">ออกเมื่อผู้เช่าจ่ายเงินแล้วเท่านั้น
         <div style={{marginTop:"6px"}}>· หนึ่งบิลออกใบเสร็จได้ใบเดียว</div>
-        {dev ? <>
-          <div>· ยกเลิกได้ ใบเสร็จไม่มีเลขที่กำกับ</div>
-          <div>· ถ้าแก้บิลแล้วออกใหม่ ใบเสร็จจะถูกยกเลิกไปด้วย</div>
-        </> : <>
-          <div>· ไม่สามารถยกเลิกได้</div>
-          <div>· ถ้าแก้บิลแล้วออกใหม่ ต้องทำก่อนออกใบเสร็จ</div>
-        </>}
+        <div>· ไม่สามารถยกเลิกได้</div>
+        <div>· ถ้าแก้บิลแล้วออกใหม่ ต้องทำก่อนออกใบเสร็จ</div>
       </div>
 
       <ErrBox>{error}</ErrBox>
@@ -106,8 +100,7 @@ export function IssueReceiptModal({ id }){
  * nothing a batch could write that would be true of all of them.
  */
 export function IssueAllReceiptsModal({ period }){
-  const { bills, issueAllReceipts, settings } = useData();
-  const dev = !!Number(settings.developer_mode);
+  const { bills, issueAllReceipts } = useData();
   const { closeModal, bumpDetail } = useUi();
   const { error, busy, run } = useSubmit();
   const [result, setResult] = useState(null);
@@ -188,8 +181,7 @@ export function IssueAllReceiptsModal({ period }){
         <div style={{marginTop:"6px"}}>· ปุ่มนี้ถือว่าทุกห้องในรายการจ่ายแล้ว ห้องที่ยังไม่จ่ายให้ออกทีละห้องแทน</div>
         <div>· ใบที่ออกไปแล้วจะถูกข้าม ไม่มีใครได้ใบเสร็จสองใบ</div>
         <div>· หมายเหตุบนใบเสร็จเว้นว่างไว้ พิมพ์เพิ่มทีหลังได้ที่ใบนั้น</div>
-        {dev ? <div>· ยกเลิกได้ทีละใบ ใบเสร็จไม่มีเลขที่กำกับ</div>
-             : <div>· ไม่สามารถยกเลิกได้</div>}
+        <div>· ไม่สามารถยกเลิกได้</div>
       </div>
 
       <ErrBox>{error}</ErrBox>
@@ -244,49 +236,3 @@ export function DeleteBillModal({ id }){
   );
 }
 
-/* Cancelling a receipt.
- *
- * Reached from the receipt itself. It asks, but not because anything is spent
- * — a receipt carries no number, so cancelling costs nothing and issuing again
- * is the same act as the first time. It asks because the tenant may be holding
- * the printed page, and because the note typed on it goes too. */
-export function CancelReceiptModal({ id }){
-  const { bills, cancelReceipt } = useData();
-  const { closeModal, go } = useUi();
-  const { error, busy, run } = useSubmit();
-  const b = bills.find(x => x.id === id);
-  const full = useApi(() => get(`/bills/${id}`), [id]);
-
-  if(full.loading) return <Modal><p className="lead">กำลังโหลด…</p></Modal>;
-  const receipt = full.data && full.data.receipt;
-  if(!receipt) return (
-    <Modal>
-      <h3>ยกเลิกใบเสร็จ</h3>
-      <p className="lead">บิลใบนี้ยังไม่ได้ออกใบเสร็จ</p>
-      <div className="actions"><button className="btn ghost" onClick={closeModal}>ปิด</button></div>
-    </Modal>
-  );
-
-  return (
-    <Modal>
-      <h3>ยกเลิกใบเสร็จห้อง {b.unit_number}</h3>
-      <p className="lead">{b.tenant_name} · งวด {b.period} ·{" "}
-        <span className="num">{baht(b.total)}</span> บาท</p>
-      <div className="warn">บิลจะกลับไปเป็น "ยังไม่ได้ออก" และออกใบเสร็จใหม่ได้ทันที
-        <div style={{marginTop:"6px"}}>· บิลใบนี้ไม่ถูกลบ ตัวเลขไม่เปลี่ยน</div>
-        <div>· ถ้าพิมพ์ใบเสร็จให้ผู้เช่าไปแล้ว ใบนั้นใช้ไม่ได้อีก</div>
-        {receipt.note ? <div>· หมายเหตุ "{receipt.note}" จะหายไปด้วย</div> : null}
-      </div>
-      <ErrBox>{error}</ErrBox>
-      <div className="actions">
-        <button className="btn ghost" onClick={closeModal}>ไม่ยกเลิก</button>
-        <button className="btn danger" disabled={busy}
-          onClick={() => run(async () => {
-            await cancelReceipt(receipt.id);
-            closeModal();
-            go({name:"bill", id});
-          })}>ยกเลิกใบเสร็จ</button>
-      </div>
-    </Modal>
-  );
-}

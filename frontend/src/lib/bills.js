@@ -12,10 +12,11 @@ import { ApiError, get } from './api.js';
 // GET /bills/preview/:leaseId/:period — the same figures POST /bills would
 // write, without writing anything. A 400 here is not a failure: it is the
 // server saying this room cannot be billed yet, and the message names why.
-export function previewBill(leaseId, period, { prorate = false, days = null } = {}){
+export function previewBill(leaseId, period, { prorate = false, days = null, waiveRent = false } = {}){
   const q = [];
   if(prorate) q.push('prorate=true');
   if(days !== null && days !== undefined) q.push(`days=${days}`);
+  if(waiveRent) q.push('waive_rent=true');
   return get(`/bills/preview/${leaseId}/${period}${q.length ? '?' + q.join('&') : ''}`);
 }
 
@@ -29,11 +30,23 @@ export async function previewOrReason(leaseId, period, opts){
   }
 }
 
-// Whether a bill was made with rent charged by the day. The working is
-// recorded in the rent line, which is the only place it survives — a bill
-// stores amounts, not the options it was generated with.
-export const wasProrated = bill =>
-  !!(bill.items && bill.items[0] && (bill.items[0].detail || '').includes('จาก'));
+// How a bill's rent was worked out, read back off its rent line — the only
+// place it survives, since a bill stores amounts, not the options it was made
+// with. The wording is buildBill's in backend/routes/bills.js; change both.
+//
+//   ห้อง 101 — คิด 11 จาก 31 วัน              → by the day, 11 days
+//   ห้อง 101 — ชำระล่วงหน้าแล้ว Paid in advance  → no rent this month
+//
+// The day count matters. Re-checking a prorated bill against a preview with no
+// day count compares it with a full month: the screen then reports a change
+// that never happened, and its one button rebills the room for the whole month.
+export function rentOptionsOf(bill){
+  const detail = (bill.items && bill.items[0] && bill.items[0].detail) || '';
+  const days = detail.match(/คิด (\d+) จาก \d+ วัน/);
+  if(days) return { prorate: true, days: Number(days[1]), waiveRent: false };
+  if(detail.includes('ชำระล่วงหน้าแล้ว')) return { prorate: false, days: null, waiveRent: true };
+  return { prorate: false, days: null, waiveRent: false };
+}
 
 /* Compares a saved bill with what the same inputs would produce now.
  *
@@ -60,8 +73,7 @@ export function diffItems(oldItems, newItems){
 // A stored bill against a fresh preview of the same lease and month.
 export async function billDiff(bill){
   try {
-    const fresh = await previewBill(bill.lease_id, bill.period,
-      { prorate: wasProrated(bill), days: null });
+    const fresh = await previewBill(bill.lease_id, bill.period, rentOptionsOf(bill));
     return { changes: diffItems(bill.items, fresh.items) };
   } catch (e) {
     // The data moved so far that a bill can no longer be built at all — the

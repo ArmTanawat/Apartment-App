@@ -250,11 +250,10 @@ A key–value table. All values are stored as TEXT so one table can hold both a 
 | `electricity_min_amount` | Flat amount for that first block | 100 |
 | `water_meter_digits` | Digits on the dial, for rollover | 4 |
 | `electricity_meter_digits` | Digits on the dial, for rollover | 4 |
-| `developer_mode` | 0 or 1 — shows the receipt undo on screen | 0 |
 
 Water and electricity have entirely separate figures. They are not required to match.
 
-**`developer_mode` hides buttons, it does not change rules.** With it off — which is how the program arrives, and how it stays for ordinary use — the receipt screen has no ยกเลิกใบเสร็จ button and the issue dialog says a receipt cannot be taken back. `DELETE /receipts/:id` is untouched and still works, and correcting a bill still cancels its receipt through the cascade exactly as before.
+**There is no `developer_mode` any more.** It was a 0/1 setting that showed ยกเลิกใบเสร็จ on screen; it was removed and `openDatabase()` deletes the row from older files. `DELETE /receipts/:id` is untouched, and correcting a bill still cancels its receipt through the cascade.
 
 The wording it swaps in ("ไม่สามารถยกเลิกได้") describes what the reader can do from the screen in front of them, which is not the same claim as what the program can do. That was the intent: a receipt should read as final to whoever is handing them out, and stay correctable by whoever knows where the switch is. Anyone changing this should know they are looking at a screen setting and not a rule — the rules are in `CLAUDE.md` and none of them moved.
 
@@ -410,6 +409,8 @@ Whether the minimum applies is decided per month, so it lives in `period_setting
 **Changing how a charge is calculated never touches the schema.** Bills store computed amounts, so the minimum-charge formula and prorated rent both slot into `buildBill()` and land in the existing columns. If a change to the calculation seems to need a new column, check that assumption first — it usually means the working belongs in `bill_items.detail` instead.
 
 **One file per building, and the schema does not know buildings exist.** Every table here describes one building. A second building is a second file (`buildings/b2.db`) with the same tables, made by the same `openDatabase()` in `db.js`; the server has one open at a time. There is no `buildings` table and no `building_id` column, deliberately: adding one would mean filtering by it in every query, and a single forgotten filter would mix two buildings' rooms or bills with no error to show for it. Separate files make that impossible. The cost, accepted by the owner, is that nothing can be reported across buildings and a tenant who moves between them is two unrelated records. A building's name is its `settings.building_name`; which ids exist is simply which files are in `buildings/`. A schema change still goes in `openDatabase()` with an `addColumn` beside it — each building's file is brought up to date the next time it is opened.
+
+**No rent this month is opt-in per bill too.** The rent line is written at 0 with `ชำระล่วงหน้าแล้ว Paid in advance` as its detail; nothing else on the bill changes. Like by-the-day, the only record of it is that line — there is no column — which is why the screen reads the option back off it.
 
 **Rent by the day is opt-in per bill.** Full month is the default because it is what nearly always happens. When chosen, `monthly_rent / days_in_month * days_occupied`, with the working recorded in the bill line, for example "11 of 30 days".
 

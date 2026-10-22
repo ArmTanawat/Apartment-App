@@ -17,7 +17,7 @@ itself on the next server start.
 
 **More than one building since 2026-10-22, on branch `auntversion2`.** Each
 building is its own SQLite file and behaves as a separate copy of the program;
-the program opens on a chooser every time. Nothing in the schema or the rules
+the program opens on a chooser when there is more than one. Nothing in the schema or the rules
 changed. See [Buildings](#buildings). An existing `apartment.db` becomes the
 first building by itself on the first start.
 
@@ -288,12 +288,17 @@ a tenant who moves to the other building is a new tenant there. This was the
 owner's explicit choice, to keep the schema and every rule exactly as they were
 for one building. Do not add anything that reads two building files at once.
 
-**One open at a time, chosen on every launch.** The server starts with nothing
+**One open at a time, chosen on every launch when there is a choice.** The server starts with nothing
 open and refuses every route but `/buildings` and `/health` with
 `400 {code:'NO_BUILDING'}` (`requireBuilding` in `buildings.js`, mounted in
 front of each router in `server.js`). The screen asks first, every time, so
-readings are not typed into the building used last by habit. `เปลี่ยนตึก` under
-the building name in the rail closes it on the server and returns to the chooser.
+readings are not typed into the building used last by habit. With exactly one
+building there is nothing to ask, so launch opens it (`BuildingsPage`, on its
+first load only — `auto` from `App`). `เปลี่ยนตึก` sits to the left of ✎ on
+ห้องพัก and shows only while ✎ is on, because it is rarely wanted. Pressing it
+closes the building on the server and shows the chooser, which then stays up
+even with one building — that is the way to add a second. Deleting down to one
+building on the chooser does not jump into the survivor either.
 
 **How the routes stayed untouched.** They `require('../db.js')` and get `db`, a
 Proxy that forwards to whichever database is open. That works only because
@@ -398,6 +403,32 @@ all refuse it now, with the wording the prototype used
 EXISTS` does nothing to a table that already exists, so added columns need a
 guarded `ALTER TABLE`. It is a no-op on a fresh database and on every start
 after the first. Any future column needs it.
+
+### ไม่คิดค่าเช่าห้อง — no rent this month
+
+Added 2026-10-22: a third switch on บิล beside the minimum and by-the-day,
+for a tenant who paid this month's rent at move-in. It sets the rent line to 0
+and nothing else — water, electricity and every fee are charged as usual. A
+share fee on `rent` comes to 0 with it, and one on `subtotal` is smaller,
+because both are shares of figures on this bill. The rent line stays on the
+bill at 0 with `ชำระล่วงหน้าแล้ว Paid in advance`, so the tenant sees rent was
+not forgotten.
+
+`waive_rent` on `POST /bills`, `POST /bills/batch` and `?waive_rent=true` on the
+preview. It excludes by-the-day: the server refuses both (400, and once for a
+whole batch rather than per room), and the screen turns one off when the other
+goes on. It applies to every ticked room, so a warning says how many. Unlike
+the other bill switches it is not sticky — it goes off after a run, so it
+cannot ride along into next month's whole-building run.
+
+**And the prorate bug it uncovered.** A bill stores amounts, not options, so
+the screen reads them back off the rent line (`rentOptionsOf()` in
+`lib/bills.js`). It used to read only *that* a bill was prorated, not the day
+count, and re-checked it against a full month: every prorated bill showed the
+"ข้อมูลเปลี่ยนไปหลังออกบิลนี้" banner with `ค่าเช่า 1,100 → 3,100` though nothing
+had changed, and its one button rebilled the whole month. It now reads the day
+count, and the no-rent marker the same way. `smoke:stale` covers both, and fails
+on the old code.
 
 ### The yearly meter report
 
@@ -670,23 +701,22 @@ something anybody reads off it. The standing line
 receipt's footer holding only its note; with no note the footer is not rendered
 at all, so an empty rule does not print under the total.
 
-**`settings.developer_mode`,** 0 or 1, off by default and off on a database
-that predates it. Off, the receipt page has no ยกเลิกใบเสร็จ button and no
-paragraph explaining that a receipt can be taken back, and the issue dialog
-reads `· ไม่สามารถยกเลิกได้ / · ถ้าแก้บิลแล้วออกใหม่ ต้องทำก่อนออกใบเสร็จ`.
-On, all three come back. The switch is its own card on ตั้งค่า.
+**โหมดผู้ดูแล was removed on 2026-10-22,** at the owner's request: correcting
+a bill never needed it. It was `settings.developer_mode`, a switch on ตั้งค่า that
+showed ยกเลิกใบเสร็จ on the receipt page. The program now behaves as it did with
+it off, permanently: no ยกเลิกใบเสร็จ anywhere, and the issue dialogs say
+`· ไม่สามารถยกเลิกได้ / · ถ้าแก้บิลแล้วออกใหม่ ต้องทำก่อนออกใบเสร็จ`.
+`CancelReceiptModal` and the `cancelReceipt` action are gone; `openDatabase()`
+deletes the old setting row, because `PUT /settings` now refuses the key.
 
-**It hides buttons and nothing else.** `DELETE /receipts/:id` is unchanged and
-still works, and a corrected bill still takes its receipt with it through the
-cascade. The intent is that a receipt reads as final to whoever is issuing them
-while staying correctable by whoever knows where the switch is — so the off
-wording describes the screen, not the program. Worth knowing before treating
-`ไม่สามารถยกเลิกได้` as a rule: it is not one, and `CLAUDE.md` still says a
-receipt can be cancelled, which is still true.
+**What still takes a receipt back.** `DELETE /receipts/:id` is unchanged, and a
+corrected bill still takes its receipt with it through the cascade — the stale
+banner and ลบบิล both say so. So a receipt issued by mistake for the right
+figures is undone on screen by deleting the bill and issuing it again. The
+wording `ไม่สามารถยกเลิกได้` describes the screen, not the program.
 
-`smoke:receipts` drives both states, and turns the mode on by clicking the
-switch on ตั้งค่า rather than by writing the setting through the API, so the
-card itself is covered.
+`smoke:receipts` checks there is no card, no setting and no button, and still
+exercises the route directly.
 
 **ออกใบเสร็จทุกห้อง — a month of receipts in one press.** Added 2026-09-26,
 beside พิมพ์ทั้งหมด in the ใบเสร็จเดือนนี้ card, and gone once there is nothing
@@ -726,9 +756,6 @@ would still read ยังไม่ได้ออก on receipts that exist.
 nothing and that no bill ends up with two receipts; `smoke:rules` covers the
 three things the route refuses.
 
-**ยกเลิกใบเสร็จ is a grey button** (`btn quiet`), not a red one. Cancelling
-spends nothing and destroys nothing — the bill and its figures are untouched —
-so the red it had was overstating it.
 
 ### On the printed page
 

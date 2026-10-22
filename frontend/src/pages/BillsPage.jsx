@@ -15,7 +15,7 @@ import { useUi } from '../state/UiContext.jsx';
  * about this month's bills: the minimum charge, and charging rent by the day. */
 export default function BillsPage(){
   const { units, bills, h, generateBills, setApplyMinimum } = useData();
-  const { period, go, openModal, picked, setPicked, prorateOn, setProrateOn,
+  const { period, go, openModal, picked, setPicked, prorateOn, setProrateOn, waiveRent, setWaiveRent,
           prorateDays, setProrateDays, lastResult, setLastResult,
           billsOpen, setBillsOpen, receiptsOpen, setReceiptsOpen,
           detailRevision } = useUi();
@@ -121,7 +121,7 @@ export default function BillsPage(){
         jobs.push(Promise.resolve({ unit, tenant, skip: "ออกบิลเดือนนี้ไปแล้ว" }));
         return;
       }
-      jobs.push(previewOrReason(l.id, period, { prorate: prorateOn, days: prorateDays })
+      jobs.push(previewOrReason(l.id, period, { prorate: prorateOn, days: prorateDays, waiveRent })
         .then(r => r.built
           ? { unit: r.built.unit_number, tenant: r.built.tenant_name, built: r.built, lease_id: l.id }
           : { unit, tenant, skip: r.skip }));
@@ -132,7 +132,7 @@ export default function BillsPage(){
       .finally(() => { if(alive) setPreviewing(false); });
     return () => { alive = false; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pickedKey, period, prorateOn, prorateDays, bills]);
+  }, [pickedKey, period, prorateOn, prorateDays, waiveRent, bills]);
 
   const ready = previews.filter(p => p.built);
   const readyTotal = ready.reduce((s, p) => s + p.built.total, 0);
@@ -147,13 +147,14 @@ export default function BillsPage(){
     setPageError(null);
     try {
       const r = await generateBills({ period, unit_ids: [...picked],
-        prorate: prorateOn, prorate_days: prorateOn ? prorateDays : null });
+        prorate: prorateOn, prorate_days: prorateOn ? prorateDays : null, waive_rent: waiveRent });
       setLastResult({
         made: r.generated_count,
         total: r.generated.reduce((s, g) => s + g.total, 0),
         skipped: r.skipped.map(x => ({ unit: x.unit_number, reason: x.reason })),
       });
       setPicked(new Set());
+      setWaiveRent(false);
     } catch (e) {
       setPageError(messageOf(e));
     } finally {
@@ -210,9 +211,17 @@ export default function BillsPage(){
               catch(e){ setPageError(messageOf(e)); }
             }}>
             คิดขั้นต่ำค่าน้ำค่าไฟ</Switch>
+          {/* The two rent switches exclude each other — by the day of a rent
+              that is not being charged means nothing — so turning one on turns
+              the other off. The server refuses both together as well. */}
           <Switch on={prorateOn}
-            onClick={() => { setProrateOn(!prorateOn); if(prorateOn){ setProrateDays(null); setDaysText(null); } setLastResult(null); }}>
+            onClick={() => { setProrateOn(!prorateOn); if(prorateOn){ setProrateDays(null); setDaysText(null); }
+              else setWaiveRent(false); setLastResult(null); }}>
             คิดค่าเช่าตามวันที่อยู่จริง</Switch>
+          <Switch on={waiveRent}
+            onClick={() => { if(!waiveRent){ setProrateOn(false); setProrateDays(null); setDaysText(null); }
+              setWaiveRent(!waiveRent); setLastResult(null); }}>
+            ไม่คิดค่าเช่าห้อง</Switch>
           {prorateOn && (
             <span style={{display:"flex",alignItems:"center",gap:"8px",fontSize:"14px"}}>
               <input className="num" value={daysText ?? String(prorateDays ?? totalDays)}
@@ -224,7 +233,15 @@ export default function BillsPage(){
           )}
         </div>
         <p className="lead" style={{margin:"8px 0 0"}}>สวิตช์ขั้นต่ำเป็นของทั้งตึกสำหรับเดือนนี้
-          ส่วนคิดรายวันใช้กับรอบที่กำลังจะออกนี้เท่านั้น</p>
+          ส่วนคิดรายวันและไม่คิดค่าเช่าใช้กับรอบที่กำลังจะออกนี้เท่านั้น</p>
+        {/* It applies to every room ticked, so it says how many. Meant for a
+            tenant who paid this month's rent at move-in; water, electricity
+            and fees are still charged. */}
+        {waiveRent && (
+          <div className="warn" style={{margin:"12px 0 0"}}>ไม่คิดค่าเช่ากับทุกห้องที่เลือก{" "}
+            <b className="num">{picked.size}</b> ห้อง ค่าน้ำ ค่าไฟ และค่าธรรมเนียมยังคิดตามปกติ
+            ใช้กับห้องที่ผู้เช่าจ่ายค่าเช่าเดือนนี้ไปแล้วตอนย้ายเข้า</div>
+        )}
 
         {/* The same thing บันทึกมิเตอร์ says when a month is already billed.
             PUT /settings/period/:period reports the count too — a bill stores

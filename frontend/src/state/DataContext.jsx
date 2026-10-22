@@ -206,13 +206,14 @@ export function DataProvider({ children }){
       // bill — so nothing is passed but the bill. Issuing twice for one bill
       // hands back the one that exists rather than making a second.
       //
-      // Cancelling is an ordinary delete, because a receipt spends nothing.
+      // There is no cancel action. DELETE /receipts/:id still exists, but the
+      // screens reach it only through the bill: correcting a bill takes its
+      // receipt with it (ON DELETE CASCADE).
       issueReceipt: (bill_id, note) => post('/receipts', { bill_id, note }),
       // Nothing in `bills` changes, so there is no collection to refetch here.
       // The receipts list is the screen's own, and the screen refreshes it.
       issueAllReceipts: period => post('/receipts/batch', { period }),
       updateReceiptNote: (id, note) => put(`/receipts/${id}`, { note }),
-      cancelReceipt: id => del(`/receipts/${id}`),
 
       // ---- settings ----
       patchSettings: async patch => { await put('/settings', patch); await after(['settings']); },

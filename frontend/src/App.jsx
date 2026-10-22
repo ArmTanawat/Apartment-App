@@ -35,7 +35,7 @@ const PAGE_SUBJECT = {
   tenant: ['tenants', 'ผู้เช่ารายนี้ไม่มีอยู่แล้ว', 'tenants', '← ผู้เช่า'],
 };
 
-function Shell({ onSwitch }){
+function Shell(){
   const { units, tenants, settings, down, reload } = useData();
   const { view, go } = useUi();
 
@@ -68,8 +68,7 @@ function Shell({ onSwitch }){
     <div className="app">
       <aside className="rail">
         <div className="brand"><span>{settings.building_name.trim() || "—"}</span>
-          <small><span className="num">{units.length}</span> ห้อง</small>
-          <button className="switch" onClick={onSwitch}>เปลี่ยนตึก</button></div>
+          <small><span className="num">{units.length}</span> ห้อง</small></div>
         <nav className="nav">
           {NAV.map(n => (
             <a key={n.k} href="#" className={n.k === active ? "on" : ""}
@@ -116,6 +115,10 @@ function Gone({ subject, onBack }){
 export default function App(){
   const [building, setBuilding] = useState(null);
   const [notice, setNotice] = useState(null);
+  // At launch, a lone building is opened without asking — there is nothing to
+  // choose. Once the user has pressed เปลี่ยนตึก the chooser stays up even
+  // then, because that press is how a second building gets added.
+  const [auto, setAuto] = useState(true);
 
   // The server lost its open building under us — restarted, most likely.
   useEffect(() => {
@@ -133,15 +136,16 @@ export default function App(){
   // building just left. It shows even if this fails, and says the server is gone.
   const switchBuilding = async () => {
     try { await post('/buildings/close'); } catch { /* see above */ }
+    setAuto(false);
     setBuilding(null);
   };
 
-  if(!building) return <BuildingsPage notice={notice} onOpen={choose} />;
+  if(!building) return <BuildingsPage notice={notice} auto={auto} onOpen={choose} />;
 
   return (
-    <UiProvider key={building.id}>
+    <UiProvider key={building.id} switchBuilding={switchBuilding}>
       <DataProvider>
-        <Shell onSwitch={switchBuilding} />
+        <Shell />
       </DataProvider>
     </UiProvider>
   );

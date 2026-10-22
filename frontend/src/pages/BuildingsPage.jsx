@@ -1,10 +1,11 @@
-/* เลือกตึก — the first screen, every time the program opens.
+/* เลือกตึก — the first screen whenever there is more than one building.
  *
  * Each building is a separate set of data: its own rooms, tenants, bills and
  * settings, sharing nothing with the others. Choosing one here is what makes
  * every other screen read and write that building, which is why it is asked
  * at every launch rather than remembered — readings typed into the wrong
- * building look perfectly normal until the bills come out wrong.
+ * building look perfectly normal until the bills come out wrong. With only
+ * one building there is no wrong one, so the question is skipped.
  *
  * One card per building, side by side; pressing anywhere on a card opens it.
  * Its colour and icon are there so the right card is found without reading,
@@ -13,9 +14,11 @@
  *
  * It sits outside DataProvider: there is no building's data to load yet. When
  * the server says one is already open (a page reload, or the desktop shell
- * bringing a crashed server back), it goes straight through.
+ * bringing a crashed server back), it goes straight through — and at launch,
+ * when there is only one building, it opens that one without being seen.
+ * เปลี่ยนตึก, beside ✎ on the board while editing, brings it back.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import ErrBox from '../components/ErrBox.jsx';
 import { del, get, messageOf, post, put } from '../lib/api.js';
 import { useSubmit } from '../lib/useSubmit.js';
@@ -57,9 +60,13 @@ const PENCIL = <><path d="M4 20h4L19 9l-4-4L4 16z" /><path d="M14 6l4 4" /></>;
 const TRASH  = <path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13" />;
 const PLUS   = <path d="M12 5v14M5 12h14" />;
 
-export default function BuildingsPage({ notice, onOpen }){
+export default function BuildingsPage({ notice, auto, onOpen }){
   const [list, setList] = useState(null);
   const [failed, setFailed] = useState(null);
+  // Only the first look. Deleting down to one building, or retrying after the
+  // server was gone, reloads the list too, and neither should jump into a
+  // building nobody pressed.
+  const autoOpen = useRef(auto);
 
   const load = async () => {
     try {
@@ -67,6 +74,14 @@ export default function BuildingsPage({ notice, onOpen }){
       if(r.current){
         const open = r.buildings.find(b => b.id === r.current);
         if(open){ onOpen(open); return; }
+      }
+      // Only one building: open it rather than ask. App turns this off once
+      // the user has asked for the chooser with เปลี่ยนตึก.
+      const first = autoOpen.current;
+      autoOpen.current = false;
+      if(first && r.buildings.length === 1 && !r.buildings[0].unreadable){
+        onOpen(await post(`/buildings/${r.buildings[0].id}/open`));
+        return;
       }
       setList(r.buildings);
       setFailed(null);

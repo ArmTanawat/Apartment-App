@@ -128,6 +128,8 @@ Rates in force are read at bill generation and the resulting baht amount is froz
 | 6.9 | Choose rooms by range, by tick list, or select all | Done |
 | 6.10 | Charge rent by the day instead of the full month, when chosen | Done |
 | 6.15 | Rent by the day applies to a batch as well as to a single bill | Done |
+| 6.16 | Charge no rent this month, keeping water, electricity and fees, for a tenant who paid at move-in | Done |
+| 6.17 | A bill made by the day or without rent is not reported as changed for that reason alone, and regenerating it keeps the same rent | Done |
 | 6.12 | Detect a bill whose underlying data changed after it was issued | Done |
 | 6.13 | Correct a bill in one action — delete and regenerate | Done |
 | 6.14 | Print every bill for a month in one pass | Done |
@@ -240,7 +242,7 @@ The backups sit on the same machine as the database, so the folder should also b
 | # | Requirement | Status |
 |---|---|---|
 | 9.1 | Keep each building's data completely separate, as if each had its own copy of the program | Done |
-| 9.2 | Choose the building every time the program opens | Done |
+| 9.2 | Choose the building every time the program opens, unless there is only one | Done |
 | 9.3 | Add a building by name; it starts empty, on the default settings | Done |
 | 9.4 | Refuse a building name already in use | Done |
 | 9.5 | Switch to another building without closing the program | Done |

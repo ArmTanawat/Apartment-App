@@ -97,9 +97,9 @@ Work with nothing open. Everything below them is for the open building only.
 ### Bills
 - `GET /bills?period=2026-08` — bills for a month, or all
 - `GET /bills/:id` — one bill with its printable line items, and its receipt when one has been issued
-- `GET /bills/preview/:leaseId/:period` — calculate without saving (`?prorate=true&days=11`)
+- `GET /bills/preview/:leaseId/:period` — calculate without saving (`?prorate=true&days=11`, or `?waive_rent=true` for rent 0 with everything else as usual; not both)
 - `GET /bills/example/:kind/:units` — what N units of water or electricity cost at today's rates, for the worked example on the settings screen
-- `POST /bills` — generate and save
+- `POST /bills` — generate and save (`prorate`, `prorate_days`, `waive_rent` as for the preview)
 - `POST /bills/batch` — generate for several rooms at once, reporting each room it skipped and why
 - `DELETE /bills/:id` — the receipt for it, if any, goes too
 

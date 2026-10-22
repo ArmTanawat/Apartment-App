@@ -55,7 +55,7 @@ check('and the rate working is not printed beside them',
 check('the total is spelled out in Thai',
   /\(.*บาท(ถ้วน|.*สตางค์)\)/.test(body()), text('.pitems tr.total'));
 
-section('with โหมดผู้ดูแล off, which is how the program arrives');
+section('the issue dialog says a receipt is final');
 await click(byText('.btn', 'ออกใบเสร็จ'));
 check('the dialog says the receipt cannot be taken back',
   $('.modal').textContent.includes('ไม่สามารถยกเลิกได้'), $('.modal').textContent.slice(0,180));
@@ -65,22 +65,12 @@ check('it does not offer an undo it is hiding',
   !$('.modal').textContent.includes('ยกเลิกได้ ใบเสร็จไม่มีเลขที่กำกับ'));
 await click(byText('.modal .btn', 'ยกเลิก'), 300);
 
-section('turning โหมดผู้ดูแล on, through the switch rather than the API');
+section('there is no โหมดผู้ดูแล to turn the undo back on');
 await nav('ตั้งค่า');
-{
-  const card = $$('.setcard').find(c => c.querySelector('h2').textContent.trim() === 'โหมดผู้ดูแล');
-  check('the card is on ตั้งค่า', !!card, $$('.setcard h2').map(h=>h.textContent.trim()).join(' | '));
-  // The switch carries no words of its own, so its state is the class the
-  // shared Switch sets — the same one every other toggle in the app uses.
-  check('it names what it governs', $('label', card).textContent.trim() === 'ใบเสร็จ',
-    $('label', card).textContent);
-  check('and it starts off', !$('.switch', card).className.includes('on'),
-    $('.switch', card).className);
-  await click($('.switch', card), 600);
-  const again = $$('.setcard').find(c => c.querySelector('h2').textContent.trim() === 'โหมดผู้ดูแล');
-  check('the switch turns on', $('.switch', again).className.includes('on'),
-    $('.switch', again).className);
-}
+check('no such card on ตั้งค่า',
+  !$$('.setcard h2').some(h => h.textContent.trim() === 'โหมดผู้ดูแล'),
+  $$('.setcard h2').map(h=>h.textContent.trim()).join(' | '));
+check('and no such setting on the server', !('developer_mode' in await api('GET', '/settings')));
 await nav('บิล');
 {
   const card = $$('.setcard').find(c => c.querySelector('h2').textContent.trim() === 'บิลเดือนนี้');
@@ -91,10 +81,10 @@ section('it asks first, though nothing here is one-way');
 await click(byText('.btn', 'ออกใบเสร็จ'));
 check('a dialog stops first', !!$('.modal') && $('.modal h3').textContent === 'ออกใบเสร็จ',
   $('.modal') && $('.modal h3').textContent);
-check('it says the receipt can be cancelled',
-  $('.modal').textContent.includes('ยกเลิกได้'), $('.modal').textContent.slice(0,140));
-check('and that correcting the bill takes it with it',
-  $('.modal').textContent.includes('ใบเสร็จจะถูกยกเลิกไปด้วย'));
+check('it says the receipt cannot be taken back',
+  $('.modal').textContent.includes('ไม่สามารถยกเลิกได้'), $('.modal').textContent.slice(0,140));
+check('and that the bill is fixed first',
+  $('.modal').textContent.includes('ต้องทำก่อนออกใบเสร็จ'));
 check('and it no longer claims a number is spent',
   !$('.modal').textContent.includes('ใช้ซ้ำ'), $('.modal').textContent.slice(0,140));
 check('and when to press it', $('.modal').textContent.includes('เมื่อผู้เช่าจ่ายเงินแล้ว'));
@@ -154,28 +144,24 @@ check('and the delete button is there', !!byText('.modal .btn', 'ลบบิล
 await click(byText('.modal .btn', 'ยกเลิก'), 300);
 check('backing out deletes nothing', !$('.modal') && !!byText('.btn', 'พิมพ์ใบเสร็จ'));
 
-section('a receipt can be taken back, which is the whole of the change');
+section('the receipt page offers no undo, but the route still takes one back');
 const firstReceipt = (await api('GET', `/receipts?period=${period}`))[0];
 await click(byText('.btn', 'พิมพ์ใบเสร็จ'), 500);
-check('the receipt page offers to cancel', !!byText('.btn', 'ยกเลิกใบเสร็จ'), body().slice(0,120));
-check('and no longer claims it cannot be', !body().includes('ยกเลิกไม่ได้'));
-await click(byText('.btn', 'ยกเลิกใบเสร็จ'), 400);
-check('it asks first', !!$('.modal') && $('.modal h3').textContent.includes('ยกเลิกใบเสร็จ'),
-  $('.modal') && $('.modal h3').textContent);
-check('saying the bill itself is untouched',
-  $('.modal').textContent.includes('บิลใบนี้ไม่ถูกลบ'), $('.modal').textContent.slice(0,160));
-await click(byText('.modal .btn', 'ไม่ยกเลิก'), 300);
-check('backing out cancels nothing', !$('.modal'));
-await click(byText('.btn', 'ยกเลิกใบเสร็จ'), 400);
-await click(byText('.modal .btn', 'ยกเลิกใบเสร็จ'), 700);
-check('it lands back on the bill, which still exists', !!$('.paper') && body().includes('ใบแจ้งหนี้'),
-  body().slice(0,120));
-check('and offers to issue again, not to print', !!byText('.btn', 'ออกใบเสร็จ') && !byText('.btn', 'พิมพ์ใบเสร็จ'));
+check('the receipt page has no ยกเลิกใบเสร็จ', !byText('.btn', 'ยกเลิกใบเสร็จ'), body().slice(0,120));
+check('nor the paragraph saying it could be cancelled', !body().includes('แล้วออกใหม่ได้ทันที'));
+// DELETE /receipts/:id is unchanged (CLAUDE.md: cancelling is an ordinary
+// delete). Nothing on screen calls it now, so it is called here.
+await api('DELETE', `/receipts/${firstReceipt.id}`);
 {
   const gone = await api('GET', `/receipts?period=${period}`);
-  check('the row is gone from the server too',
+  check('the route still removes it',
     !gone.some(r => r.bill_id === firstReceipt.bill_id), `${gone.length} left`);
 }
+await nav('บิล');
+await click($$('tbody tr', $$('.setcard').find(c => c.querySelector('h2').textContent.trim() === 'บิลเดือนนี้'))
+  .find(r => r.textContent.includes(firstReceipt.unit_number)), 600);
+check('and the bill offers to issue again, not to print',
+  !!byText('.btn', 'ออกใบเสร็จ') && !byText('.btn', 'พิมพ์ใบเสร็จ'));
 await click(byText('.btn', 'ออกใบเสร็จ'));
 await click(byText('.modal .btn', 'ออกใบเสร็จ'), 700);
 check('issuing again works, with nothing spent in between',

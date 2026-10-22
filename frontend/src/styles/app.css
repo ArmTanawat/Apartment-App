@@ -603,6 +603,3 @@ h1{font-size:32px; font-weight:700; margin:0; line-height:1.4}
   font:inherit; font-size:14px; cursor:pointer}
 .baddcard:hover{border-color:var(--muted); color:var(--ink)}
 .bcard.badd{min-height:0}
-.brand .switch{display:block; margin-top:8px; padding:0; border:0; background:none;
-  font:inherit; font-size:13px; font-weight:400; color:var(--muted); cursor:pointer; text-decoration:underline}
-.brand .switch:hover{color:var(--ink)}

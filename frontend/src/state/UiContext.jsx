@@ -11,7 +11,10 @@ import { shiftPeriod, thisMonth } from '../lib/helpers.js';
 
 const UiContext = createContext(null);
 
-export function UiProvider({ children }){
+// switchBuilding comes from App, which owns which building is open. It is
+// passed through here only so the board can offer it without App threading a
+// prop through the page router.
+export function UiProvider({ children, switchBuilding = null }){
   const [view, setView] = useState({ name: 'board' });
   // The working month survives a reload. It is clamped on the way back in,
   // because a stored month can be in the past but must never be in the future
@@ -38,6 +41,10 @@ export function UiProvider({ children }){
   const [picked, setPicked] = useState(() => new Set());
   const [prorateOn, setProrateOn] = useState(false);
   const [prorateDays, setProrateDays] = useState(null);
+  // ไม่คิดค่าเช่าห้อง. Not sticky the way the others are: it is switched off
+  // again once a run of bills goes out, so it cannot be left on by accident
+  // and carried into next month's whole-building run.
+  const [waiveRent, setWaiveRent] = useState(false);
   const [lastResult, setLastResult] = useState(null);
   // The two long lists on บิล, open or folded away. A building of forty rooms
   // puts eighty rows between the generate card and the bottom of the page, and
@@ -96,7 +103,7 @@ export function UiProvider({ children }){
     editMode, setEditMode, filter, setFilter,
     meterFilter, setMeterFilter, showVacant, setShowVacant,
     tenantSearch, setTenantSearch, tenantFilter, setTenantFilter,
-    picked, setPicked, prorateOn, setProrateOn, prorateDays, setProrateDays,
+    picked, setPicked, prorateOn, setProrateOn, prorateDays, setProrateDays, waiveRent, setWaiveRent,
     lastResult, setLastResult,
     billsOpen, setBillsOpen, receiptsOpen, setReceiptsOpen,
     exampleUnits, setExampleUnits,
@@ -105,9 +112,10 @@ export function UiProvider({ children }){
     meterRevision, bumpMeter,
     detailRevision, bumpDetail,
     modal, openModal: setModal, closeModal: () => setModal(null),
-  }), [view, go, period, setPeriod, shiftMonth, monthOpen, editMode, filter,
+    switchBuilding,
+  }), [switchBuilding, view, go, period, setPeriod, shiftMonth, monthOpen, editMode, filter,
        meterFilter, showVacant, tenantSearch, tenantFilter, picked, prorateOn,
-       prorateDays, lastResult, billsOpen, receiptsOpen, exampleUnits, reportKind, reportYear, yearOpen, meterRevision, bumpMeter, detailRevision, bumpDetail, modal]);
+       prorateDays, waiveRent, lastResult, billsOpen, receiptsOpen, exampleUnits, reportKind, reportYear, yearOpen, meterRevision, bumpMeter, detailRevision, bumpDetail, modal]);
 
   return <UiContext.Provider value={value}>{children}</UiContext.Provider>;
 }

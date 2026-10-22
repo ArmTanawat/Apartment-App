@@ -35,7 +35,7 @@ const { act } = await import('react');
 const { default: App } = await import('../src/App.jsx');
 
 const container = document.getElementById('root');
-const root = createRoot(container);
+let root = createRoot(container);
 
 // Everything on screen now arrives over the network, so a step is not finished
 // when the click returns. settle() lets the pending requests and the re-renders
@@ -50,8 +50,21 @@ await settle(200);
 // The app asks which building is open before it loads anything, so the first
 // screen is two round trips away rather than one. Wait for it — the building's
 // rail, or the chooser — instead of guessing how long that takes.
-for(let i = 0; i < 40 && !document.querySelector('.rail .nav, .chooser .blist, .chooser .err'); i++){
-  await settle(50);
+const firstScreen = async () => {
+  for(let i = 0; i < 40 && !document.querySelector('.rail .nav, .chooser .bgrid, .chooser .err'); i++){
+    await settle(50);
+  }
+};
+await firstScreen();
+
+// The program closed and opened again: everything the app held is dropped and
+// it starts from what the server says, as at launch.
+export async function remount(){
+  await act(async () => { root.unmount(); });
+  root = createRoot(container);
+  await act(async () => { root.render(<App />); });
+  await settle(200);
+  await firstScreen();
 }
 
 export const $  = (sel, ctx = document) => ctx.querySelector(sel);

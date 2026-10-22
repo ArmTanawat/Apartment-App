@@ -10,7 +10,7 @@
  */
 import { API } from './api-base.mjs';
 import './seed.mjs';
-import { $, $$, byText, check, click, done, nav, section, text, type } from './harness.jsx';
+import { $, $$, byText, check, click, done, nav, remount, section, text, type } from './harness.jsx';
 
 const api = async (m, p, b) => {
   const r = await fetch(API + p,
@@ -69,5 +69,54 @@ check('still the real reason, not a "gone" card',
   $('.modal .err') && $('.modal .err').textContent.includes('มีบิลอยู่'),
   $('.modal h3').textContent);
 await click(byText('.modal .btn', 'ปิด'));
+
+// A bill stores amounts, not the options it was made with; the screen reads
+// them back off the rent line. A prorated bill used to be re-checked against a
+// full month — reported as changed when nothing had, and rebilled for the
+// whole month by the banner's one button.
+{
+  const p2 = n => String(n).padStart(2, '0');
+  const d = new Date();
+  const cur = `${d.getFullYear()}-${p2(d.getMonth() + 1)}`;
+  const u = await api('POST', '/units', { unit_number: 'S90', floor: 9, base_rent: 3100 });
+  const t = await api('POST', '/tenants', { full_name: 'ผู้เช่า สวิตช์ค่าเช่า' });
+  const l = await api('POST', '/leases', { tenant_id: t.id, unit_id: u.id, start_date: '2026-01-01', monthly_rent: 3100 });
+  await api('POST', '/readings', { unit_id: u.id, period: cur, water_prev: 0, water_curr: 5, elec_prev: 0, elec_curr: 5 });
+  const reading = async () => (await api('GET', `/readings?period=${cur}`)).find(r => r.unit_number === 'S90');
+  // Made and changed through the API, behind the screen, so the app is
+  // reloaded first to see them.
+  const openBill = async () => {
+    await remount();
+    await nav('บิล');
+    const bc = $$('.setcard').find(c => c.querySelector('h2').textContent.trim() === 'บิลเดือนนี้');
+    await click($$('tbody tr', bc).find(r => r.textContent.includes('S90')), 700);
+  };
+
+  for (const [what, opts, line] of [
+    ['by the day, 11 days', { prorate: true, prorate_days: 11 }, 'คิด 11 จาก'],
+    ['with no rent', { waive_rent: true }, 'ชำระล่วงหน้าแล้ว'],
+  ]) {
+    section(`a bill made ${what} is not stale for that alone`);
+    const made = await api('POST', '/bills/batch', { period: cur, unit_ids: [u.id], ...opts });
+    const first = await api('GET', `/bills/${made.generated[0].bill_id}`);
+    await openBill();
+    check('no banner on a bill nothing has touched', !$('.stale'), $('.stale') && $('.stale').textContent);
+
+    const r = await reading();
+    await api('PUT', `/readings/${r.reading_id}`, { water_curr: r.water_curr + 3 });
+    await openBill();
+    check('a real change still raises it', !!$('.stale'));
+    check('naming only the line that changed, not the rent',
+      $('.stale') && !$('.stale').textContent.includes('ค่าเช่า'), $('.stale') && $('.stale').textContent);
+    await click(byText('.stale .btn', 'ออกบิลใหม่'), 900);
+    const now = (await api('GET', `/bills?period=${cur}`)).find(b => b.unit_number === 'S90');
+    const again = await api('GET', `/bills/${now.id}`);
+    check('regenerating keeps the rent as it was made',
+      again.rent_amount === first.rent_amount && again.items[0].detail.includes(line),
+      `${first.rent_amount} → ${again.rent_amount}, ${again.items[0].detail}`);
+    check('and picks up the new reading', again.water_amount !== first.water_amount);
+    await api('DELETE', `/bills/${again.id}`);
+  }
+}
 
 done();

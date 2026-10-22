@@ -23,7 +23,7 @@ Adding a feature means one new file in `routes/` plus two lines in `server.js` �
 
 **Never prepare a statement at module level.** Routes get `db` from `db.js`, a Proxy to whichever building is open. A statement prepared when a route file loads holds on to that building and keeps writing to it after the user switches — wrong building, no error. Prepare inside the handler, as every route already does.
 
-**Nothing is open until the user chooses.** The program opens on the chooser every launch; every route but `/buildings` and `/health` answers `400 {code:'NO_BUILDING'}` until then. Do not remember the last building across launches — asking each time is what stops readings going into the wrong one. The only reopen is the desktop shell reviving a crashed server (`APARTMENT_OPEN_BUILDING`).
+**Nothing is open until the user chooses.** With two or more buildings the program opens on the chooser every launch; with exactly one it opens that one, because there is nothing to choose. Every route but `/buildings` and `/health` answers `400 {code:'NO_BUILDING'}` until a building is open. Do not remember the last building across launches — asking each time is what stops readings going into the wrong one. The other reopen is the desktop shell reviving a crashed server (`APARTMENT_OPEN_BUILDING`). `เปลี่ยนตึก` sits beside ✎ on the board and shows only while ✎ is on; after it is pressed the chooser stays up even with one building, since that is how a second one is added.
 
 **Delete moves the file, it does not erase it.** The name must be typed exactly, the open building cannot be deleted, and the file goes to `buildings-deleted/`. Ids are never reused, because a deleted building's backups stay in `backups/<id>/`.
 
@@ -45,7 +45,7 @@ Every date comparison must use this meaning. In practice that means `end_date > 
 
 **A receipt has no number, and that is what makes the rest of it work.** It is the paper form of one bill: the room, the period, every line and the total are read off the bill when the page is drawn, and the only thing stored on the receipt itself is a note. Nothing is printed on it that the program would later be contradicting, so a receipt can be cancelled and issued again, and a corrected bill produces a corrected receipt. Adding an identifier to `receipts` takes all of that back.
 
-**Cancelling a receipt is an ordinary delete.** `DELETE /receipts/:id` removes the row, the bill goes back to `ยังไม่ได้ออก`, and issuing again is the same act as the first time. The note goes too — it described that issuing, and there is no second issuing it would still be true of.
+**Cancelling a receipt is an ordinary delete.** `DELETE /receipts/:id` removes the row, the bill goes back to `ยังไม่ได้ออก`, and issuing again is the same act as the first time. The note goes too — it described that issuing, and there is no second issuing it would still be true of. No screen offers it: the owner removed โหมดผู้ดูแล, the switch that showed ยกเลิกใบเสร็จ, so a receipt reads as final. The route stays, and correcting the bill is how a receipt is taken back on screen.
 
 **A receipt goes with its bill, through `ON DELETE CASCADE`.** Correcting a bill is a delete and an insert, so the receipt for the old bill is taken with it and the user issues afresh against the new figures. Without the cascade the delete fails on the foreign key and a receipted bill becomes uncorrectable. Both screens warn before the press: the tenant may be holding the printed page, which needs replacing.
 
@@ -56,6 +56,8 @@ The screen hides this. Opening a bill quietly fetches `GET /bills/preview/:lease
 **Compare the line items, not the total.** Two mistakes can cancel out: a meter corrected down by 450 and a repair added for 450 leave the total identical while both lines are wrong. A total-only check reports "nothing changed" on a bill that is wrong twice over.
 
 A regenerated bill has a new id. If the old one was printed and handed over, say so — it needs reprinting.
+
+**A bill's rent options are read back off its rent line.** A bill stores amounts, not how they were reached, so `คิด 11 จาก 31 วัน` (by the day) and `ชำระล่วงหน้าแล้ว` (no rent this month) on the rent line are the only record. `rentOptionsOf()` in `frontend/src/lib/bills.js` parses them for the staleness check and for regenerating; `buildBill()` in `routes/bills.js` writes them. Change the wording in one and the other must follow, or every such bill reports a change that never happened and its one button rebills it differently.
 
 ## Conventions
 

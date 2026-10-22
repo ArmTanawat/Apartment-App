@@ -109,12 +109,12 @@ Respect `prefers-reduced-motion` — skip all of it.
 
 ## Screens
 
-Before any of them, เลือกตึก (`BuildingsPage.jsx`), every time the program opens. One card per building, three to a row (two, then one, on a narrow window), each with its icon, name and room count; a name too long for the card is cut to one line with … and shown whole on hover; pressing anywhere on a card opens that building. Two grey icon buttons sit in the card's corner:
+Before any of them, เลือกตึก (`BuildingsPage.jsx`), when the program opens with more than one building; with only one it goes straight into it. One card per building, three to a row (two, then one, on a narrow window), each with its icon, name and room count; a name too long for the card is cut to one line with … and shown whole on hover; pressing anywhere on a card opens that building. Two grey icon buttons sit in the card's corner:
 
 - **Pencil** unfolds a colour row (the card's border and icon colour, or none) and an icon row on the card. Each press saves at once; เสร็จ folds it. The look is there so the right building is found without reading.
 - **Trash** unfolds a box that says what goes and that the file is kept in `buildings-deleted/`; its button stays off until the building's name is typed exactly.
 
-While either is open the card does not open the building. Adding a building is rare, so it is the last card in the grid, a small dashed เพิ่มตึก that unfolds into a name box with เพิ่ม and ยกเลิก; a new building is empty and on the default rates, nothing copied from another, and เพิ่ม opens it straight away. The chooser has no rail: nothing is open to navigate. `เปลี่ยนตึก`, under the building name at the top of the rail, comes back here. The building name at the top of the rail is always the open building, which matters most when two buildings both have a room 101.
+While either is open the card does not open the building. Adding a building is rare, so it is the last card in the grid, a small dashed เพิ่มตึก that unfolds into a name box with เพิ่ม and ยกเลิก; a new building is empty and on the default rates, nothing copied from another, and เพิ่ม opens it straight away. The chooser has no rail: nothing is open to navigate. `เปลี่ยนตึก` comes back here; it sits to the left of ✎ on ห้องพัก and shows only while ✎ is on, because it is rarely wanted. After it, the chooser stays up even with one building, which is how a second one is added. The building name at the top of the rail is always the open building, which matters most when two buildings both have a room 101.
 
 Switching buildings remounts the whole app, so nothing loaded, selected or half-typed carries across. If the server answers `NO_BUILDING` in the middle of work, the app returns to the chooser and says that nothing saved was lost.
 
@@ -218,10 +218,11 @@ A reading below last month's is refused with a plain reason. Do not block typing
 
 Room selection three ways — a range (`101` ถึง `109`), individual ticks, or เลือกทั้งหมด. All three produce the same list of rooms.
 
-Two switches sit here, not in ตั้งค่า, because both are decisions about this month's bills:
+Three switches sit here, not in ตั้งค่า, because all are decisions about this month's bills:
 
 - คิดขั้นต่ำค่าน้ำค่าไฟ — on by default
 - คิดค่าเช่าตามวันที่อยู่จริง — off by default
+- ไม่คิดค่าเช่าห้อง — off by default, and off again after each run. Rent 0 for every ticked room, everything else as usual; for a tenant who paid this month's rent at move-in. A warning under it says how many rooms it applies to. It and by-the-day exclude each other.
 
 Preview before saving. The result reports both sides:
 

@@ -10,7 +10,7 @@ import { useUi } from '../state/UiContext.jsx';
  * mixing the two frames silently is how someone trusts the wrong number. */
 export default function BoardPage(){
   const { units, h, markUnit } = useData();
-  const { period, setPeriod, editMode, setEditMode, filter, setFilter, go, openModal } = useUi();
+  const { period, setPeriod, editMode, setEditMode, filter, setFilter, go, openModal, switchBuilding } = useUi();
 
   // is_occupied and leaving_on come straight from GET /units.
   const filterDefs = [
@@ -57,6 +57,12 @@ export default function BoardPage(){
     <div className="head">
       <h1>ห้องพัก</h1>
       <div className="tools">
+        {/* Rarely wanted, so it is out of sight until ✎ is on — the same
+            moment the building's rooms themselves become editable. */}
+        {editMode && switchBuilding && (
+          <button className="btn quiet" style={{padding:"6px 12px",fontSize:"13px"}}
+            onClick={switchBuilding}>เปลี่ยนตึก</button>
+        )}
         <button className={"iconbtn" + (editMode ? " on" : "")}
           title={editMode ? "เสร็จสิ้น" : "แก้ไขห้อง"}
           onClick={() => setEditMode(!editMode)}>{editMode ? "✓" : "✎"}</button>

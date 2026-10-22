@@ -325,11 +325,12 @@ function openDatabase(file) {
   seedSetting.run('water_meter_digits', 4);
   seedSetting.run('electricity_meter_digits', 4);
 
-  // Off by default, including on a database that predates it — INSERT OR IGNORE
-  // adds the row on the next start and leaves it alone afterwards. Off is the
-  // normal state: the undo is for whoever is correcting a mistake, not part of
-  // the daily round.
-  seedSetting.run('developer_mode', 0);
+  // โหมดผู้ดูแล was a 0/1 setting that showed ยกเลิกใบเสร็จ on the receipt page.
+  // It is gone, and the program behaves as it did with it off. Its row is
+  // removed rather than left behind, because PUT /settings refuses a key it
+  // does not know, and a client that reads every setting and writes them all
+  // back would otherwise be refused on any building that still had it.
+  db.prepare(`DELETE FROM settings WHERE key = 'developer_mode'`).run();
 
   // Starter fee types so the app is usable immediately. These are ordinary rows —
   // add, rename, or retire them through the UI without touching this file.

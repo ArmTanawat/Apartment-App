@@ -18,12 +18,11 @@ import { useUi } from '../state/UiContext.jsx';
  * cancelling spends nothing and issuing again is the same act as the first
  * time. It is still worth asking, because a tenant may be holding the page. */
 export default function ReceiptPage({ id }){
-  const { bills, updateReceiptNote, settings } = useData();
-  // Off is the normal state. The undo still exists and the route still works —
-  // this hides the way in, so a receipt reads as final to whoever is issuing
-  // them and stays correctable by whoever knows where the switch is.
-  const dev = !!Number(settings.developer_mode);
-  const { go, openModal } = useUi();
+  const { bills, updateReceiptNote } = useData();
+  // No ยกเลิกใบเสร็จ here: a receipt reads as final to whoever issues it.
+  // DELETE /receipts/:id still exists, and correcting the bill still takes the
+  // receipt with it — that is the way back, from the bill, not from here.
+  const { go } = useUi();
   const [note, setNote] = useState(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
@@ -83,14 +82,7 @@ export default function ReceiptPage({ id }){
         <button className="btn" onClick={() => window.print()}>พิมพ์</button>
         <button className="btn quiet" disabled={saving || shown === (b.receipt.note || "")}
           onClick={saveNote}>บันทึกหมายเหตุ</button>
-        {dev && <button className="btn quiet"
-          onClick={() => openModal({kind:"cancelReceipt", id})}>ยกเลิกใบเสร็จ</button>}
       </div>
-      {dev && (
-        <p className="sub" style={{fontSize:"13px",marginTop:"10px"}}>
-          ใบเสร็จนี้ไม่มีเลขที่กำกับ ตัวเลขบนใบมาจากบิลงวด {b.period} ห้อง {b.unit_number}
-          ถ้าแก้บิลใบนั้นแล้วออกใหม่ ใบเสร็จจะถูกยกเลิกไปด้วย แล้วออกใหม่ได้ทันที</p>
-      )}
     </div>
   </>;
 }
