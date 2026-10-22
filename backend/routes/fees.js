@@ -9,7 +9,7 @@
 // for that door every month afterwards.
 
 const express = require('express');
-const db = require('../db.js');
+const { db } = require('../db.js');
 const { FEE_BASIS, FEE_BASIS_KEYS } = require('../fee-basis.js');
 
 const router = express.Router();

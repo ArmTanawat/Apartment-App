@@ -28,13 +28,14 @@ The requirements in `REQUIREMENTS.md` are marked Done against the backend; the R
 apartment-app/
 ├── CLAUDE.md              Rules and decisions. Read first.
 ├── DATABASE_DESIGN.md     The 11 tables and why each is shaped that way
-├── REQUIREMENTS.md        69 requirements, all Done
+├── REQUIREMENTS.md        Every requirement and its status
 ├── FRONTEND.md            Design direction, screen specs, endpoint map
 ├── HANDOFF.md             This file
 ├── backend/
-│   ├── db.js              Creates every table, seeds 15 settings
-│   ├── server.js          Mounts routers, runs a backup on start
-│   ├── backup.js          Copies the database, keeps 30
+│   ├── db.js              Creates every table in a building's file, seeds 15 settings
+│   ├── buildings.js       One file per building; which one is open
+│   ├── server.js          Mounts routers behind requireBuilding
+│   ├── backup.js          Copies a building's file when opened, keeps 30
 │   ├── README.md          Every endpoint listed
 │   └── routes/
 │       ├── tenants.js     5 endpoints
@@ -44,7 +45,8 @@ apartment-app/
 │       ├── fees.js        12
 │       ├── bills.js       6
 │       ├── settings.js    4
-│       └── backups.js     2
+│       ├── backups.js     2
+│       └── buildings.js   6
 └── archive/              not in git; kept on disk only
     ├── rooms.html         The whole frontend, 2780 lines, mock data
     └── board.html         An early board-only sketch, superseded
@@ -260,7 +262,7 @@ Every one of these came from clicking around rather than reading code.
 
 Payment tracking. Bills are recorded; whether anyone paid is tracked on paper. The bank details in settings are text printed on an invoice, nothing more.
 
-Multi-building. Tenant login. Online payment.
+Anything across buildings — each building is its own file and they share nothing. Tenant login. Online payment.
 
 Adding payments later needs no restructuring: a `payments` table pointing at `bills.id`, and an outstanding balance becomes "bills with no matching payment".
 
@@ -274,6 +276,6 @@ npm install
 node server.js          # http://localhost:3001
 ```
 
-`apartment.db` is created on first start. Delete it to begin from nothing. A backup is copied into `backend/backups/` on every start, keeping the last 30.
+Nothing is open on start; the screen asks which building. Each one is `backend/buildings/b<n>.db`; delete that folder to begin from nothing. A building is copied into `backend/backups/<id>/` each time it is opened, keeping the last 30. An old `apartment.db` moves in as the first building on start.
 
 The prototype is a single file — open `archive/rooms.html` in a browser. It needs no server, and changes nothing.

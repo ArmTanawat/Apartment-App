@@ -1,4 +1,7 @@
+import { useEffect, useState } from 'react';
 import ModalHost from './components/modals/ModalHost.jsx';
+import { onNoBuilding, post } from './lib/api.js';
+import BuildingsPage from './pages/BuildingsPage.jsx';
 import BillPage from './pages/BillPage.jsx';
 import BillsPage from './pages/BillsPage.jsx';
 import BoardPage from './pages/BoardPage.jsx';
@@ -32,7 +35,7 @@ const PAGE_SUBJECT = {
   tenant: ['tenants', 'ผู้เช่ารายนี้ไม่มีอยู่แล้ว', 'tenants', '← ผู้เช่า'],
 };
 
-function Shell(){
+function Shell({ onSwitch }){
   const { units, tenants, settings, down, reload } = useData();
   const { view, go } = useUi();
 
@@ -65,7 +68,8 @@ function Shell(){
     <div className="app">
       <aside className="rail">
         <div className="brand"><span>{settings.building_name.trim() || "—"}</span>
-          <small><span className="num">{units.length}</span> ห้อง</small></div>
+          <small><span className="num">{units.length}</span> ห้อง</small>
+          <button className="switch" onClick={onSwitch}>เปลี่ยนตึก</button></div>
         <nav className="nav">
           {NAV.map(n => (
             <a key={n.k} href="#" className={n.k === active ? "on" : ""}
@@ -103,11 +107,41 @@ function Gone({ subject, onBack }){
   </>;
 }
 
+// The chooser first, then one building's app.
+//
+// Keyed by the building, so choosing another one unmounts everything —
+// loaded rooms, the open page, a half-filled dialog — and the next building
+// starts from nothing. No state can survive the switch to show one building's
+// figures under another's name.
 export default function App(){
+  const [building, setBuilding] = useState(null);
+  const [notice, setNotice] = useState(null);
+
+  // The server lost its open building under us — restarted, most likely.
+  useEffect(() => {
+    onNoBuilding(() => {
+      setBuilding(null);
+      setNotice('โปรแกรมถูกเริ่มใหม่ กรุณาเลือกตึกอีกครั้ง ข้อมูลที่บันทึกแล้วไม่หายไป');
+    });
+    return () => onNoBuilding(null);
+  }, []);
+
+  const choose = b => { setNotice(null); setBuilding(b); };
+
+  // Closed on the server first. The chooser asks the server what is open, and
+  // asking before the close lands would send it straight back into the
+  // building just left. It shows even if this fails, and says the server is gone.
+  const switchBuilding = async () => {
+    try { await post('/buildings/close'); } catch { /* see above */ }
+    setBuilding(null);
+  };
+
+  if(!building) return <BuildingsPage notice={notice} onOpen={choose} />;
+
   return (
-    <UiProvider>
+    <UiProvider key={building.id}>
       <DataProvider>
-        <Shell />
+        <Shell onSwitch={switchBuilding} />
       </DataProvider>
     </UiProvider>
   );

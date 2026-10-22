@@ -98,12 +98,23 @@ const ok = (name, cond, detail = '') => {
   ok('the app started', await serving(60000), String(lastPort()));
   const first = lastPort();
 
+  const api = (p, method = 'GET', body) => fetch(`http://127.0.0.1:${lastPort()}${p}`, {
+    method, headers: { 'Content-Type': 'application/json' },
+    body: body && JSON.stringify(body) }).then(r => r.status === 204 ? null : r.json());
+  ok('a fresh launch has no building open, so the chooser shows',
+     (await api('/buildings')).current === null);
+  const made = await api('/buildings', 'POST', { name: 'ตึกทดสอบ' });
+  await api(`/buildings/${made.id}/open`, 'POST');
+  await sleep(500); // for the main process to read the line the server prints
+
   console.log('\nthe server dies while the app is open');
   killServer();
   ok('it came back', await serving());
   ok('on the same port, so the window never had to move', lastPort() === first,
      `${first} then ${lastPort()}`);
   ok('and the window is still on the app', (await page()).url.startsWith('http://127.0.0.1:'));
+  ok('in the building it had open, not back at the chooser',
+     (await api('/buildings')).current === made.id);
 
   console.log('\na server that will not stay up');
   // Killed only once it is up again, because a death while it was already

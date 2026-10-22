@@ -20,8 +20,19 @@ if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir, { recursive: true });
 }
 
+// One file per building, named by id (b1.db, b2.db) rather than by the
+// building's name, so renaming a building in ตั้งค่า touches no file.
+//
+// apartment.db is where the single building lived before there could be
+// more than one. buildings.js moves it in as the first building and never
+// reads it again; the path is kept only so it can be found.
+//
+// A deleted building's file is moved to deletedDir, not erased. Each
+// building's copies live in backups/<id>/, and stay there after it is deleted.
 module.exports = {
   dataDir,
-  dbPath: path.join(dataDir, 'apartment.db'),
-  backupDir: path.join(dataDir, 'backups'),
+  buildingsDir: path.join(dataDir, 'buildings'),
+  deletedDir: path.join(dataDir, 'buildings-deleted'),
+  backupRoot: path.join(dataDir, 'backups'),
+  legacyDbPath: path.join(dataDir, 'apartment.db'),
 };

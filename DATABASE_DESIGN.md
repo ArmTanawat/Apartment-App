@@ -234,6 +234,8 @@ A key–value table. All values are stored as TEXT so one table can hold both a 
 | Key | Meaning | Example |
 |---|---|---|
 | `building_name` | The building's own name, shown in the app and on bills | บ้านสวนพลู |
+| `building_color` | The border colour of this building's card on เลือกตึก. Not seeded; absent reads as `none`. Ids in `building-look.js` | `blue` |
+| `building_icon` | The icon on that card. Not seeded; absent reads as `building` | `house` |
 | `building_address` | Printed as the invoice header. May be blank | 88/1 ซ.สวนพลู 4 … |
 | `building_phone` | Printed as the invoice header. May be blank | 02-123-4567 |
 | `bank_name` | Printed at the foot of the invoice. May be blank | ธนาคารกสิกรไทย |
@@ -335,7 +337,7 @@ Integer satang (3800 baht stored as `380000`) is the stricter approach and is wh
 
 **Periods stay Gregorian in the database.** `'2026-09'` sorts and compares correctly as text. Displaying a Buddhist year is a formatting function on the frontend, not a stored value.
 
-**The database is backed up on every server start.** `backup.js` copies `apartment.db` into `backups/` with a timestamp and keeps the last 30. It runs before the database is opened, so the copy is of a settled file. The whole database being one file is what makes this trivial — and without it, a corrupted file loses every bill ever generated, since no server holds a copy.
+**A building is backed up each time it is opened.** `backup.js` copies `buildings/<id>.db` into `backups/<id>/` with a timestamp and keeps the last 30 for that building. It runs before the file is opened, so the copy is of a settled file. The whole database being one file is what makes this trivial — and without it, a corrupted file loses every bill ever generated, since no server holds a copy.
 
 **`settings.value` is TEXT, and numeric settings are converted on read.** One table holds both a rate and the building's name. `routes/settings.js` keeps the list of numeric keys and does the conversion once, so nothing downstream has to remember that `9` arrived as a string — `'9' + 1` would give `'91'` and a bill would be silently wrong.
 
@@ -406,6 +408,8 @@ The same category of rule applies elsewhere: one meter reading per unit per mont
 Whether the minimum applies is decided per month, so it lives in `period_settings` keyed by period. It is one switch for the whole building — not per room, because ticking twenty rooms every month is worse than one tick. A month with no row defaults to applying the minimum.
 
 **Changing how a charge is calculated never touches the schema.** Bills store computed amounts, so the minimum-charge formula and prorated rent both slot into `buildBill()` and land in the existing columns. If a change to the calculation seems to need a new column, check that assumption first — it usually means the working belongs in `bill_items.detail` instead.
+
+**One file per building, and the schema does not know buildings exist.** Every table here describes one building. A second building is a second file (`buildings/b2.db`) with the same tables, made by the same `openDatabase()` in `db.js`; the server has one open at a time. There is no `buildings` table and no `building_id` column, deliberately: adding one would mean filtering by it in every query, and a single forgotten filter would mix two buildings' rooms or bills with no error to show for it. Separate files make that impossible. The cost, accepted by the owner, is that nothing can be reported across buildings and a tenant who moves between them is two unrelated records. A building's name is its `settings.building_name`; which ids exist is simply which files are in `buildings/`. A schema change still goes in `openDatabase()` with an `addColumn` beside it — each building's file is brought up to date the next time it is opened.
 
 **Rent by the day is opt-in per bill.** Full month is the default because it is what nearly always happens. When chosen, `monthly_rent / days_in_month * days_occupied`, with the working recorded in the bill line, for example "11 of 30 days".
 

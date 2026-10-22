@@ -8,13 +8,25 @@ npm install
 node server.js
 ```
 
-Server starts at http://localhost:3001
-The database file `apartment.db` is created automatically on first run.
+Server starts at http://localhost:3001 with **no building open**. Every
+endpoint except `/buildings` and `/health` answers
+`400 {"error": "...", "code": "NO_BUILDING"}` until one is opened:
+
+```
+curl -X POST localhost:3001/buildings -H 'Content-Type: application/json' -d '{"name":"ตึกทดสอบ"}'
+curl -X POST localhost:3001/buildings/b1/open
+```
+
+Each building is its own file, `buildings/b<n>.db`. An `apartment.db` from
+before there were buildings is moved in as `b1` on the first start.
 
 ## Files
 
-- `db.js` — creates apartment.db and all tables
-- `backup.js` — copies the database to backups/ on every start, keeps the last 30
+- `db.js` — `openDatabase(file)` creates a building's tables; `db` is the open building
+- `buildings.js` — which buildings exist and which is open; `requireBuilding`
+- `routes/buildings.js` — the chooser's endpoints
+- `building-look.js` — the colours and icons a building's card can have
+- `backup.js` — copies a building to backups/<id>/ each time it is opened, keeps the last 30
 - `routes/backups.js` — list backups and trigger one on demand
 - `server.js` — starts the server, mounts the route files
 - `routes/tenants.js` — /tenants endpoints
@@ -22,6 +34,15 @@ The database file `apartment.db` is created automatically on first run.
 - `routes/leases.js` — /leases endpoints (including the double-booking check)
 
 ## Endpoints so far
+
+### Buildings
+Work with nothing open. Everything below them is for the open building only.
+- `GET /buildings` — `{buildings: [{id, name, units, color, icon}], current}`; `current` is null on the chooser. A file that cannot be read has `unreadable: true`
+- `POST /buildings` — `{name}`; makes the file with default settings, does not open it. 400 on a blank or already-used name
+- `POST /buildings/close` — nothing open afterwards (204)
+- `POST /buildings/:id/open` — closes the current one, backs this one up, opens it. 404 if no such building
+- `PUT /buildings/:id/look` — `{color, icon}`, either or both, from the lists in `building-look.js`; returns the building as `GET /buildings` lists it. 400 for an id not on the list
+- `DELETE /buildings/:id` — `{name}` typed in full (the id, for an unreadable file). 400 if it does not match or the building is open. The file moves to `buildings-deleted/` (204)
 
 ### Tenants
 - `GET /tenants` — list all
@@ -98,8 +119,8 @@ There is deliberately no `DELETE`. See "Receipts are numbered" below.
 - `PUT /settings/period/:period` — turn the minimum on or off for a month
 
 ### Backups
-- `GET /backups` — list existing copies, newest first
-- `POST /backups` — make a copy now
+- `GET /backups` — the open building's copies, newest first
+- `POST /backups` — copy the open building now
 
 ### Other
 - `GET /health` — check the server is alive
@@ -153,11 +174,15 @@ Switched off for a month, the charge is simply units x rate.
 
 ## Backups
 
-Every server start copies `apartment.db` into `backups/` with a timestamp, keeping
-the most recent 30. To restore, stop the server, copy a backup file over
-`apartment.db`, and start again.
+Opening a building copies its file into `backups/<id>/` with a timestamp,
+keeping the most recent 30 for that building. To restore, stop the server, copy
+a backup file over `buildings/<id>.db`, and start again.
 
-The database is a single file, so a backup is a plain file copy. Copy the folder
+A deleted building is not erased: its file is in `buildings-deleted/`, named
+with its id, the date and its name. To bring it back, stop the server and copy
+it into `buildings/` as `b<n>.db` with a number not used before.
+
+Each building is a single file, so a backup is a plain file copy. Copy the folder
 to a USB drive or cloud folder occasionally — a backup on the same failed disk is
 not a backup.
 

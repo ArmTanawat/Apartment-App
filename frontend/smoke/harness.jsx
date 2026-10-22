@@ -47,6 +47,12 @@ export async function settle(ms = 60){
 
 await act(async () => { root.render(<App />); });
 await settle(200);
+// The app asks which building is open before it loads anything, so the first
+// screen is two round trips away rather than one. Wait for it — the building's
+// rail, or the chooser — instead of guessing how long that takes.
+for(let i = 0; i < 40 && !document.querySelector('.rail .nav, .chooser .blist, .chooser .err'); i++){
+  await settle(50);
+}
 
 export const $  = (sel, ctx = document) => ctx.querySelector(sel);
 export const $$ = (sel, ctx = document) => [...ctx.querySelectorAll(sel)];

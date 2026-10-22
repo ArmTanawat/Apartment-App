@@ -1,7 +1,7 @@
 // routes/readings.js — monthly water and electricity meter entry.
 
 const express = require('express');
-const db = require('../db.js');
+const { db } = require('../db.js');
 
 const router = express.Router();
 

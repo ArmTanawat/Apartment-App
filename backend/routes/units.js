@@ -1,7 +1,7 @@
 // routes/units.js — every endpoint that deals with rooms.
 
 const express = require('express');
-const db = require('../db.js');
+const { db } = require('../db.js');
 
 const router = express.Router();
 

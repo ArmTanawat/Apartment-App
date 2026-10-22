@@ -1,7 +1,8 @@
 // routes/settings.js — utility rates, minimum charges, and the monthly switch.
 
 const express = require('express');
-const db = require('../db.js');
+const { db } = require('../db.js');
+const look = require('../building-look.js');
 
 const router = express.Router();
 
@@ -36,7 +37,13 @@ const TEXT_KEYS = [
 // print onto a real invoice.
 const REQUIRED_TEXT_KEYS = ['building_name'];
 
-const ALLOWED_KEYS = [...NUMERIC_KEYS, ...TEXT_KEYS];
+// The chooser's card colour and icon. Set through PUT /buildings/:id/look, but
+// they are rows in this table, so GET /settings returns them — and a screen or
+// suite that reads everything and writes it back must not be refused for it.
+// Held to the same lists here as there.
+const LOOK_KEYS = { building_color: look.COLORS, building_icon: look.ICONS };
+
+const ALLOWED_KEYS = [...NUMERIC_KEYS, ...TEXT_KEYS, ...Object.keys(LOOK_KEYS)];
 
 // Everything is stored as text so one table can hold both a rate and a name.
 // Numeric settings are converted here, once, so nothing downstream has to
@@ -68,6 +75,12 @@ router.put('/', (req, res) => {
   for (const [key, value] of Object.entries(updates)) {
     if (!ALLOWED_KEYS.includes(key)) {
       return res.status(400).json({ error: `ไม่รู้จักการตั้งค่าชื่อ "${key}"` });
+    }
+    if (LOOK_KEYS[key]) {
+      if (!LOOK_KEYS[key].includes(value)) {
+        return res.status(400).json({ error: `${key} ต้องเป็นหนึ่งใน ${LOOK_KEYS[key].join(', ')}` });
+      }
+      continue;
     }
     if (TEXT_KEYS.includes(key)) {
       if (typeof value !== 'string') {

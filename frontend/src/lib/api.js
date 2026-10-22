@@ -26,6 +26,13 @@ export class ApiDown extends Error {
   constructor(cause){ super('ติดต่อเซิร์ฟเวอร์ไม่ได้ กรุณาลองใหม่'); this.name = 'ApiDown'; this.cause = cause; }
 }
 
+/* The server answers NO_BUILDING when no building is open — it was restarted
+ * under the window, say. Nothing on the current screen can be right after
+ * that, so App registers what to do (go back to the chooser) and every request
+ * reports it here, besides throwing as usual. */
+let noBuilding = null;
+export const onNoBuilding = fn => { noBuilding = fn; };
+
 async function request(path, options){
   let res;
   try {
@@ -46,6 +53,7 @@ async function request(path, options){
   // beats inventing wording that says less. The generic line is only for a
   // response that carried no message at all.
   if(!res.ok){
+    if(body && body.code === 'NO_BUILDING' && noBuilding) noBuilding();
     throw new ApiError((body && body.error) || `เซิร์ฟเวอร์ตอบกลับผิดพลาด (${res.status})`, res.status);
   }
   return body;
@@ -54,7 +62,8 @@ async function request(path, options){
 export const get  = path        => request(path);
 export const post = (path, body) => request(path, { method: 'POST',   body: JSON.stringify(body) });
 export const put  = (path, body) => request(path, { method: 'PUT',    body: JSON.stringify(body) });
-export const del  = path        => request(path, { method: 'DELETE' });
+export const del  = (path, body) => request(path, { method: 'DELETE',
+  body: body === undefined ? undefined : JSON.stringify(body) });
 
 // A message to show, whatever went wrong.
 export const messageOf = e =>

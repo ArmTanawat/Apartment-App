@@ -49,6 +49,15 @@ async function main() {
     process.exit(1);
   }
 
+  // Nothing is open when a server starts; the screen asks. The suites all work
+  // inside one building, so one is made and opened for them here. smoke:chooser
+  // and smoke:buildings close it, open others and come back to it.
+  const base = `http://127.0.0.1:${PORT}`;
+  const made = await (await fetch(`${base}/buildings`, { method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: 'ตึกทดสอบ' }) })).json();
+  await fetch(`${base}/buildings/${made.id}/open`, { method: 'POST' });
+
   const suites = [
     ['smoke',         'เดินตามเส้นทางการใช้งานหลัก'],
     ['smoke:share',   'ค่าธรรมเนียมที่คิดเป็นเปอร์เซ็นต์'],
@@ -57,6 +66,8 @@ async function main() {
     ['smoke:offline', 'เมื่อเซิร์ฟเวอร์ไม่ทำงาน'],
     ['smoke:rules',   'กฎการคิดเงินทุกข้อ'],
     ['smoke:receipts','ใบเสร็จและรายงาน'],
+    ['smoke:buildings','ตึกแยกข้อมูลกัน สร้าง เปิด ลบ'],
+    ['smoke:chooser', 'หน้าเลือกตึก และปุ่มเปลี่ยนตึก'],
     ['check-text',    'จำนวนเงินเป็นตัวหนังสือ และเลขมิเตอร์'],
     ['check-fonts',   'ฟอนต์อยู่ในเครื่อง ไม่ได้โหลดจากเน็ต'],
   ];

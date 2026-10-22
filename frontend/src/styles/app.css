@@ -564,3 +564,45 @@ h1{font-size:32px; font-weight:700; margin:0; line-height:1.4}
   border-radius:8px; padding:10px 12px; font-size:14px; margin-bottom:14px; line-height:1.6}
 .warn{background:var(--soft); border:1px solid var(--line); border-radius:8px;
   padding:10px 12px; font-size:13px; color:var(--muted); margin-bottom:14px; line-height:1.6}
+
+/* เลือกตึก — no rail, because no building is open yet to navigate.
+   One card per building, side by side; --accent is the card's chosen colour. */
+.chooser .main{max-width:960px; margin:0 auto}
+.bgrid{display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; align-items:start}
+@media (max-width:760px){ .bgrid{grid-template-columns:repeat(2,minmax(0,1fr))} }
+@media (max-width:480px){ .bgrid{grid-template-columns:1fr} }
+.bcard{position:relative; background:var(--surface); border:2px solid var(--accent, var(--line));
+  border-radius:10px; padding:18px 20px 16px; min-height:132px; min-width:0}
+.bcard.opens{cursor:pointer; transition:box-shadow .12s, transform .12s}
+.bcard.opens:hover{box-shadow:0 2px 10px rgba(0,0,0,.08); transform:translateY(-1px)}
+.bcard.opens:focus-visible{outline:2px solid var(--ink); outline-offset:2px}
+.bcard .bicon{color:var(--accent); margin-bottom:10px; line-height:0}
+.bcard.plain .bicon{color:var(--ink)}
+/* One line, however long the name: the cards in a row stay the same height,
+   and the full name is in the title on hover and in the delete box. */
+.bcard .bname{font-weight:700; font-size:17px; line-height:1.35;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.bcard small{color:var(--muted); font-size:13px}
+.btools{position:absolute; top:10px; right:10px; display:flex; gap:2px}
+.btool{border:0; background:none; color:var(--muted); padding:5px; border-radius:6px; cursor:pointer; line-height:0}
+.btool:hover{background:var(--soft); color:var(--ink)}
+.bpanel{margin-top:14px; border-top:1px solid var(--line); padding-top:12px; cursor:default}
+.bpanel .actions{margin-top:12px}
+.blabel{font-size:12px; color:var(--muted); margin:0 0 6px}
+.bswatches,.bicons{display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px}
+.bswatch{width:24px; height:24px; border-radius:50%; border:2px solid var(--surface);
+  background:var(--c); box-shadow:0 0 0 1px var(--line); cursor:pointer; padding:0}
+.bswatch.none{background:var(--surface); background-image:linear-gradient(135deg,transparent 45%,var(--muted) 45%,var(--muted) 55%,transparent 55%)}
+.bswatch.on{box-shadow:0 0 0 2px var(--ink)}
+.bpick{border:1px solid var(--line); background:var(--surface); color:var(--ink); border-radius:6px;
+  padding:5px; cursor:pointer; line-height:0}
+.bpick.on{border-color:var(--ink); background:var(--soft)}
+.bwarn{font-size:13px; color:var(--muted); line-height:1.6; margin:0 0 12px}
+.baddcard{display:flex; align-items:center; justify-content:center; gap:6px; min-height:132px;
+  border:2px dashed var(--line); border-radius:10px; background:none; color:var(--muted);
+  font:inherit; font-size:14px; cursor:pointer}
+.baddcard:hover{border-color:var(--muted); color:var(--ink)}
+.bcard.badd{min-height:0}
+.brand .switch{display:block; margin-top:8px; padding:0; border:0; background:none;
+  font:inherit; font-size:13px; font-weight:400; color:var(--muted); cursor:pointer; text-decoration:underline}
+.brand .switch:hover{color:var(--ink)}

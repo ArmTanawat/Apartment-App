@@ -227,13 +227,29 @@ Wording is frozen into `bill_items` when a bill is generated. Renaming a fee aft
 
 | # | Requirement | Status |
 |---|---|---|
-| 8.1 | Copy the database to a dated file on every server start | Done |
-| 8.2 | Keep the most recent 30 copies and delete older ones | Done |
-| 8.3 | Restore by copying a backup file over `apartment.db` | Done |
+| 8.1 | Copy a building's database to a dated file each time it is opened | Done |
+| 8.2 | Keep the most recent 30 copies of each building and delete older ones | Done |
+| 8.3 | Restore by copying a backup file over `buildings/<id>.db` | Done |
 | 8.4 | See the list of existing backups and when the last one was made | Done |
 | 8.5 | Make a backup on demand, before a batch of changes | Done |
 
 The backups sit on the same machine as the database, so the folder should also be copied to a USB drive or cloud folder from time to time. A backup on the same failed disk is not a backup.
+
+## Buildings
+
+| # | Requirement | Status |
+|---|---|---|
+| 9.1 | Keep each building's data completely separate, as if each had its own copy of the program | Done |
+| 9.2 | Choose the building every time the program opens | Done |
+| 9.3 | Add a building by name; it starts empty, on the default settings | Done |
+| 9.4 | Refuse a building name already in use | Done |
+| 9.5 | Switch to another building without closing the program | Done |
+| 9.6 | Delete a building only after its name is typed in full | Done |
+| 9.7 | Keep a deleted building's file rather than erasing it | Done |
+| 9.8 | Refuse to delete the building that is open | Done |
+| 9.9 | Bring the single building from before this change in as the first building, untouched | Done |
+
+Nothing is reported across buildings and nothing is shared between them — not tenants, not rates, not fee types. A tenant who moves from one building to the other is entered again in the second. This was chosen to keep each building's data and every rule above exactly as they were with one building.
 
 ## Known gaps
 
@@ -251,7 +267,7 @@ Neither blocks anything. Both are listed so they are not mistaken for dead code 
 |---|---|
 | Payment tracking | Bills are recorded; whether they were paid is tracked outside the program on paper |
 | Outstanding balance carried onto the next bill | Not shown. Depends on payment tracking |
-| Multi-building support | One building only |
+| Anything across buildings | Combined reports, shared tenants or settings. Each building is a separate file (9.1) |
 | Tenant login | Staff use only |
 | Online payment | No |
 

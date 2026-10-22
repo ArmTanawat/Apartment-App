@@ -1,4 +1,8 @@
-// backup.js — copies apartment.db to a dated file on every server start.
+// backup.js — copies a building's database to a dated file each time that
+// building is opened.
+//
+// Every function takes the building's file and its own backup folder
+// (backups/<id>/), so two buildings never share or prune each other's copies.
 //
 // The whole database is a single file, so a backup is a file copy. Without
 // this, a corrupted file or a dead laptop loses every bill ever generated,
@@ -6,16 +10,15 @@
 
 const fs = require('fs');
 const path = require('path');
-const { dbPath, backupDir } = require('./data-dir.js');
 
 const KEEP = 30;
 
-function runBackup() {
-  // Nothing to copy on the very first run, before the database exists.
+function runBackup(dbPath, backupDir) {
+  // Nothing to copy for a building whose file has not been made yet.
   if (!fs.existsSync(dbPath)) return null;
 
   if (!fs.existsSync(backupDir)) {
-    fs.mkdirSync(backupDir);
+    fs.mkdirSync(backupDir, { recursive: true });
   }
 
   // YYYY-MM-DD-HHMM sorts correctly as plain text, so the oldest file is
@@ -55,7 +58,7 @@ function runBackup() {
 
 // Lists the backup files, newest first, with their size and when they were made.
 // Reads the folder — it never opens the database.
-function listBackups() {
+function listBackups(backupDir) {
   if (!fs.existsSync(backupDir)) return [];
 
   return fs.readdirSync(backupDir)

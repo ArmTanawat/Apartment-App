@@ -64,6 +64,9 @@ let serverPort = null;
 let live = false;
 // Whether we asked it to stop. Quitting is not a crash.
 let stopping = false;
+// The building the server last said it opened (its APARTMENT_BUILDING= line),
+// handed back to a revived server so the open window stays in that building.
+let openBuilding = '';
 // When it last died on its own, so a server that will not stay up is not
 // restarted for ever.
 let deaths = [];
@@ -106,6 +109,9 @@ function startServer(wantPort = 0) {
         ELECTRON_RUN_AS_NODE: '1',
         PORT: String(wantPort),
         APARTMENT_DATA_DIR: DATA_DIR,
+        // Empty on launch, so the chooser comes up. Set only when this is a
+        // revive, so the window carries on in the building it was showing.
+        APARTMENT_OPEN_BUILDING: openBuilding,
         // Only when running from source. See the note in backend/db.js: the
         // packaged app ships one build of better-sqlite3 and it is the right
         // one, but from source backend/node_modules shadows it with a build
@@ -122,6 +128,8 @@ function startServer(wantPort = 0) {
       note(text);
       const found = text.match(/APARTMENT_SERVER_PORT=(\d+)/);
       if (found) done(resolve, Number(found[1]));
+      const opened = [...text.matchAll(/^APARTMENT_BUILDING=(\w*)\r?$/gm)].pop();
+      if (opened) openBuilding = opened[1];
     });
     server.stderr.on('data', d => note(d.toString()));
     server.on('error', e => { note(`[could not start: ${e.message}]\n`); done(reject, e); });

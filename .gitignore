@@ -2,6 +2,9 @@ node_modules/
 
 # The database and its copies are this machine's data, not the program.
 backend/apartment.db
+backend/apartment.db.moved-to-buildings
+backend/buildings/
+backend/buildings-deleted/
 backend/backups/
 
 # Build output.

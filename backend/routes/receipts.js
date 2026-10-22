@@ -18,7 +18,7 @@
 //   up holding paper the program disagrees with.
 
 const express = require('express');
-const db = require('../db.js');
+const { db } = require('../db.js');
 
 const router = express.Router();
 

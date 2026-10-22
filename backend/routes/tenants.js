@@ -1,7 +1,7 @@
 // routes/tenants.js — every endpoint that deals with tenants.
 
 const express = require('express');
-const db = require('../db.js'); // ../ means "go up one folder" to find db.js
+const { db } = require('../db.js'); // ../ means "go up one folder" to find db.js
 
 // A Router is a mini Express app. It collects routes here, and server.js
 // mounts the whole group under a prefix. Note the paths below are '/' and

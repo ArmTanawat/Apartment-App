@@ -1,6 +1,6 @@
 # Apartment Management App
 
-Local software for one small apartment building. It shows which rooms are free, takes the monthly water and electricity readings, bills each tenant, and issues a receipt.
+Local software for small apartment buildings. It shows which rooms are free, takes the monthly water and electricity readings, bills each tenant, and issues a receipt. Each building is a separate SQLite file, used one at a time, as if it were its own copy of the program.
 
 `PROGRESS.md` is the resume point: what is built, what is open. `FRONTEND.md` holds the screens and the rules that govern them, `DATABASE_DESIGN.md` the schema and its reasoning, `REQUIREMENTS.md` what the program must do, `backend/README.md` every endpoint. The source is the truth for structure — `backend/db.js` for tables, `frontend/src/` for screens — not any document.
 
@@ -15,7 +15,17 @@ Local software for one small apartment building. It shows which rooms are free, 
 
 `backend/server.js` starts the server and mounts routers, nothing else. Route files under `backend/routes/` use `express.Router()` and declare paths relative to their mount point (`/` and `/:id`, never `/tenants/:id`). The prefix belongs in `server.js` only.
 
-Adding a feature means one new file in `routes/` plus two lines in `server.js`. Do not put route logic in `server.js`.
+Adding a feature means one new file in `routes/` plus two lines in `server.js` — mounted behind `requireBuilding`, like every router except `/buildings` — and its path added to `API_PATHS` in `frontend/vite.config.js`. Do not put route logic in `server.js`.
+
+## Buildings
+
+**Each building is its own file, and nothing crosses between them.** `buildings/b<n>.db`, all with the same tables from `openDatabase()` in `db.js`. No `building_id`, no combined report, no route that reads two files. A tenant who moves buildings is a new tenant. The owner chose this so the schema and every rule below stay exactly as they were for one building; every rule in this file applies within one building.
+
+**Never prepare a statement at module level.** Routes get `db` from `db.js`, a Proxy to whichever building is open. A statement prepared when a route file loads holds on to that building and keeps writing to it after the user switches — wrong building, no error. Prepare inside the handler, as every route already does.
+
+**Nothing is open until the user chooses.** The program opens on the chooser every launch; every route but `/buildings` and `/health` answers `400 {code:'NO_BUILDING'}` until then. Do not remember the last building across launches — asking each time is what stops readings going into the wrong one. The only reopen is the desktop shell reviving a crashed server (`APARTMENT_OPEN_BUILDING`).
+
+**Delete moves the file, it does not erase it.** The name must be typed exactly, the open building cannot be deleted, and the file goes to `buildings-deleted/`. Ids are never reused, because a deleted building's backups stay in `backups/<id>/`.
 
 ## Rules the database cannot enforce
 
@@ -83,8 +93,8 @@ in English suggests. Read narrowly.
 
 `npm test` from the repository root runs the suites; `PROGRESS.md` says what each one covers. When testing a rule, test both sides — that valid input succeeds and that invalid input is actually blocked. A guard that was never seen to reject something has not been tested.
 
-Delete `backend/apartment.db` to start from a clean state; it is recreated on the next server start.
+Delete `backend/buildings/` to start from a clean state (and `backend/apartment.db`, or it moves back in as the first building). Running a single suite by hand needs a building open; the suites re-seed whichever one is.
 
 ## Not in scope
 
-Payments are a future addition. The design accommodates it — a `payments` table would point at `bills.id` — but do not build it. Multi-building support, tenant login, and online payment are not planned.
+Payments are a future addition. The design accommodates it — a `payments` table would point at `bills.id` — but do not build it. Tenant login and online payment are not planned. Several buildings are supported only as separate files — anything shared or combined across them is out of scope.

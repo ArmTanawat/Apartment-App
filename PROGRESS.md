@@ -15,6 +15,12 @@ cancelled, and correcting a bill carries its receipt with it. The reasoning and
 what it cost are under [Receipts](#receipts); an existing database migrates
 itself on the next server start.
 
+**More than one building since 2026-10-22, on branch `auntversion2`.** Each
+building is its own SQLite file and behaves as a separate copy of the program;
+the program opens on a chooser every time. Nothing in the schema or the rules
+changed. See [Buildings](#buildings). An existing `apartment.db` becomes the
+first building by itself on the first start.
+
 ---
 
 ## How to run it
@@ -38,8 +44,11 @@ cd backend  && npm install && node server.js     # http://localhost:3001
 cd frontend && npm install && npm run dev        # http://localhost:5173
 ```
 
-`apartment.db` is created on first start. `npm run seed` (in `frontend/`) fills
-it with a sample building, with the months placed relative to today. It cannot
+Nothing is open on start: open `http://localhost:5173`, and add or choose a
+building. Each one is `buildings/b<n>.db` beside the code. `npm run seed` (in
+`frontend/`) fills **whichever building is open** with a sample building, with
+the months placed relative to today — so open a throwaway one first. With none
+open it stops with `ยังไม่ได้เลือกตึก`. It cannot
 clear a database that has receipts in it — see [Receipts](#receipts) — and says
 so rather than throwing.
 
@@ -57,6 +66,8 @@ From the repository root. It starts its own server on its own temporary
 database on a random free port, which the suites read from
 `APARTMENT_TEST_PORT`, so a test run never touches the database being worked
 on. It runs all suites and the two desktop-shell checks and reports each.
+The runner makes and opens a building called `ตึกทดสอบ` before the suites,
+because a fresh server has none open.
 
 One at a time, from `frontend/`, which is what to do when one fails and the
 detail matters:
@@ -69,6 +80,8 @@ npm run smoke:share      # fees that are a percentage of something else
 npm run smoke:screens    # filter counts, the month picker, printing, previews
 npm run smoke:rules      # the rules in CLAUDE.md, attacked at their boundaries
 npm run smoke:receipts   # ใบเสร็จ and รายงาน
+npm run smoke:buildings  # add/open/delete buildings, and nothing crossing between them
+npm run smoke:chooser    # เลือกตึก and เปลี่ยนตึก, from the screen
 npm run check-text       # Thai baht words, and meter figures out of a bill line
 ```
 
@@ -76,10 +89,13 @@ Two checks are outside `npm test` on purpose:
 
 - `npm run check-revive` launches the real app and kills the server underneath
   it several times. Slow. Run it after touching `electron/main.js`.
-- `smoke/coldstart.jsx` needs a server on a database with no rooms in it — the
-  first day of using the program. Move `apartment.db` aside, start the server,
-  then `npx vite build --ssr smoke/coldstart.jsx --outDir smoke-dist && node
-  smoke-dist/coldstart.js`.
+- `smoke/coldstart.jsx` needs a building with no rooms in it — the first day
+  of using the program. Add a new building on the chooser (it starts empty) and
+  leave it open, then `npx vite build --ssr smoke/coldstart.jsx --outDir
+  smoke-dist && node smoke-dist/coldstart.js`.
+
+Run one suite by hand against a server that has a building open, or it gets
+`NO_BUILDING` on every request. The suites re-seed whatever building is open.
 
 ---
 
@@ -87,13 +103,15 @@ Two checks are outside `npm test` on purpose:
 
 ```
 backend/            Express + SQLite; see backend/README.md for every endpoint
-├── db.js           tables, and addColumn() for guarded migrations
-├── data-dir.js     works out where the database and backups live
+├── db.js           openDatabase(): tables and guarded migrations; the open-building proxy
+├── buildings.js    which buildings exist, which is open; create/open/close/delete
+├── building-look.js  the colour and icon ids a building's card can have
+├── data-dir.js     works out where the building files and backups live
 ├── fee-basis.js    the five percentage bases and their Thai labels
-└── routes/         one file per topic (9)
+└── routes/         one file per topic (10)
 
 frontend/src/
-├── App.jsx                    view router, the rail, the offline banner
+├── App.jsx                    the chooser first, then view router, rail, offline banner
 ├── styles/app.css             the prototype's <style> block, verbatim
 ├── lib/
 │   ├── api.js                 THE base URL, and the two kinds of failure
@@ -104,7 +122,7 @@ frontend/src/
 ├── state/
 │   ├── DataContext.jsx        the collections, fetched; one named action per change
 │   └── UiContext.jsx          view, working month, and the sticky per-screen bits
-├── pages/                     one file per view
+├── pages/                     one file per view; BuildingsPage is the chooser
 └── components/
     ├── RoomCard, MonthPicker, Modal, Switch, ErrBox
     ├── BillPaper.jsx          shared by BillPage and PrintAllPage
@@ -256,6 +274,81 @@ reason rather than a "gone" card.
 **Not covered:** a stale screen that is never written to stays stale until
 something reloads it. There is no polling, and for a single-user local app there
 should not be.
+
+---
+
+## Buildings
+
+**Each building is a whole separate copy of the data.** `buildings/b1.db`,
+`buildings/b2.db`, … — the same tables in each, created by the same
+`openDatabase()` in `db.js`, and nothing shared. Rooms, tenants, leases, bills,
+receipts, rates, fee types, the bill header and backups are all per building.
+There is no `building_id` anywhere, no combined report, and no reading across:
+a tenant who moves to the other building is a new tenant there. This was the
+owner's explicit choice, to keep the schema and every rule exactly as they were
+for one building. Do not add anything that reads two building files at once.
+
+**One open at a time, chosen on every launch.** The server starts with nothing
+open and refuses every route but `/buildings` and `/health` with
+`400 {code:'NO_BUILDING'}` (`requireBuilding` in `buildings.js`, mounted in
+front of each router in `server.js`). The screen asks first, every time, so
+readings are not typed into the building used last by habit. `เปลี่ยนตึก` under
+the building name in the rail closes it on the server and returns to the chooser.
+
+**How the routes stayed untouched.** They `require('../db.js')` and get `db`, a
+Proxy that forwards to whichever database is open. That works only because
+every route prepares its statements inside the handler. **A statement prepared
+at module level would keep writing to the building open when the file loaded,
+after the user had switched.** Keep `db.prepare` inside handlers.
+
+**Choosing another building remounts the whole app.** `App.jsx` keys
+`UiProvider` by building id, so loaded data, the open page and any half-filled
+dialog are dropped; nothing can show one building's figures under the other's
+name. The working month in `localStorage` is shared on purpose — the owner does
+the same month in both.
+
+**The ids.** `b<n>`, never reused: the next number is past every id still seen
+in `buildings/`, `buildings-deleted/` and `backups/`, because a deleted
+building's backups stay in `backups/<id>/` and a new building given that id
+would list them as its own. Names are what the user sees; they live in each
+file's `settings.building_name`, so renaming in ตั้งค่า renames the building.
+Adding refuses a name already used (trimmed, case-insensitive). Renaming in
+ตั้งค่า does not check — it would mean reading the other files from a building
+route — so two buildings can end up with the same name. Harmless: delete is by
+id, and the typed name is checked against that id's name.
+
+**Deleting** needs the name typed exactly, refuses the open building, and moves
+the file to `buildings-deleted/b<n>-<date>-<name>.db` instead of erasing it. A
+file that cannot be opened is listed as such and takes its id as the name to
+type. There is no restore button; restoring is copying the file back into
+`buildings/` under an unused id.
+
+**Each card's colour and icon** are rows in that building's own `settings`
+(`building_color`, `building_icon`), set from the chooser by
+`PUT /buildings/:id/look` while the building is closed. Not seeded; a missing
+row reads as the default (no colour, the building icon). The allowed ids are in
+`backend/building-look.js`, and `LOOK_COLORS`/`LOOK_ICONS` in
+`BuildingsPage.jsx` must name the same ones. `PUT /settings` accepts the two
+keys too, held to the same lists, because a client that reads every setting
+and writes it back would otherwise be refused once a look was set.
+
+**Backups are per building**, in `backups/<id>/`, taken each time that building
+is opened (before the file is opened, as the old start-up backup was), keeping
+the last 30. `POST /backups` copies the open building.
+
+**The old single file.** On start, if `apartment.db` exists and there are no
+buildings yet, it is copied to `buildings/b1.db`, renamed to
+`apartment.db.moved-to-buildings` so this never runs twice, and its old backups
+move into `backups/b1/`. The copy comes before the rename, so a failure leaves
+`apartment.db` as it was.
+
+**The desktop shell and a crashed server.** The server prints
+`APARTMENT_BUILDING=<id>` whenever it opens or closes one; `electron/main.js`
+keeps the last value and hands it back as `APARTMENT_OPEN_BUILDING` when it
+revives the server, so the window carries on in the same building. A fresh
+launch passes nothing, so the chooser shows. If the screen ever does get
+`NO_BUILDING` mid-session, `api.js` tells `App`, which goes back to the chooser
+with a notice saying nothing saved was lost.
 
 ---
 
@@ -757,9 +850,9 @@ anything.
 
 **Where the data lives.** `backend/data-dir.js` works the paths out once, from
 `APARTMENT_DATA_DIR` when the main process passes it and `__dirname` when it
-does not — so `node server.js` still writes beside the code. Packaged, the
-database and `backups/` are under `userData`, and nothing is written into the
-bundle.
+does not — so `node server.js` still writes beside the code. Packaged,
+`buildings/`, `buildings-deleted/` and `backups/` are under `userData`, and
+nothing is written into the bundle.
 
 **The native module is Node-API, and `npm run check-runtime` guards it.**
 better-sqlite3 v13 declares `NAPI_VERSION=10`. There is nothing to rebuild, and
@@ -778,7 +871,7 @@ Node-API, has to read that check before deleting it.**
 
 **One origin.** Express serves `frontend/dist`, so the pages and the API share
 an origin: `cors` is gone, `API_BASE` is `''`, and every request is a relative
-path. `vite.config.js` proxies the nine API paths in development so the same
+path. `vite.config.js` proxies the API paths in development so the same
 relative paths work there — its list is the mount points in `server.js`, and **a
 new router needs a line in both**.
 
@@ -912,6 +1005,12 @@ assumes otherwise finds nothing. Nothing was wrong with the app. Neither suite
 has been made robust to the date — running `npm test` on the 1st will fail the
 same way again, and fixing that means seeding the working month rather than
 relying on it having been filled.
+
+**Buildings, not yet seen by the owner.** Built and tested on 2026-10-22
+(`smoke:buildings`, `smoke:chooser`, and `check-revive` now checks the building
+survives a revive). Not yet done: looking at the chooser in the real window,
+and upgrading a real Windows install so its `apartment.db` moves in as the
+first building. Back up `%APPDATA%` by hand before that first upgrade.
 
 **Windows has never been installed on.** The x64 installer builds
 (`Apartment Manager Setup 1.0.0.exe`, 110 MB, `win32-x64.node` unpacked, no

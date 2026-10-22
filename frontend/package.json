@@ -17,7 +17,9 @@
     "smoke:screens": "vite build --ssr smoke/screens.jsx --outDir smoke-dist && node smoke-dist/screens.js",
     "check-text": "node smoke/text.mjs",
     "smoke:receipts": "vite build --ssr smoke/receipts.jsx --outDir smoke-dist && node smoke-dist/receipts.js",
-    "check-fonts": "node smoke/fonts.mjs"
+    "check-fonts": "node smoke/fonts.mjs",
+    "smoke:buildings": "node smoke/buildings.mjs",
+    "smoke:chooser": "vite build --ssr smoke/chooser.jsx --outDir smoke-dist && node smoke-dist/chooser.js"
   },
   "dependencies": {
     "react": "^19.2.8",

@@ -5,7 +5,7 @@
 // what was actually charged.
 
 const express = require('express');
-const db = require('../db.js');
+const { db } = require('../db.js');
 const { FEE_BASIS } = require('../fee-basis.js');
 
 const router = express.Router();

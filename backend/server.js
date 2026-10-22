@@ -5,13 +5,13 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 
-// Runs before anything opens the database, so the copy is of yesterday's
-// finished state rather than a file being written to.
-const { runBackup } = require('./backup.js');
-const backupFile = runBackup();
-if (backupFile) {
-  console.log(`Backed up to ${backupFile}`);
-}
+// No building is open yet: the screen asks which one. start() makes the
+// folders, moves an old single-building apartment.db in as the first building,
+// and reopens a building only when the desktop shell is reviving a crashed
+// server. A building is backed up each time it is opened (see buildings.js).
+const buildings = require('./buildings.js');
+buildings.start();
+const { requireBuilding } = buildings;
 
 const tenantsRouter = require('./routes/tenants.js');
 const unitsRouter = require('./routes/units.js');
@@ -22,6 +22,7 @@ const billsRouter = require('./routes/bills.js');
 const settingsRouter = require('./routes/settings.js');
 const receiptsRouter = require('./routes/receipts.js');
 const backupsRouter = require('./routes/backups.js');
+const buildingsRouter = require('./routes/buildings.js');
 
 const app = express();
 
@@ -30,15 +31,19 @@ app.use(express.json());
 // Mounting. Every route inside tenants.js is prefixed with /tenants here,
 // which is why that file declares '/' and '/:id' rather than the full path.
 // The prefix lives in exactly one place, so changing it is a one-line edit.
-app.use('/tenants', tenantsRouter);
-app.use('/units', unitsRouter);
-app.use('/leases', leasesRouter);
-app.use('/readings', readingsRouter);
-app.use('/fees', feesRouter);
-app.use('/bills', billsRouter);
-app.use('/settings', settingsRouter);
-app.use('/receipts', receiptsRouter);
-app.use('/backups', backupsRouter);
+//
+// /buildings is the chooser and works with nothing open. Everything else reads
+// or writes the open building, so it is refused until one is chosen.
+app.use('/buildings', buildingsRouter);
+app.use('/tenants', requireBuilding, tenantsRouter);
+app.use('/units', requireBuilding, unitsRouter);
+app.use('/leases', requireBuilding, leasesRouter);
+app.use('/readings', requireBuilding, readingsRouter);
+app.use('/fees', requireBuilding, feesRouter);
+app.use('/bills', requireBuilding, billsRouter);
+app.use('/settings', requireBuilding, settingsRouter);
+app.use('/receipts', requireBuilding, receiptsRouter);
+app.use('/backups', requireBuilding, backupsRouter);
 
 // A quick way to confirm the server is alive without touching the database.
 app.get('/health', (req, res) => {

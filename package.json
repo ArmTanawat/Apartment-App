@@ -34,6 +34,9 @@
       "frontend/dist/**/*",
       "package.json",
       "!backend/apartment.db",
+      "!backend/apartment.db.moved-to-buildings",
+      "!backend/buildings/**",
+      "!backend/buildings-deleted/**",
       "!backend/backups/**",
       "!**/node_modules/*/{test,__tests__,powered-test,example,examples}/**"
     ],

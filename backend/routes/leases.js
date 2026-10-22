@@ -1,7 +1,7 @@
 // routes/leases.js — moving tenants in and out of rooms.
 
 const express = require('express');
-const db = require('../db.js');
+const { db } = require('../db.js');
 
 const router = express.Router();
 
