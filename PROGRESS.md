@@ -23,8 +23,9 @@ first building by itself on the first start.
 
 **Four features added on 2026-10-28, on branch `MultipleBuilding`**, one
 commit each: the payment QR on bills, meter import from .csv/.xlsx, one-time
-charge presets (รายการด่วน), and Export เป็นรูปภาพ. All tested by suite;
-none yet tried by the owner. See [Added on 2026-10-28](#added-on-2026-10-28).
+charge presets (รายการด่วน), and Export เป็นรูปภาพ. Released as **1.5.0** on
+2026-10-29 (`release/Apartment Manager Setup 1.5.0.exe`, built on macOS). All
+tested by suite; none yet tried by the owner on Windows. See [Added on 2026-10-28](#added-on-2026-10-28).
 
 ---
 
