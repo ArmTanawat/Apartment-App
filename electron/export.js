@@ -4,12 +4,13 @@
 // The pictures are the printed page. A hidden window opens the app's capture
 // view (frontend/src/pages/CapturePage.jsx — the same BillPaper the print
 // pages use), is switched to print media so the print stylesheet applies, and
-// each sheet is photographed on its own at its full height.
+// each sheet is photographed on its own as one A4 page. Every picture is the
+// same size; a bill too long for the page is shrunk to fit by the page itself.
 //
 // Through the DevTools protocol rather than webContents.capturePage(), which
-// takes only what is inside the window — and a window cannot be made taller
-// than the screen it is on, so a long bill would be cut off at the bottom.
-// Page.captureScreenshot takes the sheet whatever its height, at twice the
+// takes only what is inside the window — and a window cannot be made as tall
+// as an A4 page on many screens, so the foot of the bill would be cut off.
+// Page.captureScreenshot takes the page whatever the screen, at twice the
 // pixel density, so the text is sharp on a phone and the QR still scans.
 //
 // PNG, never JPEG: JPEG's smearing at the edges of the QR's squares is what
@@ -28,6 +29,8 @@ const MONTHS = ['january', 'february', 'march', 'april', 'may', 'june',
 // A4 is 210mm, which at the 96 CSS pixels to the inch the page is laid out in
 // is 793.7px. The capture sheet is exactly that wide.
 const SHEET_WIDTH = 794;
+// 297mm is 1122.5px; every picture is this tall, 2246px at twice the density.
+const SHEET_HEIGHT = 1123;
 const SCALE = 2;
 const READY_TIMEOUT_MS = 30000;
 
@@ -61,7 +64,7 @@ async function captureInto(port, kind, period, dir, each) {
   const win = new BrowserWindow({
     show: false,
     width: SHEET_WIDTH,
-    height: 1123,
+    height: SHEET_HEIGHT,
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
@@ -90,14 +93,14 @@ async function captureInto(port, kind, period, dir, each) {
 
     const written = [];
     for (let i = 0; i < state.files.length; i++) {
-      const { height } = await win.webContents.executeJavaScript(`window.__capture.show(${i})`);
+      await win.webContents.executeJavaScript(`window.__capture.show(${i}, ${SHEET_HEIGHT})`);
       await dbg.sendCommand('Emulation.setDeviceMetricsOverride', {
-        width: SHEET_WIDTH, height, deviceScaleFactor: SCALE, mobile: false,
+        width: SHEET_WIDTH, height: SHEET_HEIGHT, deviceScaleFactor: SCALE, mobile: false,
       });
       const shot = await dbg.sendCommand('Page.captureScreenshot', {
         format: 'png',
         captureBeyondViewport: true,
-        clip: { x: 0, y: 0, width: SHEET_WIDTH, height, scale: 1 },
+        clip: { x: 0, y: 0, width: SHEET_WIDTH, height: SHEET_HEIGHT, scale: 1 },
       });
       // The page names the room (102, or 102-2 for the second lease in a
       // handover month); the month goes on here.

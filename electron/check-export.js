@@ -187,11 +187,18 @@ async function main() {
     const sizeOf = f => nativeImage.createFromPath(f).getSize();
     const normal = sizeOf(path.join(billDir, billFiles.find(f => f !== png(longBill.unit_number))));
     const long = sizeOf(path.join(billDir, png(longBill.unit_number)));
-    ok('twice the A4 width in pixels', normal.width === 1588 && long.width === 1588, `${normal.width}`);
-    ok('the long bill is captured to its full height, past one A4 page',
-       long.height > 2246 && long.height > normal.height + 1500, `${normal.height} vs ${long.height}`);
-    const longTail = await win2Text(port, period, longBill.unit_number);
-    ok('and its total is in the picture area, not cut off', longTail, 'total row below the captured height');
+    const sizes = [...billFiles.map(f => path.join(billDir, f)),
+      ...fs.readdirSync(receiptDir).map(f => path.join(receiptDir, f))].map(sizeOf);
+    ok('every picture, bill or receipt, is one A4 page at 2×: 1588 × 2246',
+       sizes.every(s => s.width === 1588 && s.height === 2246),
+       [...new Set(sizes.map(s => `${s.width}x${s.height}`))].join(' '));
+    ok('the long bill is the same size as the rest', long.width === normal.width && long.height === normal.height);
+    const fit = await fitOf(port, period, longBill.unit_number);
+    ok('it was too long for a page, so it was shrunk to fit', fit.natural > 1123 && fit.scale < 1
+       && Math.abs(fit.natural * fit.scale - 1123) < 1, JSON.stringify(fit));
+    ok('and its total is on the page, not cut off', fit.totalBottom <= 1123, JSON.stringify(fit));
+    const short = await fitOf(port, period, bills.find(x => x.id !== longBill.id).unit_number);
+    ok('a bill that fits is not shrunk', short.scale === 1, JSON.stringify(short));
 
     ok('the QR scans out of an exported bill', readQr(path.join(billDir, billFiles[0])) === QR_TEXT,
        String(readQr(path.join(billDir, billFiles[0]))));
@@ -244,9 +251,9 @@ async function main() {
   }
 }
 
-// The long bill's total row, measured in the capture view under print media:
-// it must sit inside the sheet the picture was taken of.
-async function win2Text(port, period, room) {
+// How a bill sits on its page in the capture view under print media: its
+// natural height, the scale it was given, and where its total row ends.
+async function fitOf(port, period, room) {
   const w = new BrowserWindow({ show: false, width: 794, height: 1123, webPreferences: { backgroundThrottling: false } });
   try {
     const dbg = w.webContents.debugger;
@@ -256,10 +263,9 @@ async function win2Text(port, period, room) {
     for (let i = 0; i < 100 && !await w.webContents.executeJavaScript('!!(window.__capture && window.__capture.files)'); i++) await sleep(100);
     return await w.webContents.executeJavaScript(`(() => {
       const i = window.__capture.files.indexOf(${JSON.stringify(String(room))});
-      const size = window.__capture.show(i);
+      const fit = window.__capture.show(i, 1123);
       const sheet = document.querySelectorAll('.capsheet')[i];
-      const total = sheet.querySelector('tr.total').getBoundingClientRect();
-      return total.bottom <= size.height && total.bottom > 1123;
+      return { ...fit, totalBottom: sheet.querySelector('tr.total').getBoundingClientRect().bottom };
     })()`);
   } finally { w.destroy(); }
 }

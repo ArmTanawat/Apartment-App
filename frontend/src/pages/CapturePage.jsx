@@ -13,8 +13,14 @@ import { get, messageOf } from '../lib/api.js';
  *
  * It only reads. When the sheets are drawn, the fonts are in and every image
  * has decoded, it puts window.__capture up for the shell: the file names, and
- * show(i), which hides every sheet but one and returns its size, so each
- * picture is taken from the top of the page at its full height.
+ * show(i, pageHeight), which hides every sheet but one so it is photographed
+ * from the top of the page.
+ *
+ * Every picture is one A4 page, so they are all the same size. A bill that
+ * fits — nearly all of them — sits at the top with white below, as on paper.
+ * One too long for the page is shrunk until it fits, rather than cut into two
+ * pictures: one room is one file, and the total and the QR at the foot stay
+ * on it. It is scaled from the top centre, so it stays a page, only smaller.
  */
 
 // A room number as a file name. Room numbers are free text; the characters a
@@ -65,10 +71,17 @@ export default function CapturePage({ kind, period }){
       const els = [...document.querySelectorAll('.capsheet')];
       window.__capture = {
         files: sheets.map(s => s.file),
-        show: i => {
+        show: (i, pageHeight) => {
           els.forEach((el, n) => { el.style.display = n === i ? '' : 'none'; });
-          const r = els[i].getBoundingClientRect();
-          return { width: Math.ceil(r.width), height: Math.ceil(r.height) };
+          const el = els[i];
+          el.style.transform = '';
+          const natural = el.getBoundingClientRect().height;
+          const scale = natural > pageHeight ? pageHeight / natural : 1;
+          if(scale < 1){
+            el.style.transformOrigin = 'top center';
+            el.style.transform = `scale(${scale})`;
+          }
+          return { natural: Math.ceil(natural), scale };
         },
       };
     })();

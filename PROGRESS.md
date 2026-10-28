@@ -1104,7 +1104,9 @@ remembered in `settings.export_folder` (per building). `FRONTEND.md` §4 and §7
 - **One template.** `CapturePage` renders the same `BillPaper` as the print
   pages; `electron/export.js` opens it in a hidden window, emulates print media,
   shows one sheet at a time and photographs it with the DevTools protocol's
-  `Page.captureScreenshot` at deviceScaleFactor 2. Not `capturePage()`: it takes
+  `Page.captureScreenshot` at deviceScaleFactor 2, always one A4 page
+  (1588 × 2246). A bill too long for the page is scaled down to fit by
+  `CapturePage`'s `show(i, pageHeight)`, the owner's choice over splitting it. Not `capturePage()`: it takes
   only the window's viewport, and a window cannot be taller than the screen, so
   a long bill would be cut. PNG, because JPEG breaks QR edges.
 - **Asked, not mixed.** Existing folders come back as `conflict`; overwrite
@@ -1123,8 +1125,9 @@ remembered in `settings.export_folder` (per building). `FRONTEND.md` §4 and §7
 - Tested: `check-export`, in real Electron — the QR uploaded through ตั้งค่า's
   file box (which also proves `lib/image.js` in a real browser: 1400px in, 600px
   PNG under 300 KB out), every room billed with one bill of 45 extra lines and
-  one receipt, folder and file names, counts, progress, 1588px wide, the long
-  bill past one A4 page with its total inside the picture, **the QR decoded out
+  one receipt, folder and file names, counts, progress, every picture exactly
+  1588 × 2246 (one A4 page at 2×), the long bill shrunk to fit with its total
+  on the page and a short one not shrunk, **the QR decoded out
   of the exported PNG with jsQR** (and none on the receipt), bills and receipts
   unchanged, the conflict, overwrite keeping a non-picture file, no-receipt
   months, and the refusals. `qrcode` and `jsqr` are root devDependencies for

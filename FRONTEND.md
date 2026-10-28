@@ -349,7 +349,7 @@ Opened from a single bill. Not a nav page.
 
 Labels are already bilingual and frozen into the record, so nothing is translated at print time.
 
-**Exported pictures are this layout.** `?capture=bills|receipts&period=` (`pages/CapturePage.jsx`, chosen in `main.jsx` before `App`) draws each `BillPaper` on a `.capsheet` 210 mm wide with the page's 12 mm margin; the shell switches the window to print media, so the print stylesheet above applies, and photographs each sheet at its full height at 2× — a long bill is one tall picture, not two pages.
+**Exported pictures are this layout.** `?capture=bills|receipts&period=` (`pages/CapturePage.jsx`, chosen in `main.jsx` before `App`) draws each `BillPaper` on a `.capsheet`, an A4 page with the page's 12 mm margin; the shell switches the window to print media, so the print stylesheet above applies, and photographs exactly one A4 page at 2×. **Every picture is 1588 × 2246.** A bill that fits sits at the top with white below, as on paper; one too long for the page is shrunk from the top centre until it fits, rather than split, so one room is still one file with its total and QR on it. The owner chose shrinking over splitting or a taller picture on 2026-10-28.
 
 **The payment QR** sits to the right of the ชำระเงิน block in the footer, 3.5 cm square on screen and on paper (`.payqr`), and wraps under the text only when the paper is too narrow. It is a bill-only element: a receipt has no bank details and so no QR. With no QR set the footer's markup is exactly what it was before the QR existed — `smoke:screens` compares it.
 

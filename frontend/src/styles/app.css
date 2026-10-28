@@ -537,11 +537,11 @@ h1{font-size:32px; font-weight:700; margin:0; line-height:1.4}
   .pitems tr.total{break-before:avoid; page-break-before:avoid}
 }
 
-/* Export เป็นรูปภาพ: one sheet per picture, the width of A4 with the printed
-   page's 12mm margin, so the paper inside lays out exactly as it prints. The
-   shell renders this under print media; the height is the content's, so a
-   long bill is one tall picture rather than two pages. */
-.capsheet{width:210mm; padding:12mm; box-sizing:border-box; background:#fff}
+/* Export เป็นรูปภาพ: one sheet per picture, an A4 page with the printed page's
+   12mm margin, so the paper inside lays out exactly as it prints. The shell
+   renders this under print media and photographs exactly one page of it; a
+   bill too long for the page is scaled down to fit (CapturePage). */
+.capsheet{width:210mm; min-height:297mm; padding:12mm; box-sizing:border-box; background:#fff}
 
 /* ---------- form + modal ---------- */
 .field{margin-bottom:14px}
