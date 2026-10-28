@@ -619,6 +619,73 @@ section('ออกใบเสร็จทุกห้อง refuses what it can
      && empty.body.error.includes('2019-03'), JSON.stringify(empty.body));
 }
 
+section('meter import — all rows or none, and blank is never 0');
+{
+  const a = await newUnit('T31'), b = await newUnit('T32'), c = await newUnit('T33');
+  await POST('/readings', { unit_id:a.id, period:'2019-01', water_prev:0, water_curr:9990, elec_prev:0, elec_curr:500 });
+  await POST('/readings', { unit_id:b.id, period, water_prev:100, water_curr:150, elec_prev:200, elec_curr:260 });
+  const at = async u => (await GET(`/readings?period=${period}`)).body.find(r => r.unit_id === u.id);
+
+  const bad = await POST('/readings/import', { period, rows: [
+    { unit_id:b.id, water:170, electric:null },
+    { unit_id:a.id, water:12, electric:600 } ] });
+  ok('a reading below last month with no fix refuses the whole import', bad.status === 400
+     && bad.body.error.includes('T31') && bad.body.error.includes('เลขน้ำ'), JSON.stringify(bad.body));
+  ok('and the good row beside it was not saved either', (await at(b)).water_curr === 150);
+  ok('the refusal says which row', bad.body.results.find(r => r.unit_id === a.id).status === 'error'
+     && bad.body.results.find(r => r.unit_id === b.id).status === 'ok');
+
+  const good = await POST('/readings/import', { period, rows: [
+    { unit_id:b.id, water:170, electric:null },
+    { unit_id:a.id, water:12, electric:600, water_fix:'rollover' },
+    { unit_id:c.id, water:0, electric:0 } ] });
+  ok('the same import with the fix chosen is saved', good.status === 200 && good.body.saved === 3,
+     JSON.stringify(good.body));
+  const ra = await at(a), rb = await at(b), rc = await at(c);
+  ok('a new row starts from last completed month', ra.water_prev === 9990 && ra.elec_prev === 500);
+  ok('ครบรอบ is the dial from settings: 9990 → 12 is 22 units', ra.water_used === 22 && ra.water_rollover === 10000,
+     JSON.stringify(ra));
+  ok('a blank electricity keeps the stored one, water and electricity saved together',
+     rb.water_curr === 170 && rb.elec_curr === 260, JSON.stringify(rb));
+  ok('0 is saved as 0, not as nothing', rc.water_curr === 0 && rc.elec_curr === 0 && rc.is_entered,
+     JSON.stringify(rc));
+
+  const d = await newUnit('T34');
+  await POST('/readings', { unit_id:d.id, period:'2019-01', water_prev:0, water_curr:800, elec_prev:0, elec_curr:50 });
+  const fresh = await POST('/readings/import', { period, rows: [{ unit_id:d.id, water:5, electric:60, water_fix:'new_meter' }] });
+  ok('เปลี่ยนมิเตอร์ counts from 0', fresh.status === 200 && (await at(d)).water_used === 5
+     && (await at(d)).water_prev === 0 && (await at(d)).elec_used === 10, JSON.stringify(await at(d)));
+  const needless = await POST('/readings/import', { period, rows: [{ unit_id:c.id, water:10, electric:null, water_fix:'rollover' }] });
+  ok('a fix on a reading that went up is refused, not added', needless.status === 400
+     && (await at(c)).water_curr === 0, JSON.stringify(needless.body));
+
+  for(const [why, rows] of [
+    ['a room twice', [{ unit_id:b.id, water:180, electric:null }, { unit_id:b.id, water:190, electric:null }]],
+    ['no such room', [{ unit_id:999999, water:1, electric:1 }]],
+    ['a value that is not a number', [{ unit_id:b.id, water:'abc', electric:null }]],
+    ['a negative value', [{ unit_id:b.id, water:-1, electric:null }]],
+    ['both meters blank', [{ unit_id:b.id, water:null, electric:null }]],
+    ['an unknown fix', [{ unit_id:b.id, water:180, electric:null, water_fix:'guess' }]],
+  ]){
+    const r = await POST('/readings/import', { period, rows });
+    ok(`refused: ${why}`, r.status === 400 && (await at(b)).water_curr === 170, JSON.stringify(r.body));
+  }
+  ok('refused: no rows', (await POST('/readings/import', { period, rows: [] })).status === 400);
+  ok('refused: a bad period', (await POST('/readings/import', { period:'10/2026', rows:[{ unit_id:b.id, water:1 }] })).status === 400);
+
+  const t = await newTenant('ผู้เช่า นำเข้า');
+  const l = await POST('/leases', { tenant_id:t.id, unit_id:b.id, start_date:'2026-01-01', monthly_rent:1000 });
+  const bill = await POST('/bills', { lease_id:l.body.id, period });
+  const billedRow = await POST('/readings/import', { period, rows: [{ unit_id:b.id, water:200, electric:null }] });
+  ok('a room already billed this month is refused by name', billedRow.status === 400
+     && billedRow.body.error.includes('T32') && billedRow.body.error.includes('ออกบิล'), JSON.stringify(billedRow.body));
+  ok('and its reading is untouched', (await at(b)).water_curr === 170);
+  ok('import makes no bills', (await GET(`/bills?period=${period}`)).body
+     .filter(x => ['T31','T33'].includes(x.unit_number)).length === 0);
+  await DEL(`/bills/${bill.body.id}`);
+  await DEL(`/leases/${l.body.id}`);
+}
+
 section('the payment QR is checked by the server, not only by the screen');
 {
   const png = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';

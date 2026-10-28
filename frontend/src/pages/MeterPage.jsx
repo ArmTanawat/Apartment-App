@@ -1,7 +1,10 @@
 import { useRef, useState } from 'react';
+import ErrBox from '../components/ErrBox.jsx';
 import MonthPicker from '../components/MonthPicker.jsx';
 import Switch from '../components/Switch.jsx';
 import { messageOf } from '../lib/api.js';
+import { rolloverAmount } from '../lib/helpers.js';
+import { downloadTemplate, parseRows, readSheetFile } from '../lib/meterImport.js';
 import { useData } from '../state/DataContext.jsx';
 import { useUi } from '../state/UiContext.jsx';
 
@@ -30,6 +33,8 @@ export default function MeterPage(){
     </div>
     <p className="sub">พิมพ์เฉพาะเลขปัจจุบัน เลขก่อนหน้าดึงมาจากงวดที่แล้วให้แล้ว ·
       กด Enter เพื่อไปช่องถัดไป · บันทึกเองอัตโนมัติ</p>
+
+    <ImportBar />
 
     {billed > 0 && (
       <div className="warn" style={{maxWidth:"640px"}}>งวดนี้ออกบิลไปแล้ว{" "}
@@ -66,6 +71,44 @@ export default function MeterPage(){
         <MeterRows key={`${period}:${meterRevision}`} rows={rows} />
       </tbody>
     </table>
+  </>;
+}
+
+/* นำเข้าจากไฟล์ — a spreadsheet instead of typing. The file is read and parsed
+   here; what it would do is shown in a preview dialog, and nothing is saved
+   until that is confirmed. Applies to the month in the picker. */
+function ImportBar(){
+  const { units, h } = useData();
+  const { period, openModal } = useUi();
+  const [error, setError] = useState(null);
+  const input = useRef(null);
+  const help = () => openModal({kind:"meterImportHelp"});
+
+  const pick = async e => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = "";
+    if(!file) return;
+    setError(null);
+    try {
+      const parsed = parseRows(await readSheetFile(file), units.map(u => u.unit_number));
+      if(parsed.error) throw new Error(parsed.error);
+      if(!parsed.rows.length) throw new Error('ไฟล์นี้มีแต่หัวคอลัมน์ ไม่มีห้อง');
+      openModal({kind:"meterImport", parsed, fileName: file.name});
+    } catch (err) { setError(messageOf(err)); }
+  };
+
+  return <>
+    <div className="importbar">
+      <button className="btn quiet" onClick={() => input.current.click()}>นำเข้าจากไฟล์</button>
+      <button className="qhelp" title="วิธีเตรียมไฟล์" aria-label="วิธีเตรียมไฟล์" onClick={help}>?</button>
+      <button className="linkbtn" onClick={() =>
+        downloadTemplate(units, id => h.previousReading(id), period).catch(e => setError(messageOf(e)))}>
+        ดาวน์โหลดแม่แบบ</button>
+      <input ref={input} type="file" accept=".csv,.xlsx" style={{display:"none"}} onChange={pick} />
+    </div>
+    <div className="ihint">รูปแบบ: room, water, electricity</div>
+    <ErrBox>{error && <>{error} · <button className="linkbtn" style={{color:"inherit",textDecoration:"underline"}}
+      onClick={help}>ดูวิธีเตรียมไฟล์</button></>}</ErrBox>
   </>;
 }
 
@@ -217,14 +260,11 @@ function MeterRows({ rows }){
   });
 
   // The dial wrapped: usage is what it counted up to its last digit, plus the
-  // new number. The rollover amount is the meter's capacity, which comes from
-  // how many digits it has — a property of the meter, kept in settings.
-  // Counting the digits in the reading would get it wrong for any meter
-  // showing a number padded with zeros. The previous figure is untouched: the
-  // dial kept counting from where it was.
+  // new number. The rollover amount is the meter's capacity (rolloverAmount).
+  // The previous figure is untouched: the dial kept counting from where it was.
   const applyRollover = (unitId, kind) => applyFix(unitId, kind,
     p => p,
-    () => Math.pow(10, kind === "w" ? settings.water_meter_digits : settings.electricity_meter_digits));
+    () => rolloverAmount(settings, kind));
 
   // The meter was replaced, so it starts from zero and usage is just the new
   // number. Same symptom as a rollover, different arithmetic: the previous

@@ -16,6 +16,7 @@
     "smoke:rules": "node smoke/rules.mjs",
     "smoke:screens": "vite build --ssr smoke/screens.jsx --outDir smoke-dist && node smoke-dist/screens.js",
     "check-text": "node smoke/text.mjs",
+    "check-import": "node smoke/import.mjs",
     "smoke:receipts": "vite build --ssr smoke/receipts.jsx --outDir smoke-dist && node smoke-dist/receipts.js",
     "check-fonts": "node smoke/fonts.mjs",
     "smoke:buildings": "node smoke/buildings.mjs",
@@ -23,7 +24,8 @@
   },
   "dependencies": {
     "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "react-dom": "^19.2.8",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "devDependencies": {
     "@types/react": "^19.2.18",

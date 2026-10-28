@@ -199,12 +199,23 @@ Vacant rooms are hidden.
 | Prefill previous | `GET /readings/previous/:unitId/:period` |
 | Save | `POST /readings` |
 | Correct | `PUT /readings/:id` |
+| Import a file | `POST /readings/import` |
 
 `is_entered: false` marks the rooms still needing a number — that flag is the whole checklist.
 
 Saving is per row, as the number is typed. No submit button for the page, so closing it never loses anything.
 
 A reading below last month's is refused with a plain reason. Do not block typing; check on save.
+
+**นำเข้าจากไฟล์** — above the table: the button, a (?) that opens the format help (✕, Esc or a click outside closes it), ดาวน์โหลดแม่แบบ, and `รูปแบบ: room, water, electricity` in grey beneath. Applies to the month in the picker.
+
+- The file is `.csv` (UTF-8, BOM or not) or `.xlsx`, read in the browser with SheetJS (`lib/meterImport.js`, loaded only when used). Headers match in any case and order — `room`/`number`/`no`/`unit`/`ห้อง`/`เลขห้อง`, `water`/`น้ำ`/`มิเตอร์น้ำ`, `electricity`/`electric`/`ไฟ`/`มิเตอร์ไฟ` — exactly, not as substrings, so the template's `prev_water` is never taken for water. Other columns are ignored. A first row that is a room number (or a number) means no header: room, water, electricity in that order. `102.0` is room `102`.
+- **Blank is never 0.** A blank cell skips that meter; both blank is ข้าม; a room not in the file is untouched; empty rows are ignored. `0` is saved as 0.
+- A file that cannot be read, or whose header is not recognised, shows the reason with ดูวิธีเตรียมไฟล์, which opens the same help.
+- **The preview** is a dialog, and nothing is saved until ยืนยันนำเข้า. One row per line of the file: previous → imported, units, and a status — ✅; ⚠️ for a vacant room, overwriting a stored figure, usage over 3× the room's recent average, or a reading below last month; ❌ (cannot be ticked) for an unknown room, a non-number, a room twice in the file, or a room already billed this month. Counts at the top; rows can be unticked.
+- **Below last month** gets a choice on that meter — ครบรอบ or เปลี่ยนมิเตอร์ — the same two fixes as the buttons on the table, with the same arithmetic (`rolloverAmount()` in `helpers.js`). Left unchosen, that meter is not imported and the room's other one still is. The program does not guess, for the same reason the table asks.
+- Confirm sends one `POST /readings/import`; the server re-checks every row and saves all or none. No bill is made.
+- **The template** is an `.xlsx` with every room (as text, so `0102` keeps its zero), blank water and electricity, and last month's figures in `prev_water` / `prev_electricity` for reference.
 
 ---
 

@@ -185,6 +185,9 @@ export function DataProvider({ children }){
       // correct electricity figure beside it.
       createReading: async row => { await post('/readings', row); await after(['readings']); },
       patchReading: async (id, patch) => { await put(`/readings/${id}`, patch); await after(['readings']); },
+      // A month from a spreadsheet, all rows or none. Readings only; bills are
+      // still generated the usual way.
+      importReadings: async body => { const r = await post('/readings/import', body); await after(['readings']); return r; },
 
       // ---- fee types ----
       addFeeType: async f => { await post('/fees/types', f); await after(['feeTypes']); },

@@ -75,6 +75,7 @@ Work with nothing open. Everything below them is for the open building only.
 - `GET /readings/history/:unitId` — every reading for one room
 - `GET /readings/year/2026` — a year of usage for every room: `{ year, years, rooms:[{unit_id, unit_number, floor, water:[12], elec:[12]}] }`. Months with no reading, or one entered but unfinished, are `0`. `years` lists the years that have readings, so the picker needs no second call
 - `POST /readings` — record a month (send `water_rollover`/`elec_rollover` when a dial wrapped)
+- `POST /readings/import` — a month from a spreadsheet: `{period, rows:[{unit_id, water, electric, water_fix, elec_fix}]}`. `water`/`electric` are current readings; `null` leaves that meter as it is. `*_fix` is `'rollover'` or `'new_meter'`, required for a reading below last month and refused on one that is not. Refused per row: no such room, a room twice, not a number ≥ 0, both meters null, a room already billed that month. **All rows or none** — any refusal is a 400 naming every bad row, with `results` per row, and nothing is saved. Success is `{period, saved, results}`. Never creates a bill
 - `PUT /readings/:id` — correct a reading (send `water_curr: null` / `elec_curr: null` explicitly to clear one)
 - `DELETE /readings/:id`
 

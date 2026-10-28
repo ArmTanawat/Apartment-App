@@ -83,6 +83,7 @@ npm run smoke:receipts   # ใบเสร็จ and รายงาน
 npm run smoke:buildings  # add/open/delete buildings, and nothing crossing between them
 npm run smoke:chooser    # เลือกตึก and เปลี่ยนตึก, from the screen
 npm run check-text       # Thai baht words, and meter figures out of a bill line
+npm run check-import     # reading a meter spreadsheet, and the import preview
 ```
 
 Two checks are outside `npm test` on purpose:
@@ -118,6 +119,7 @@ frontend/src/
 │   ├── bills.js               preview, and the line-by-line staleness diff
 │   ├── helpers.js             the rule-mirroring helpers, pure
 │   ├── image.js               shrinks the payment QR picture before upload
+│   ├── meterImport.js         reads a meter .csv/.xlsx and builds the import preview
 │   ├── useApi.js              page-scoped fetching
 │   └── useSubmit.js           what a dialog does with a write
 ├── state/
@@ -1016,6 +1018,42 @@ intended — it always points at the current account. Receipts never show it.
   non-image, an empty body, over 1 MB, over the body limit, the limit not
   leaking to other routes, removed) and `smoke:screens` (no QR → no box and the
   footer's markup unchanged; with one → on every bill, inside the bank block).
+
+### Meter readings from a spreadsheet
+
+นำเข้าจากไฟล์ on บันทึกมิเตอร์: a `.csv` or `.xlsx` of current readings —
+`room,water,electricity` — previewed room by room, saved only on confirm, in
+one transaction. `FRONTEND.md` §3 has the screen; `backend/README.md` the
+endpoint.
+
+- **Parsing is in the browser** (`lib/meterImport.js`, SheetJS 0.20.3 from the
+  SheetJS CDN tarball — the `xlsx` package on npm stopped at 0.18.5 with open
+  advisories). It is a separate chunk, loaded on first import. The functions
+  that read cells and build the preview are pure, which is what `check-import`
+  runs against.
+- **The server checks everything again** in `POST /readings/import`, sharing
+  `negativeMeter()`, `previousOf()` and the "below last month" wording with
+  `POST`/`PUT /readings` rather than restating them. Water and electricity of
+  one room go in one row write; a blank meter keeps what is stored.
+- **A reading below last month is not guessed.** The owner chose, on
+  2026-10-28, a per-meter ครบรอบ / เปลี่ยนมิเตอร์ choice in the preview, sent
+  as `water_fix` / `elec_fix`. The server works out the rollover itself from
+  `*_meter_digits` (`rolloverOf()`, the twin of `rolloverAmount()` in
+  `helpers.js`, which the table's ครบรอบ button now uses too), and refuses a fix
+  on a reading that did not go down.
+- **A billed room is refused**, which is stricter than typing: the table lets a
+  reading change under a bill and the bill then shows its stale banner. An
+  import would do that to a whole month without anyone looking at a bill.
+- **"Unusually high"** is > 3× the average of the room's last three recorded
+  months and > 20 units, from `GET /readings/year` for this year and last. A
+  warning only. REQUIREMENTS.md explains why the reports still have no such flag.
+- Tested: `check-import` (cells, a CSV with a BOM and Thai headers out of order,
+  an xlsx with extra columns and number-typed rooms, headerless files, refused
+  headers, every preview status, the fixes, the template read back),
+  `smoke:rules` (all-or-none, each refusal, the fixes, 0 kept, a blank meter
+  keeping the other, a billed room, no bills made) and `smoke:screens` (the
+  help and Esc, the error's link to the help, preview without saving, unticking,
+  confirm, the table showing the figure).
 
 ## Where the two sides do not line up
 

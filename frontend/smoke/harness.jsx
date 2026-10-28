@@ -114,6 +114,21 @@ export async function select(el, value){
   await settle();
 }
 
+// A file chosen in a file box. jsdom has no picker, so the list is put on the
+// input and change fired, which is what the browser does after one.
+export async function chooseFile(input, name, contents, type = 'text/csv'){
+  if(!input) throw new Error('chooseFile: no input');
+  const file = new dom.window.File([contents], name, { type });
+  Object.defineProperty(input, 'files', { value: [file], configurable: true });
+  await act(async () => { input.dispatchEvent(new dom.window.Event('change', {bubbles:true})); });
+  await settle(400);
+}
+
+export async function press(key){
+  await act(async () => { dom.window.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key, bubbles:true })); });
+  await settle();
+}
+
 export async function nav(label){
   await click(byText('.nav a', label), 250);
 }

@@ -16,6 +16,45 @@ const router = express.Router();
 const usage = (prev, curr, rollover = 0) =>
   curr == null ? null : (curr + rollover) - prev;
 
+// Which meter, if any, these figures make run backwards. Shared by manual entry
+// and import so the two cannot disagree on what is refused.
+function negativeMeter(r) {
+  const wu = usage(r.water_prev, r.water_curr, r.water_rollover);
+  if (wu !== null && wu < 0) return 'water';
+  const eu = usage(r.elec_prev, r.elec_curr, r.elec_rollover);
+  if (eu !== null && eu < 0) return 'elec';
+  return null;
+}
+
+const BELOW_PREVIOUS = {
+  water: 'เลขน้ำน้อยกว่างวดก่อน เป็นการพิมพ์ผิด มิเตอร์ถูกเปลี่ยนใหม่ หรือมิเตอร์ครบรอบ ต้องระบุว่าอย่างไหน',
+  elec:  'เลขไฟน้อยกว่างวดก่อน เป็นการพิมพ์ผิด มิเตอร์ถูกเปลี่ยนใหม่ หรือมิเตอร์ครบรอบ ต้องระบุว่าอย่างไหน',
+};
+
+// The last completed month before this one — the chain a new row's previous
+// figures come from. A skipped month does not break it.
+function previousOf(unitId, period) {
+  return db.prepare(`
+    SELECT water_curr, elec_curr, period
+    FROM meter_readings
+    WHERE unit_id = ? AND period < ?
+      AND water_curr IS NOT NULL AND elec_curr IS NOT NULL
+    ORDER BY period DESC
+    LIMIT 1
+  `).get(unitId, period);
+}
+
+// What a dial adds when it wraps: its capacity, from how many digits it has.
+// A property of the meter, kept in settings — counting the digits in a reading
+// would get it wrong for any meter showing a number padded with zeros. The
+// meter page's ครบรอบ button sends this same figure (rolloverAmount() in
+// frontend/src/lib/helpers.js).
+function rolloverOf(kind) {
+  const key = kind === 'water' ? 'water_meter_digits' : 'electricity_meter_digits';
+  const row = db.prepare('SELECT value FROM settings WHERE key = ?').get(key);
+  return Math.pow(10, Number(row ? row.value : 4));
+}
+
 // GET /readings?period=2026-08 — readings for a month, one row per room.
 //
 // LEFT JOIN from units means rooms with no reading yet still appear, with null
@@ -129,14 +168,7 @@ router.get('/year/:year', (req, res) => {
 // Falls back to the most recent reading before this period rather than exactly
 // the month before, so a skipped month does not break the chain.
 router.get('/previous/:unitId/:period', (req, res) => {
-  const last = db.prepare(`
-    SELECT water_curr, elec_curr, period
-    FROM meter_readings
-    WHERE unit_id = ? AND period < ?
-      AND water_curr IS NOT NULL AND elec_curr IS NOT NULL
-    ORDER BY period DESC
-    LIMIT 1
-  `).get(req.params.unitId, req.params.period);
+  const last = previousOf(req.params.unitId, req.params.period);
 
   // No history at all means this is the first reading for the room. Zeros are
   // returned rather than a 404 so the form still has something to fill in.
@@ -203,15 +235,9 @@ router.post('/', (req, res) => {
   // replaced meter, or a dial that wrapped — and the caller has to say which,
   // because each produces a different bill. Without a rollover supplied, the
   // reading is refused rather than billed as a negative.
-  if (water_curr != null && usage(water_prev, water_curr, water_rollover) < 0) {
-    return res.status(400).json({
-      error: 'เลขน้ำน้อยกว่างวดก่อน เป็นการพิมพ์ผิด มิเตอร์ถูกเปลี่ยนใหม่ หรือมิเตอร์ครบรอบ ต้องระบุว่าอย่างไหน'
-    });
-  }
-  if (elec_curr != null && usage(elec_prev, elec_curr, elec_rollover) < 0) {
-    return res.status(400).json({
-      error: 'เลขไฟน้อยกว่างวดก่อน เป็นการพิมพ์ผิด มิเตอร์ถูกเปลี่ยนใหม่ หรือมิเตอร์ครบรอบ ต้องระบุว่าอย่างไหน'
-    });
+  const backwards = negativeMeter({ water_prev, water_curr, water_rollover, elec_prev, elec_curr, elec_rollover });
+  if (backwards) {
+    return res.status(400).json({ error: BELOW_PREVIOUS[backwards] });
   }
 
   try {
@@ -233,6 +259,143 @@ router.post('/', (req, res) => {
     }
     throw err;
   }
+});
+
+// POST /readings/import — a month of meters from a spreadsheet, in one go.
+//
+//   { period: '2026-10',
+//     rows: [{ unit_id, water, electric, water_fix, elec_fix }] }
+//
+// water and electric are current readings, exactly what is typed on the meter
+// page. null means the file left that cell blank: that meter is not touched,
+// and the room's other meter is still saved. A row with both null is not sent.
+//
+// water_fix / elec_fix answer the question the meter page asks when a reading
+// is below last month: 'rollover' (the dial wrapped) or 'new_meter' (it was
+// replaced, so it counts from 0). Without one, such a reading is refused here
+// as it is on manual entry — the program does not guess which it was.
+//
+// The screen has already checked all of this to draw its preview. It is
+// checked again because the screen's picture can be out of date — a bill
+// generated in another window between preview and confirm, say.
+//
+// All or nothing, in one transaction. A row the server refuses fails the whole
+// import with every row's result, so the user sees which, and nothing has been
+// half-saved. It writes readings only; bills are generated the normal way.
+router.post('/import', (req, res) => {
+  const { period, rows } = req.body || {};
+
+  if (!period || !/^\d{4}-\d{2}$/.test(period)) {
+    return res.status(400).json({ error: 'งวดต้องอยู่ในรูปแบบ 2026-10' });
+  }
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return res.status(400).json({ error: 'ไม่มีห้องให้นำเข้า' });
+  }
+
+  const FIXES = ['rollover', 'new_meter'];
+  const seen = new Map(rows.map(r => [r && r.unit_id, 0]));
+  rows.forEach(r => seen.set(r && r.unit_id, seen.get(r && r.unit_id) + 1));
+  const isReading = v => v === null || v === undefined
+    || (typeof v === 'number' && Number.isFinite(v) && v >= 0);
+
+  const plans = rows.map(r => {
+    const unit = r && db.prepare('SELECT * FROM units WHERE id = ?').get(r.unit_id);
+    const out = { unit_id: r && r.unit_id, unit_number: unit ? unit.unit_number : null };
+    if (!unit) return { ...out, error: 'ไม่พบห้องนี้' };
+    const name = `ห้อง ${unit.unit_number}`;
+    if (seen.get(r.unit_id) > 1) return { ...out, error: `${name} ซ้ำในรายการนำเข้า` };
+    if (!isReading(r.water) || !isReading(r.electric)) {
+      return { ...out, error: `${name}: เลขมิเตอร์ต้องเป็นตัวเลขตั้งแต่ 0 ขึ้นไป` };
+    }
+    const water = r.water ?? null, elec = r.electric ?? null;
+    if (water === null && elec === null) return { ...out, error: `${name}: ไม่มีเลขให้นำเข้า` };
+    if ((r.water_fix && !FIXES.includes(r.water_fix)) || (r.elec_fix && !FIXES.includes(r.elec_fix))) {
+      return { ...out, error: `${name}: ต้องเลือกครบรอบหรือเปลี่ยนมิเตอร์` };
+    }
+
+    // Bills are frozen: a reading changed under one leaves it stale. The meter
+    // page allows that and warns; an import does not, because it would do it to
+    // a whole month at once without anyone looking at a single bill.
+    const billed = db.prepare(`
+      SELECT 1 FROM bills b JOIN leases l ON l.id = b.lease_id
+      WHERE l.unit_id = ? AND b.period = ?
+    `).get(unit.id, period);
+    if (billed) return { ...out, error: `${name} ออกบิลงวด ${period} ไปแล้ว ลบบิลก่อนถ้าต้องการแก้เลข` };
+
+    // Start from what is stored for this month, or from last month's figures
+    // for a room not yet entered — the same starting point as manual entry.
+    const existing = db.prepare('SELECT * FROM meter_readings WHERE unit_id = ? AND period = ?')
+      .get(unit.id, period);
+    const last = existing ? null : previousOf(unit.id, period);
+    const next = existing ? { ...existing } : {
+      water_prev: last ? last.water_curr : 0, water_curr: null, water_rollover: 0,
+      elec_prev:  last ? last.elec_curr  : 0, elec_curr:  null, elec_rollover:  0,
+    };
+
+    // The same two fixes the meter page's buttons apply: a wrapped dial keeps
+    // its previous figure and adds its capacity; a new meter counts from 0.
+    //
+    // A fix is only taken for a reading that needs one. ครบรอบ on a figure that
+    // went up would add a whole dial's worth of units to the bill.
+    let needless = null;
+    const apply = (kind, curr, fix) => {
+      if (curr === null) return;
+      const p = kind === 'water' ? 'water' : 'elec';
+      next[`${p}_curr`] = curr;
+      if (fix && usage(next[`${p}_prev`], curr, next[`${p}_rollover`]) >= 0) needless = kind;
+      if (fix === 'rollover') next[`${p}_rollover`] = rolloverOf(kind);
+      if (fix === 'new_meter') { next[`${p}_prev`] = 0; next[`${p}_rollover`] = 0; }
+    };
+    apply('water', water, r.water_fix);
+    apply('electricity', elec, r.elec_fix);
+    if (needless) {
+      return { ...out, error: `${name}: เลข${needless === 'water' ? 'น้ำ' : 'ไฟ'}ไม่ได้น้อยกว่างวดก่อน ไม่ต้องเลือกครบรอบหรือเปลี่ยนมิเตอร์` };
+    }
+
+    const backwards = negativeMeter(next);
+    if (backwards) return { ...out, error: `${name}: ${BELOW_PREVIOUS[backwards]}` };
+
+    return { ...out, existing, next };
+  });
+
+  if (plans.some(p => p.error)) {
+    return res.status(400).json({
+      error: `นำเข้าไม่สำเร็จ ยังไม่ได้บันทึกห้องใดเลย: ${plans.filter(p => p.error).map(p => p.error).join(' · ')}`,
+      results: plans.map(p => ({ unit_id: p.unit_id, unit_number: p.unit_number,
+        status: p.error ? 'error' : 'ok', error: p.error })),
+    });
+  }
+
+  const write = db.transaction(() => plans.map(p => {
+    const n = p.next;
+    if (p.existing) {
+      db.prepare(`
+        UPDATE meter_readings
+        SET water_prev = ?, water_curr = ?, water_rollover = ?,
+            elec_prev = ?, elec_curr = ?, elec_rollover = ?
+        WHERE id = ?
+      `).run(n.water_prev, n.water_curr, n.water_rollover,
+             n.elec_prev, n.elec_curr, n.elec_rollover, p.existing.id);
+    } else {
+      db.prepare(`
+        INSERT INTO meter_readings
+          (unit_id, period, water_prev, water_curr, water_rollover, elec_prev, elec_curr, elec_rollover)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(p.unit_id, period, n.water_prev, n.water_curr, n.water_rollover,
+             n.elec_prev, n.elec_curr, n.elec_rollover);
+    }
+    const saved = db.prepare('SELECT * FROM meter_readings WHERE unit_id = ? AND period = ?')
+      .get(p.unit_id, period);
+    return {
+      unit_id: p.unit_id, unit_number: p.unit_number, status: 'saved',
+      water_curr: saved.water_curr, elec_curr: saved.elec_curr,
+      water_used: usage(saved.water_prev, saved.water_curr, saved.water_rollover),
+      elec_used:  usage(saved.elec_prev,  saved.elec_curr,  saved.elec_rollover),
+    };
+  }));
+
+  const results = write();
+  res.json({ period, saved: results.length, results });
 });
 
 // PUT /readings/5 — correct a reading that was typed wrong.
@@ -261,9 +424,7 @@ router.put('/:id', (req, res) => {
   const elec_curr = 'elec_curr' in req.body
     ? (req.body.elec_curr ?? null) : existing.elec_curr;
 
-  const wu = usage(water_prev, water_curr, water_rollover);
-  const eu = usage(elec_prev, elec_curr, elec_rollover);
-  if ((wu !== null && wu < 0) || (eu !== null && eu < 0)) {
+  if (negativeMeter({ water_prev, water_curr, water_rollover, elec_prev, elec_curr, elec_rollover })) {
     return res.status(400).json({ error: 'ค่านี้ทำให้จำนวนหน่วยติดลบ ตรวจเลขอีกครั้ง หรือตั้งว่ามิเตอร์ครบรอบ' });
   }
 

@@ -93,6 +93,14 @@ export function overlapping(leases, unitId, start, end){
 // Last reading before this period, used to prefill the previous boxes so only
 // one number per meter is typed. Falls back to the most recent reading rather
 // than exactly last month, so a skipped month does not break the chain.
+// What a meter's dial adds when it wraps: its capacity, from how many digits
+// it has. A property of the meter, kept in settings — counting the digits in a
+// reading would get it wrong for any meter showing a number padded with zeros.
+// The server's import works it out the same way (rolloverOf in readings.js).
+// kind is "w" or "e".
+export const rolloverAmount = (settings, kind) =>
+  Math.pow(10, kind === "w" ? settings.water_meter_digits : settings.electricity_meter_digits);
+
 export function previousReading(readings, unitId, period){
   // A row whose current reading was cleared has nothing to carry forward, so
   // the chain steps back past it to the last month that was actually finished.

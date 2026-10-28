@@ -8,6 +8,7 @@ import { ChargeModal, DeleteFeeModal, DeleteFeeTypeModal, FeeModal, FeeTypeModal
 import { AddTenantModal, DeleteTenantModal, EditTenantModal } from './TenantModals.jsx';
 import { DeleteBillModal, IssueAllReceiptsModal, IssueReceiptModal } from './BillModals.jsx';
 import { RemoveQrModal } from './SettingsModals.jsx';
+import { MeterImportHelpModal, MeterImportModal } from './MeterImportModals.jsx';
 
 /* Which record each dialog is about.
  *
@@ -87,6 +88,10 @@ export default function ModalHost(){
     case "issueAllReceipts": return <IssueAllReceiptsModal period={modal.period} />;
     case "roomYear":      return <RoomYearModal unitId={modal.unitId} year={modal.year} />;
     case "removeQr":      return <RemoveQrModal />;
+    // A file the user chose, already parsed. It names rooms by number, and
+    // the preview looks each one up itself — one gone is a row marked ❌.
+    case "meterImport":   return <MeterImportModal parsed={modal.parsed} fileName={modal.fileName} />;
+    case "meterImportHelp": return <MeterImportHelpModal />;
     default: return null;
   }
 }

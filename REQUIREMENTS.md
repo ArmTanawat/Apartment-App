@@ -58,6 +58,7 @@ Damage is charged as a normal one-time charge on a monthly bill, so the deposit 
 | 3.11 | Fix water and electricity independently when both read low | Done |
 | 3.6 | One reading per room per month, no duplicates | Done |
 | 3.7 | View a room's readings for any past month | Done — the room page's month picker |
+| 3.14 | Import a month's readings from a .csv or .xlsx file, previewed before anything is saved | Done — `POST /readings/import` |
 
 ## Fees
 
@@ -194,7 +195,9 @@ A room missing from a month's takings is the thing the summary exists to make vi
 
 The yearly report answers the question a single month cannot: whether a room's water or electricity is behaving oddly over time. A column of twelve figures shows it poorly, so pressing a room draws its year as two charts — one per meter, on separate scales, because a room using 18 units of water against 146 of electricity would flatten the water line to nothing on a shared axis. It is the one report with an endpoint of its own, `GET /readings/year/:year`, because a year of every room is twelve requests otherwise and the usage arithmetic belongs on the server with the rollover rule.
 
-There is still no automatic "this looks unusual" flag, for the reason given under 10.2: usage here doubles between seasons, and any threshold that catches a broken meter in November fires on every room in April. The charts let a person see it instead.
+There is still no automatic "this looks unusual" flag in the reports, for the reason given under 10.2: usage here doubles between seasons, and any threshold that catches a broken meter in November fires on every room in April. The charts let a person see it instead.
+
+The meter import's preview is the one exception, asked for by the owner: it marks ⚠️ a reading that uses more than three times the room's average of its last three recorded months, and more than 20 units. Three times rather than two so a seasonal doubling does not trip it; a warning only, so a false one costs a glance and blocks nothing.
 
 ## Receipts
 

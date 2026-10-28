@@ -3,7 +3,7 @@
  * print structure, and the invoice previews on ตั้งค่า.
  */
 import './seed.mjs';
-import { $, $$, body, byText, check, click, done, nav, remount, section, settle, text, type } from './harness.jsx';
+import { $, $$, body, byText, check, chooseFile, click, done, nav, press, remount, section, settle, text, type } from './harness.jsx';
 import { API } from './api-base.mjs';
 
 const p2 = n => String(n).padStart(2,'0');
@@ -240,6 +240,58 @@ await nav('บิล');
   check('the receipts list is untouched by the bills list folding',
     !!$('.blist', other.closest('.setcard')));
   await click(head.querySelector('.toggle'), 300);
+}
+
+section('บันทึกมิเตอร์ — import: a preview first, and nothing saved until it is confirmed');
+{
+  const api = (method, p) => fetch(API + p, { method }).then(r => r.json());
+  const units = await api('GET', '/units');
+  const billedNow = new Set((await api('GET', `/bills?period=${period}`)).map(b => b.unit_number));
+  const free = units.filter(u => !billedNow.has(u.unit_number)).slice(0, 2);
+  const prevOf = u => api('GET', `/readings/previous/${u.id}/${period}`);
+  const [p0, p1] = [await prevOf(free[0]), await prevOf(free[1])];
+  const readingOf = async u => (await api('GET', `/readings?period=${period}`)).find(r => r.unit_id === u.id);
+  const before1 = await readingOf(free[1]);
+
+  await nav('บันทึกมิเตอร์');
+  check('the import button, the (?) and the format hint are on the page',
+    !!byText('.importbar .btn', 'นำเข้าจากไฟล์') && !!$('.qhelp') && text('.ihint') === 'รูปแบบ: room, water, electricity');
+
+  await click($('.qhelp'), 200);
+  check('(?) opens the format help', !!$('.modal .icsv') && $('.modal .icsv').textContent.startsWith('room,water,electricity'));
+  await press('Escape');
+  check('and Esc closes it', !$('.modal'));
+
+  await chooseFile($('.importbar input[type=file]'), 'nothing.csv', 'ชื่อ,ค่าน้ำ\nx,1\n');
+  check('a file with no recognisable header is an error with a way to the help',
+    !!$('.err') && !!byText('.err .linkbtn', 'ดูวิธีเตรียมไฟล์') && !$('.modal'), text('.err'));
+  await click(byText('.err .linkbtn', 'ดูวิธีเตรียมไฟล์'), 200);
+  check('which opens the same help', !!$('.modal .icsv'));
+  await click($('.modal .xclose'), 100);
+
+  const csv = `\uFEFFroom,water,electricity\n${free[0].unit_number},${p0.water_prev + 7},${p0.elec_prev + 9}\n`
+    + `${free[1].unit_number},${p1.water_prev + 3},\nZZ9,1,1\n`;
+  await chooseFile($('.importbar input[type=file]'), 'meter.csv', csv);
+  const rows = $$('.modal .itable tbody tr');
+  check('the preview lists every row of the file', rows.length === 3, `${rows.length}`);
+  check('an unknown room is ❌ and cannot be ticked',
+    rows[2].className.includes('is-error') && rows[2].querySelector('input').disabled);
+  check('the summary counts the error', /❌ ข้ามเพราะผิด\s*1/.test(text('.isum')), text('.isum'));
+  check('nothing is saved by previewing', JSON.stringify(await readingOf(free[1])) === JSON.stringify(before1));
+
+  await click(rows[1].querySelector('input'), 100);
+  const go = byText('.modal .btn', 'ยืนยันนำเข้า');
+  check('unticking a row takes it out of the count', go.textContent.includes('1 ห้อง'), go.textContent);
+  await click(go, 500);
+  check('confirming says how many were saved', !!byText('.modal h3', 'นำเข้าแล้ว'), text('.modal'));
+  const r0 = await readingOf(free[0]);
+  check('the ticked room is saved, both meters together',
+    r0 && r0.water_curr === p0.water_prev + 7 && r0.elec_curr === p0.elec_prev + 9, JSON.stringify(r0));
+  check('the unticked room is untouched', JSON.stringify(await readingOf(free[1])) === JSON.stringify(before1));
+  await click(byText('.modal .btn', 'ปิด'), 200);
+  check('and the meter page shows the imported figure',
+    $(`[data-w="${free[0].id}"]`) && $(`[data-w="${free[0].id}"]`).value === String(p0.water_prev + 7),
+    $(`[data-w="${free[0].id}"]`) && $(`[data-w="${free[0].id}"]`).value);
 }
 
 done();
