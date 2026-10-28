@@ -334,6 +334,13 @@ A note that backups sit on the same machine, and the folder should be copied els
 
 ---
 
+**Export เป็นรูปภาพ** sits beside พิมพ์ทั้งเดือน: the month's bills and receipts as one PNG per room, to send to tenants on LINE. Desktop program only — in a browser the dialog says so and points at พิมพ์ทั้งเดือน → PDF, because the pictures are made by the shell (`electron/export.js`), and a second, browser-side renderer would not match the printed page.
+
+- The dialog shows the remembered folder (`export_folder`, per building) with เลือกโฟลเดอร์…, and what will be made: `billing2026oct` — one file per bill, `receipt2026oct` — one per receipt, or "ยังไม่มีใบเสร็จ — จะไม่สร้างโฟลเดอร์ใบเสร็จ". Files are named by room, `102.png`; the second bill in a handover month is `102-2.png`.
+- A folder already there is asked about — เขียนทับ removes its old pictures first (other files stay), ยกเลิก writes nothing — so an earlier export's files are never mixed with this one's.
+- While it runs: `กำลัง export 12 / 30 ไฟล์`, and the dialog cannot be clicked away. At the end: the counts and เปิดโฟลเดอร์.
+- Read-only. Nothing about a bill or a receipt changes.
+
 ### 7. Print layout
 
 Opened from a single bill. Not a nav page.
@@ -341,6 +348,8 @@ Opened from a single bill. Not a nav page.
 `GET /bills/:id` already returns everything needed — tenant name, phone, address, room, period, and the itemised lines with their working. The layout is a print stylesheet over that data.
 
 Labels are already bilingual and frozen into the record, so nothing is translated at print time.
+
+**Exported pictures are this layout.** `?capture=bills|receipts&period=` (`pages/CapturePage.jsx`, chosen in `main.jsx` before `App`) draws each `BillPaper` on a `.capsheet` 210 mm wide with the page's 12 mm margin; the shell switches the window to print media, so the print stylesheet above applies, and photographs each sheet at its full height at 2× — a long bill is one tall picture, not two pages.
 
 **The payment QR** sits to the right of the ชำระเงิน block in the footer, 3.5 cm square on screen and on paper (`.payqr`), and wraps under the text only when the paper is too narrow. It is a bill-only element: a receipt has no bank details and so no QR. With no QR set the footer's markup is exactly what it was before the QR existed — `smoke:screens` compares it.
 

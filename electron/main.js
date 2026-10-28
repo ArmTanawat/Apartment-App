@@ -5,11 +5,12 @@
 // the app does lives here: every rule, every screen and every calculation is
 // still in backend/ and frontend/.
 
-const { app, BrowserWindow, ipcMain, shell } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, shell } = require('electron');
 const { fork } = require('child_process');
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const { exportMonth, folderNames } = require('./export.js');
 
 // The database, its backups and the server log all live here. Inside the
 // packaged app the code is read-only, so nothing may be written beside it.
@@ -277,6 +278,57 @@ async function revive() {
   else if (!recovered) await showError(diagnose());
 }
 
+/* Export เป็นรูปภาพ. The page asks; this side does the file work, because a
+ * page cannot choose a folder or write into one.
+ *
+ * The port is this process's own, never the page's to say, and so is the
+ * folder that may be opened afterwards: only one this program just wrote.
+ * One export at a time — two at once would write the same folders. */
+const exportedDirs = new Set();
+let exporting = false;
+
+function exportHandlers() {
+  ipcMain.handle('export:pick-folder', async (_, start) => {
+    const r = await dialog.showOpenDialog(win, {
+      title: 'เลือกโฟลเดอร์สำหรับเก็บไฟล์รูปบิลและใบเสร็จ',
+      defaultPath: typeof start === 'string' && start && fs.existsSync(start) ? start : app.getPath('documents'),
+      properties: ['openDirectory', 'createDirectory'],
+    });
+    return r.canceled || !r.filePaths.length ? null : r.filePaths[0];
+  });
+
+  ipcMain.handle('export:run', async (event, opts) => {
+    if (exporting) return { error: 'กำลัง export อยู่ รอให้เสร็จก่อน' };
+    if (!live || !serverPort) return { error: 'ติดต่อเซิร์ฟเวอร์ไม่ได้ กรุณาลองใหม่' };
+    exporting = true;
+    try {
+      const r = await exportMonth({
+        port: serverPort,
+        period: opts && opts.period,
+        folder: opts && opts.folder,
+        overwrite: !!(opts && opts.overwrite),
+        onProgress: p => { if (!event.sender.isDestroyed()) event.sender.send('export:progress', p); },
+      });
+      if (r.bills) exportedDirs.add(r.bills.dir);
+      if (r.receipts) exportedDirs.add(r.receipts.dir);
+      return r;
+    } catch (e) {
+      note(`[export failed: ${e.message}]\n`);
+      return { error: e.message };
+    } finally {
+      exporting = false;
+    }
+  });
+
+  // What the folders will be called, for the dialog to say before it starts.
+  // Asked of export.js rather than worked out a second time in the page.
+  ipcMain.handle('export:names', (_, period) =>
+    /^\d{4}-(0[1-9]|1[0-2])$/.test(period || '') ? folderNames(period) : null);
+
+  ipcMain.handle('export:open-folder', (_, dir) =>
+    exportedDirs.has(dir) ? shell.openPath(dir) : 'not an exported folder');
+}
+
 function createWindow() {
   win = new BrowserWindow({
     width: 1280,
@@ -311,6 +363,7 @@ if (!app.requestSingleInstanceLock()) {
   app.whenReady().then(() => {
     ipcMain.handle('startup:retry', () => boot());
     ipcMain.handle('startup:open-log', () => shell.openPath(LOG_PATH));
+    exportHandlers();
     createWindow();
     boot();
   });

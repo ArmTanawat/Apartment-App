@@ -124,7 +124,7 @@ There is deliberately no `DELETE`. See "Receipts are numbered" below.
 
 ### Settings
 - `GET /settings` — utility rates, minimum charges, and meter digit counts
-- `PUT /settings` — update one or several, e.g. `{"water_rate": 10}`
+- `PUT /settings` — update one or several, e.g. `{"water_rate": 10}`. `export_folder` is one of the text keys: the export dialog remembers its folder there
 - `GET /settings/period/:period` — is the minimum applied this month?
 - `PUT /settings/period/:period` — turn the minimum on or off for a month
 - `GET /settings/payment-qr` — `{image}`, the payment QR as a data URL, or `null`

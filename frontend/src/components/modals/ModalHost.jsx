@@ -9,6 +9,7 @@ import { AddTenantModal, DeleteTenantModal, EditTenantModal } from './TenantModa
 import { DeleteBillModal, IssueAllReceiptsModal, IssueReceiptModal } from './BillModals.jsx';
 import { DeletePresetModal, PresetModal, RemoveQrModal } from './SettingsModals.jsx';
 import { MeterImportHelpModal, MeterImportModal } from './MeterImportModals.jsx';
+import { ExportModal } from './ExportModals.jsx';
 
 /* Which record each dialog is about.
  *
@@ -96,6 +97,8 @@ export default function ModalHost(){
     // the preview looks each one up itself — one gone is a row marked ❌.
     case "meterImport":   return <MeterImportModal parsed={modal.parsed} fileName={modal.fileName} />;
     case "meterImportHelp": return <MeterImportHelpModal />;
+    // A month, like issueAllReceipts.
+    case "exportImages":  return <ExportModal period={modal.period} />;
     default: return null;
   }
 }

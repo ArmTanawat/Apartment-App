@@ -21,6 +21,11 @@ the program opens on a chooser when there is more than one. Nothing in the schem
 changed. See [Buildings](#buildings). An existing `apartment.db` becomes the
 first building by itself on the first start.
 
+**Four features added on 2026-10-28, on branch `MultipleBuilding`**, one
+commit each: the payment QR on bills, meter import from .csv/.xlsx, one-time
+charge presets (รายการด่วน), and Export เป็นรูปภาพ. All tested by suite;
+none yet tried by the owner. See [Added on 2026-10-28](#added-on-2026-10-28).
+
 ---
 
 ## How to run it
@@ -84,7 +89,12 @@ npm run smoke:buildings  # add/open/delete buildings, and nothing crossing betwe
 npm run smoke:chooser    # เลือกตึก and เปลี่ยนตึก, from the screen
 npm run check-text       # Thai baht words, and meter figures out of a bill line
 npm run check-import     # reading a meter spreadsheet, and the import preview
+npm run check-export     # (from the root) real Electron: export PNGs, QR decoded back
 ```
+
+`check-export` is inside `npm test` although it starts real Electron (about
+ten seconds, and it builds the frontend first), so `npm test` now needs a
+screen session.
 
 Two checks are outside `npm test` on purpose:
 
@@ -125,7 +135,8 @@ frontend/src/
 ├── state/
 │   ├── DataContext.jsx        the collections, fetched; one named action per change
 │   └── UiContext.jsx          view, working month, and the sticky per-screen bits
-├── pages/                     one file per view; BuildingsPage is the chooser
+├── pages/                     one file per view; BuildingsPage is the chooser,
+│                              CapturePage what Export photographs
 └── components/
     ├── RoomCard, MonthPicker, Modal, Switch, ErrBox
     ├── BillPaper.jsx          shared by BillPage and PrintAllPage
@@ -133,6 +144,8 @@ frontend/src/
 
 electron/
 ├── main.js                    starts the server child, supervises it, shows the window
+├── export.js                  Export เป็นรูปภาพ: photographs the print layout into PNGs
+├── preload.js                 the startup and exporter bridges to the page
 └── error.html                 the Thai failure page
 ```
 
@@ -1080,6 +1093,42 @@ managed on ตั้งค่า. A new table, `one_time_charge_presets`, rather
   without saving, changing the amount before saving, the tickbox making a
   preset, ↑ ↓ and ลบ on ตั้งค่า).
 
+### Bills and receipts as pictures
+
+Export เป็นรูปภาพ on บิล, beside พิมพ์ทั้งเดือน: one PNG per room into
+`billing<YYYY><mon>` and `receipt<YYYY><mon>` under a folder chosen once and
+remembered in `settings.export_folder` (per building). `FRONTEND.md` §4 and §7.
+
+- **One template.** `CapturePage` renders the same `BillPaper` as the print
+  pages; `electron/export.js` opens it in a hidden window, emulates print media,
+  shows one sheet at a time and photographs it with the DevTools protocol's
+  `Page.captureScreenshot` at deviceScaleFactor 2. Not `capturePage()`: it takes
+  only the window's viewport, and a window cannot be taller than the screen, so
+  a long bill would be cut. PNG, because JPEG breaks QR edges.
+- **Asked, not mixed.** Existing folders come back as `conflict`; overwrite
+  removes their PNGs only. No receipts means no receipt folder, and an old one
+  from an earlier export of the month is emptied and removed.
+- **Desktop only**, decided by the owner on 2026-10-28. The spec's LAN/zip
+  fallback does not apply: the server listens on 127.0.0.1 only, and a browser
+  renderer would not match print. In a browser the dialog says so.
+- **IPC** (`main.js`): `export:pick-folder`, `export:run` (the port is the main
+  process's own, one export at a time), `export:names`, `export:open-folder`
+  (only folders this run wrote), and `export:progress` events. `preload.js`
+  exposes them as `window.exporter`; its absence is how the page knows it is in
+  a browser.
+- **Receipts carry no QR**, because they carry no bank details (see
+  `BillPaper`). That is the existing rule, not an export choice.
+- Tested: `check-export`, in real Electron — the QR uploaded through ตั้งค่า's
+  file box (which also proves `lib/image.js` in a real browser: 1400px in, 600px
+  PNG under 300 KB out), every room billed with one bill of 45 extra lines and
+  one receipt, folder and file names, counts, progress, 1588px wide, the long
+  bill past one A4 page with its total inside the picture, **the QR decoded out
+  of the exported PNG with jsQR** (and none on the receipt), bills and receipts
+  unchanged, the conflict, overwrite keeping a non-picture file, no-receipt
+  months, and the refusals. `qrcode` and `jsqr` are root devDependencies for
+  this check only. Not exercised: the `-2` name, since the seed has no handover
+  month.
+
 ## Where the two sides do not line up
 
 **Local-only, no endpoint needed and never will be:** room selection on บิล, the
@@ -1132,6 +1181,11 @@ relying on it having been filled.
 survives a revive). Not yet done: looking at the chooser in the real window,
 and upgrading a real Windows install so its `apartment.db` moves in as the
 first building. Back up `%APPDATA%` by hand before that first upgrade.
+
+**Export on Windows is unproven.** `check-export` passes on macOS. The capture
+is done by Chromium itself, not the OS, so it should behave the same, but the
+folder dialog, `shell.openPath` and long Thai-named paths have not been seen on
+Windows.
 
 **Windows has never been installed on.** The x64 installer builds
 (`Apartment Manager Setup 1.0.0.exe`, 110 MB, `win32-x64.node` unpacked, no

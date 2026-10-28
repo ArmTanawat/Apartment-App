@@ -262,6 +262,7 @@ A key–value table. All values are stored as TEXT so one table can hold both a 
 | `bank_account_number` | | 123-4-56789-0 |
 | `bank_account_name` | | นายสมชาย ใจดี |
 | `bill_note` | Free text printed on every bill. May be blank | ชำระภายในวันที่ 5 … |
+| `export_folder` | The folder Export เป็นรูปภาพ last wrote into, offered again next time. Per building, like every setting. Not seeded; written by the export dialog, not shown on ตั้งค่า | `C:\Users\…\Documents\บิล` |
 | `payment_qr_image` | The payment QR beside the bank details on a bill, as a data URL (PNG/JPEG/WebP, ≤ 1 MB). Not seeded; absent means no QR. Left out of `GET /settings` and not writable through `PUT /settings` — it has its own `/settings/payment-qr` | `data:image/png;base64,…` |
 | `water_rate` | Baht per unit above the threshold | 9 |
 | `water_min_units` | Units covered by the flat amount | 5 |

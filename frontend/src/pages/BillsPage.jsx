@@ -303,6 +303,9 @@ export default function BillsPage(){
         {billsOpen && (monthBills.length ? <>
           <div className="actions" style={{margin:"0 0 14px"}}>
             <button className="btn quiet" onClick={() => go({name:"printall"})}>พิมพ์ทั้งเดือน {monthBills.length} ใบ</button>
+            {/* Beside printing because it is the same papers, as files: one
+                picture per room, bills and receipts, to send to tenants. */}
+            <button className="btn quiet" onClick={() => openModal({kind:"exportImages", period})}>Export เป็นรูปภาพ</button>
           </div>
           <table className="blist">
             <thead><tr><th>ห้อง</th><th>ผู้เช่า</th><th>ออกเมื่อ</th><th className="r">ยอด</th></tr></thead>

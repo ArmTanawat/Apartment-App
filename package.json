@@ -13,7 +13,8 @@
     "check-error-page": "node electron/check-error-page.js",
     "check": "npm run check-runtime && npm run check-error-page",
     "test": "node scripts/run-tests.js",
-    "check-revive": "node electron/check-revive.js"
+    "check-revive": "node electron/check-revive.js",
+    "check-export": "node electron/check-export.js"
   },
   "dependencies": {
     "better-sqlite3": "^13.0.3",
@@ -22,7 +23,9 @@
   "devDependencies": {
     "electron": "^43.4.1",
     "electron-builder": "^25.1.8",
-    "jsdom": "^30.0.1"
+    "jsdom": "^30.0.1",
+    "jsqr": "^1.4.0",
+    "qrcode": "^1.5.4"
   },
   "build": {
     "appId": "com.baansuanplu.apartment",

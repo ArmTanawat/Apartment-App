@@ -23,7 +23,10 @@ const NUMERIC_KEYS = [
 const TEXT_KEYS = [
   'building_name', 'building_address', 'building_phone',
   'bank_name', 'bank_account_number', 'bank_account_name',
-  'bill_note'
+  'bill_note',
+  // The folder Export เป็นรูปภาพ last wrote into, so it is offered again.
+  // Shown nowhere on ตั้งค่า; the export dialog reads and writes it.
+  'export_folder'
 ];
 
 // Only the name has to be filled in. An address and phone are blank until

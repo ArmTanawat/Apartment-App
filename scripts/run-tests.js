@@ -88,9 +88,11 @@ async function main() {
     }
   }
 
-  // The two that need no server: the desktop shell's own checks.
+  // The desktop shell's own checks, which need no server of ours.
+  // check-export starts one of its own, on its own building.
   for (const [name, what] of [['check-runtime', 'ตัวขับฐานข้อมูลใช้กับ Electron ได้'],
-                              ['check-error-page', 'หน้าจอแจ้งปัญหาตอนเปิดไม่ติด']]) {
+                              ['check-error-page', 'หน้าจอแจ้งปัญหาตอนเปิดไม่ติด'],
+                              ['check-export', 'export บิลและใบเสร็จเป็นรูป PNG']]) {
     process.stdout.write(`${name.padEnd(14)} ${what.padEnd(38)} `);
     const r = spawnSync('npm', ['run', name], { cwd: root, encoding: 'utf8',
       shell: process.platform === 'win32' });
