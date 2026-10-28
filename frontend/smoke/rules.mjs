@@ -686,6 +686,68 @@ section('meter import — all rows or none, and blank is never 0');
   await DEL(`/leases/${l.body.id}`);
 }
 
+section('one-time charge presets — a shortcut for typing, never a reference');
+{
+  const before = (await GET('/charge-presets')).body;
+  for(const p of before) await DEL(`/charge-presets/${p.id}`);
+
+  const a = await POST('/charge-presets', { name:'ทดสอบ ค่าทำความสะอาด', default_amount:300 });
+  const b = await POST('/charge-presets', { name:'ทดสอบ ค่ากุญแจหาย', default_amount:0 });
+  ok('a preset is created', a.status === 201 && a.body.is_active === 1 && a.body.created_at, JSON.stringify(a.body));
+  ok('an amount of 0 is kept as 0', b.status === 201 && b.body.default_amount === 0, JSON.stringify(b.body));
+  ok('a blank name is refused', (await POST('/charge-presets', { name:'  ', default_amount:5 })).status === 400);
+  ok('a missing amount is refused', (await POST('/charge-presets', { name:'ทดสอบ x' })).status === 400);
+  ok('an amount that is not a number is refused', (await POST('/charge-presets', { name:'ทดสอบ x', default_amount:'abc' })).status === 400);
+  const dup = await POST('/charge-presets', { name:'ทดสอบ ค่าทำความสะอาด', default_amount:1 });
+  ok('a second active preset with the same name is refused by name', dup.status === 400
+     && dup.body.error.includes('ทดสอบ ค่าทำความสะอาด'), JSON.stringify(dup.body));
+  ok('new ones go on the end', (await GET('/charge-presets')).body.map(p => p.id).join() === [a.body.id, b.body.id].join());
+
+  const order = await PUT('/charge-presets/order', { ids:[b.body.id, a.body.id] });
+  ok('reordered', order.status === 200 && order.body.map(p => p.id).join() === [b.body.id, a.body.id].join(),
+     JSON.stringify(order.body));
+  ok('an order that misses one is refused', (await PUT('/charge-presets/order', { ids:[b.body.id] })).status === 400);
+  ok('an order that repeats one is refused',
+     (await PUT('/charge-presets/order', { ids:[b.body.id, b.body.id] })).status === 400);
+  ok('an order naming one that does not exist is refused',
+     (await PUT('/charge-presets/order', { ids:[b.body.id, 999999] })).status === 400);
+  ok('and none of those changed the order', (await GET('/charge-presets')).body[0].id === b.body.id);
+
+  // Used once: the charge is the copy, made through the ordinary route.
+  const u = await newUnit('T51');
+  const t = await newTenant('ผู้เช่า รายการด่วน');
+  const l = await POST('/leases', { tenant_id:t.id, unit_id:u.id, start_date:'2026-01-01', monthly_rent:1000 });
+  await POST('/readings', { unit_id:u.id, period, water_prev:0, water_curr:1, elec_prev:0, elec_curr:1 });
+  const charge = await POST('/fees/onetime', { lease_id:l.body.id, period,
+    description:a.body.name, amount:a.body.default_amount });
+  const bill = await POST('/bills', { lease_id:l.body.id, period });
+
+  const renamed = await PUT(`/charge-presets/${a.body.id}`, { name:'ทดสอบ ทำความสะอาดใหญ่', default_amount:900 });
+  ok('a preset can be renamed and repriced', renamed.status === 200 && renamed.body.default_amount === 900);
+  const zero = await PUT(`/charge-presets/${a.body.id}`, { default_amount:0 });
+  ok('a partial update keeps the name, and 0 is not taken as absent',
+     zero.body.name === 'ทดสอบ ทำความสะอาดใหญ่' && zero.body.default_amount === 0, JSON.stringify(zero.body));
+  const kept = (await GET(`/fees/onetime/${l.body.id}?period=${period}`)).body[0];
+  ok('the charge made from it is unchanged', kept.description === 'ทดสอบ ค่าทำความสะอาด' && kept.amount === 300,
+     JSON.stringify(kept));
+  const line = (await GET(`/bills/${bill.body.id}`)).body.items.find(i => i.label.includes('ทดสอบ'));
+  ok('and so is the bill line', line && line.label.includes('ค่าทำความสะอาด') && line.amount === 300, JSON.stringify(line));
+
+  const gone = await DEL(`/charge-presets/${a.body.id}`);
+  ok('deleting is a 204', gone.status === 204);
+  ok('and the button is gone from the list', !(await GET('/charge-presets')).body.some(p => p.id === a.body.id));
+  ok('deleting it again is a 404', (await DEL(`/charge-presets/${a.body.id}`)).status === 404);
+  ok('a deleted one cannot be edited', (await PUT(`/charge-presets/${a.body.id}`, { name:'x' })).status === 404);
+  ok('the charge still stands', (await GET(`/fees/onetime/${l.body.id}?period=${period}`)).body[0].id === charge.body.id);
+  const again = await POST('/charge-presets', { name:'ทดสอบ ทำความสะอาดใหญ่', default_amount:1 });
+  ok('a deleted name is free to be used again', again.status === 201, JSON.stringify(again.body));
+
+  await DEL(`/bills/${bill.body.id}`);
+  await DEL(`/leases/${l.body.id}`);
+  for(const p of (await GET('/charge-presets')).body) await DEL(`/charge-presets/${p.id}`);
+  for(const p of before) await POST('/charge-presets', { name:p.name, default_amount:p.default_amount });
+}
+
 section('the payment QR is checked by the server, not only by the screen');
 {
   const png = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';

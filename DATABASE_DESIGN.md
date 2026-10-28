@@ -15,6 +15,7 @@
 | `fee_types` | Catalogue of possible fees | You add a new kind of fee |
 | `lease_fees` | Recurring fees — charged every month | A tenant adds parking, etc. |
 | `one_time_charges` | Charges for a single month only | A repair, a replacement |
+| `one_time_charge_presets` | Quick-pick buttons for one-time charges used often | You add a button |
 | `bills` | Finished monthly bills | Every month, per tenant |
 | `bill_items` | The printed breakdown of each bill | With every bill |
 | `receipts` | The paper issued after a tenant pays | When a receipt is printed |
@@ -167,6 +168,25 @@ This is deliberately a separate table from `lease_fees`. The two look similar bu
 There is no unique constraint on `(lease_id, period)` — two separate repairs in one month are normal, and each should appear as its own line.
 
 The question when adding any charge is simply: does this happen again next month? Yes → `lease_fees`. No → here.
+
+### `one_time_charge_presets`
+
+Buttons on เพิ่มค่าใช้จ่ายครั้งเดียว for the charges that come up often — ค่าทำความสะอาด, ค่ากุญแจหาย, ค่าปรับจ่ายช้า.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | INTEGER | Primary key |
+| `name` | TEXT | Copied into `one_time_charges.description` when used. Unique among active rows, checked in the route |
+| `default_amount` | REAL | Copied into `one_time_charges.amount`; editable in the form before saving |
+| `sort_order` | INTEGER | Button order, 0 first |
+| `is_active` | INTEGER | 0 once deleted — deleting is soft |
+| `created_at` | TEXT | `datetime('now','localtime')` |
+
+**Nothing refers to a preset.** Choosing one fills the form and nothing else; the charge saved is the text and amount, copied, exactly as if they had been typed — the same copy-don't-reference rule as rent at move-in and amounts on `lease_fees`. So renaming, repricing or deleting a preset can never change a charge or a bill, and `one_time_charges` has no column pointing here.
+
+**Not `fee_types`.** That table is the catalogue of recurring fees attached to a lease, with a percentage form and an in-use check that blocks deletion. A one-time button has none of that, and sharing the table would put cleaning fees in the recurring-fee dropdown.
+
+Added by `CREATE TABLE IF NOT EXISTS` in `openDatabase()`, so every existing building gets it, empty, the next time it is opened.
 
 ### `bills`
 

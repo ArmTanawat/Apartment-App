@@ -294,4 +294,74 @@ section('บันทึกมิเตอร์ — import: a preview first, an
     $(`[data-w="${free[0].id}"]`) && $(`[data-w="${free[0].id}"]`).value);
 }
 
+section('รายการด่วน — a button fills the form, saves nothing, and is copied not referenced');
+{
+  const api = (method, p, b) => fetch(API + p, { method, headers: {'Content-Type':'application/json'},
+    body: b && JSON.stringify(b) }).then(r => r.status === 204 ? null : r.json());
+  for(const p of await api('GET', '/charge-presets')) await api('DELETE', `/charge-presets/${p.id}`);
+  const clean = await api('POST', '/charge-presets', { name:'ค่าทำความสะอาด Cleaning', default_amount:300 });
+  await api('POST', '/charge-presets', { name:'ค่ากุญแจหาย Lost key', default_amount:150 });
+  await remount();
+
+  const unit = (await api('GET', '/units')).find(u => u.lease_id);
+  const charges = () => api('GET', `/fees/onetime/${unit.lease_id}?period=${period}`);
+  const before = (await charges()).length;
+  const openCharge = async () => {
+    await nav('ห้องพัก');
+    await click(byText('.chip', 'ทั้งหมด'));
+    await click($$('.room').find(r => r.querySelector('.rno').textContent === unit.unit_number), 400);
+    const card = $$('.card').find(c => c.querySelector('h2') && c.querySelector('h2').textContent.includes('ค่าใช้จ่ายครั้งเดียว'));
+    await click($$('.linkbtn', card).find(b => b.textContent === '+ เพิ่ม'), 200);
+  };
+
+  await openCharge();
+  const chips = $$('.modal .presets .chip');
+  check('the buttons are in the dialog, in order, with their amounts',
+    chips.length === 2 && chips[0].textContent.includes('ค่าทำความสะอาด') && chips[0].textContent.includes('300'),
+    chips.map(c => c.textContent).join(' | '));
+  await click(chips[1], 100);
+  const [descBox, amtBox] = $$('.modal .field input');
+  check('pressing one fills the name and the amount', descBox.value === 'ค่ากุญแจหาย Lost key' && amtBox.value === '150',
+    `${descBox.value} / ${amtBox.value}`);
+  check('and saves nothing', (await charges()).length === before);
+  check('a name that is a button offers no บันทึกเป็นรายการด่วน', !$('.modal .keepas'));
+  await type(amtBox, '175');
+  await click(byText('.modal .btn', 'บันทึก'), 400);
+  const made = (await charges()).find(c => c.description === 'ค่ากุญแจหาย Lost key');
+  check('the amount could be changed before saving', made && made.amount === 175, JSON.stringify(made));
+
+  await openCharge();
+  const [d2, a2] = $$('.modal .field input');
+  await type(d2, 'ค่าซ่อมมุ้ง Screen repair');
+  await type(a2, '90');
+  check('a typed name offers บันทึกเป็นรายการด่วน', !!$('.modal .keepas'));
+  await click($('.modal .keepas input'), 50);
+  await click(byText('.modal .btn', 'บันทึก'), 400);
+  check('ticked, it becomes a button', (await api('GET', '/charge-presets'))
+    .some(p => p.name === 'ค่าซ่อมมุ้ง Screen repair' && p.default_amount === 90));
+  check('and the charge is saved too', (await charges()).some(c => c.description === 'ค่าซ่อมมุ้ง Screen repair'));
+
+  await api('PUT', `/charge-presets/${clean.id}`, { default_amount: 999 });
+  check('changing a button later does not reach a charge made from another one',
+    (await charges()).find(c => c.description === 'ค่ากุญแจหาย Lost key').amount === 175);
+
+  await remount();
+  await nav('ตั้งค่า');
+  const card = byText('.setcard h2', 'รายการด่วน').closest('.setcard');
+  const names = () => $$('.fname', card).map(n => n.textContent);
+  check('ตั้งค่า lists the buttons', names().length === 3, names().join(' | '));
+  check('the first cannot move up, the last cannot move down',
+    $$('.order', card)[0].querySelector('button').disabled && $$('.order', card)[2].querySelectorAll('button')[1].disabled);
+  const first = names()[0];
+  await click($$('.order', card)[0].querySelectorAll('button')[1], 300);
+  check('↓ moves it, and the server has the new order',
+    names()[1] === first && (await api('GET', '/charge-presets'))[1].name === first, names().join(' | '));
+  await click($$('.linkbtn.danger', card)[0], 100);
+  await click(byText('.modal .btn', 'ลบ'), 300);
+  check('ลบ, confirmed, takes it off', names().length === 2);
+
+  for(const p of await api('GET', '/charge-presets')) await api('DELETE', `/charge-presets/${p.id}`);
+  for(const c of await charges()) if(!c.description.startsWith('ซ่อมก๊อก')) await api('DELETE', `/fees/onetime/${c.id}`);
+}
+
 done();

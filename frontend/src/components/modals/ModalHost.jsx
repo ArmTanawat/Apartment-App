@@ -7,7 +7,7 @@ import { EditPrevModal, MeterModal, RoomYearModal } from './MeterModals.jsx';
 import { ChargeModal, DeleteFeeModal, DeleteFeeTypeModal, FeeModal, FeeTypeModal } from './FeeModals.jsx';
 import { AddTenantModal, DeleteTenantModal, EditTenantModal } from './TenantModals.jsx';
 import { DeleteBillModal, IssueAllReceiptsModal, IssueReceiptModal } from './BillModals.jsx';
-import { RemoveQrModal } from './SettingsModals.jsx';
+import { DeletePresetModal, PresetModal, RemoveQrModal } from './SettingsModals.jsx';
 import { MeterImportHelpModal, MeterImportModal } from './MeterImportModals.jsx';
 
 /* Which record each dialog is about.
@@ -39,6 +39,8 @@ const SUBJECT = {
   deleteBill:    ['id',       'bills'],
   issueReceipt:  ['id',       'bills'],
   roomYear:      ['unitId',   'units'],
+  preset:        ['id',       'presets'],
+  deletePreset:  ['id',       'presets'],
 };
 
 /* The prototype's openModal(html) wrote a string into #modalRoot. Here the
@@ -53,7 +55,7 @@ export default function ModalHost(){
   if(subject){
     const [field, collection] = subject;
     const id = modal[field];
-    // feeType with no id is "add a new one", which has no subject.
+    // feeType and preset with no id are "add a new one", which has no subject.
     if(id !== null && id !== undefined && !data[collection].some(x => x.id === id)) {
       return <Gone onClose={closeModal} />;
     }
@@ -88,6 +90,8 @@ export default function ModalHost(){
     case "issueAllReceipts": return <IssueAllReceiptsModal period={modal.period} />;
     case "roomYear":      return <RoomYearModal unitId={modal.unitId} year={modal.year} />;
     case "removeQr":      return <RemoveQrModal />;
+    case "preset":        return <PresetModal id={modal.id} />;
+    case "deletePreset":  return <DeletePresetModal id={modal.id} />;
     // A file the user chose, already parsed. It names rooms by number, and
     // the preview looks each one up itself — one gone is a row marked ❌.
     case "meterImport":   return <MeterImportModal parsed={modal.parsed} fileName={modal.fileName} />;

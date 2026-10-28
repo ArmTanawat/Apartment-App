@@ -4,6 +4,7 @@ import ErrBox from '../ErrBox.jsx';
 import Switch from '../Switch.jsx';
 import Modal from '../Modal.jsx';
 import { get } from '../../lib/api.js';
+import { baht } from '../../lib/helpers.js';
 import { useApi } from '../../lib/useApi.js';
 import { useData } from '../../state/DataContext.jsx';
 import { useUi } from '../../state/UiContext.jsx';
@@ -131,7 +132,7 @@ export function DeleteFeeModal({ leaseId, feeId }){
 }
 
 export function ChargeModal({ leaseId }){
-  const { leases, units, bills, h, addCharge } = useData();
+  const { leases, units, bills, presets, h, addCharge, addPreset } = useData();
   const { period, closeModal, bumpDetail } = useUi();
   const { error, busy, run } = useSubmit();
   const l = leases.find(x=>x.id===leaseId);
@@ -145,11 +146,22 @@ export function ChargeModal({ leaseId }){
   const [target, setTarget] = useState(String(leaseId));
   const [desc, setDesc] = useState("");
   const [amt, setAmt] = useState("");
+  const [keep, setKeep] = useState(false);
+
+  // Offered only for a name that is not a button already. Once the preset is
+  // made the list reloads and this goes false, so pressing บันทึก again after
+  // a failed charge does not try to make the same preset twice.
+  const isCustom = desc.trim() !== "" && !presets.some(p => p.name === desc.trim());
 
   // No unique rule here: two separate repairs in one month are normal and each
   // should print as its own line.
+  //
+  // The preset is made first. If the server refuses it, nothing has been
+  // saved and the user can untick it; the other way round, a refused preset
+  // would leave a charge saved behind an error that says it was not.
   const save = () => run(
     async () => {
+      if(keep && isCustom) await addPreset({ name: desc.trim(), default_amount: parseFloat(amt) });
       await addCharge({lease_id: parseInt(target,10), period,
         description: desc.trim(), amount: parseFloat(amt)});
       bumpDetail();
@@ -178,11 +190,28 @@ export function ChargeModal({ leaseId }){
           </select>
           <div className="hint">เดือนนี้ห้องนี้มีผู้เช่าสองราย เลือกคนที่อยู่ตอนของเสียหาย</div></div>
       ) : null}
+      {/* A button fills the two boxes and saves nothing, so the amount can
+          still be changed for this one time. What is saved is the text, not a
+          reference to the button. */}
+      {presets.length > 0 && (
+        <div className="presets">
+          {presets.map(p => (
+            <button key={p.id} type="button" className={"chip" + (desc.trim() === p.name ? " on" : "")}
+              onClick={() => { setDesc(p.name); setAmt(String(p.default_amount)); }}>
+              {p.name}<span className="n num">{baht(p.default_amount)}</span></button>
+          ))}
+        </div>
+      )}
       <div className="field"><label>รายการ</label>
         <input value={desc} onChange={e=>setDesc(e.target.value)} />
         <div className="hint">พิมพ์ไทยตามด้วยอังกฤษ ข้อความนี้จะขึ้นบนใบแจ้งหนี้ตามที่พิมพ์</div></div>
       <div className="field"><label>จำนวนเงิน (บาท)</label>
         <input className="num" value={amt} onChange={e=>setAmt(e.target.value)} /></div>
+      {isCustom && (
+        <label className="keepas">
+          <input type="checkbox" checked={keep} onChange={e => setKeep(e.target.checked)} />
+          บันทึกเป็นรายการด่วน — ครั้งหน้ากดปุ่มได้เลย</label>
+      )}
       <div className="actions">
         <button className="btn ghost" onClick={closeModal}>ยกเลิก</button>
         <button className="btn" disabled={busy} onClick={save}>บันทึก</button>

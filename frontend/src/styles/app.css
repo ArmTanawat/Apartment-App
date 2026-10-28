@@ -570,6 +570,15 @@ h1{font-size:32px; font-weight:700; margin:0; line-height:1.4}
   color:var(--muted); cursor:pointer; padding:4px 8px}
 .xclose:hover{color:var(--ink)}
 
+/* The quick-pick buttons on เพิ่มค่าใช้จ่ายครั้งเดียว. */
+.presets{display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px}
+.keepas{display:flex; align-items:center; gap:8px; font-size:13px; color:var(--muted); cursor:pointer}
+.ptable td .order{display:inline-flex; gap:2px}
+.ptable td .order button{border:1px solid var(--line); background:var(--surface); color:var(--muted);
+  border-radius:5px; width:24px; height:22px; cursor:pointer; padding:0; font-size:11px}
+.ptable td .order button:hover:not(:disabled){border-color:var(--ink); color:var(--ink)}
+.ptable td .order button:disabled{opacity:.3; cursor:default}
+
 /* นำเข้ามิเตอร์ */
 .importbar{display:flex; align-items:center; gap:10px; max-width:680px}
 .qhelp{width:24px; height:24px; border-radius:50%; border:1px solid var(--line); background:var(--surface);

@@ -23,6 +23,7 @@ const settingsRouter = require('./routes/settings.js');
 const receiptsRouter = require('./routes/receipts.js');
 const backupsRouter = require('./routes/backups.js');
 const buildingsRouter = require('./routes/buildings.js');
+const presetsRouter = require('./routes/presets.js');
 
 const app = express();
 
@@ -48,6 +49,7 @@ app.use('/bills', requireBuilding, billsRouter);
 app.use('/settings', requireBuilding, settingsRouter);
 app.use('/receipts', requireBuilding, receiptsRouter);
 app.use('/backups', requireBuilding, backupsRouter);
+app.use('/charge-presets', requireBuilding, presetsRouter);
 
 // A quick way to confirm the server is alive without touching the database.
 app.get('/health', (req, res) => {

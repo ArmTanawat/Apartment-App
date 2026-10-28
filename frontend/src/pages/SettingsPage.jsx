@@ -198,6 +198,8 @@ export default function SettingsPage(){
           ปิดใช้งานแทนเพื่อไม่ให้เลือกได้อีก บิลเก่ายังอ่านได้เหมือนเดิม</p>
       </div>
 
+      <Presets />
+
       <Backups req={backups} error={backupError} onBackup={doBackup} />
     </div>
   </>;
@@ -296,6 +298,55 @@ function PaymentQr(){
             onClick={() => openModal({kind:"removeQr"})}>ลบ QR</button>
         )}
       </div>
+    </div>
+  );
+}
+
+/* รายการด่วน — the buttons on เพิ่มค่าใช้จ่ายครั้งเดียว, in the order they
+   appear there. ↑ ↓ send the whole new order, so what is saved is what is
+   on screen. */
+function Presets(){
+  const { presets, reorderPresets } = useData();
+  const { openModal } = useUi();
+  const [error, setError] = useState(null);
+
+  const move = async (i, by) => {
+    const ids = presets.map(p => p.id);
+    [ids[i], ids[i + by]] = [ids[i + by], ids[i]];
+    try { await reorderPresets(ids); setError(null); }
+    catch (e) { setError(messageOf(e)); }
+  };
+
+  return (
+    <div className="setcard">
+      <h2>รายการด่วน <button className="linkbtn" style={{float:"right",fontSize:"13px"}}
+        onClick={() => openModal({kind:"preset", id:null})}>+ เพิ่ม</button></h2>
+      <p className="lead">ปุ่มลัดสำหรับค่าใช้จ่ายครั้งเดียวที่ใช้บ่อย เช่น ค่าทำความสะอาด ค่ากุญแจหาย
+        กดแล้วเติมชื่อและจำนวนเงินให้ แก้ก่อนบันทึกได้ แก้หรือลบปุ่มทีหลัง
+        ค่าใช้จ่ายและบิลที่ทำไปแล้วไม่เปลี่ยน</p>
+      <ErrBox>{error}</ErrBox>
+      {presets.length ? (
+        <table className="ftable ptable">
+          <thead><tr><th>ชื่อรายการ</th><th className="r">จำนวนเงิน</th><th className="r">ลำดับ</th><th></th></tr></thead>
+          <tbody>
+            {presets.map((p, i) => (
+              <tr key={p.id}>
+                <td><span className="fname">{p.name}</span></td>
+                <td className="r num">{baht(p.default_amount)}</td>
+                <td className="r"><span className="order">
+                  <button title="เลื่อนขึ้น" disabled={i === 0} onClick={() => move(i, -1)}>↑</button>
+                  <button title="เลื่อนลง" disabled={i === presets.length - 1} onClick={() => move(i, 1)}>↓</button>
+                </span></td>
+                <td className="r">
+                  <button className="linkbtn" onClick={() => openModal({kind:"preset", id:p.id})}>แก้</button>
+                  <button className="linkbtn danger" style={{marginLeft:"8px"}}
+                    onClick={() => openModal({kind:"deletePreset", id:p.id})}>ลบ</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      ) : <p className="none">ยังไม่มีรายการด่วน</p>}
     </div>
   );
 }

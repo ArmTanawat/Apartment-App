@@ -109,7 +109,7 @@ backend/            Express + SQLite; see backend/README.md for every endpoint
 ├── building-look.js  the colour and icon ids a building's card can have
 ├── data-dir.js     works out where the building files and backups live
 ├── fee-basis.js    the five percentage bases and their Thai labels
-└── routes/         one file per topic (10)
+└── routes/         one file per topic (11)
 
 frontend/src/
 ├── App.jsx                    the chooser first, then view router, rail, offline banner
@@ -129,7 +129,7 @@ frontend/src/
 └── components/
     ├── RoomCard, MonthPicker, Modal, Switch, ErrBox
     ├── BillPaper.jsx          shared by BillPage and PrintAllPage
-    └── modals/                one component per dialog (17), + ModalHost
+    └── modals/                one component per dialog (27), + ModalHost
 
 electron/
 ├── main.js                    starts the server child, supervises it, shows the window
@@ -142,7 +142,7 @@ Two deviations from the structure originally suggested, both deliberate:
   variables split into two kinds, data and UI. Keeping both in one component
   would have meant threading a dozen props through every page. `DataContext` is
   the file that got `fetch` in it; `UiContext` never did.
-- **`components/modals/` is six files, not one.** Seventeen dialogs.
+- **`components/modals/` is eight files, not one.** Twenty-seven dialogs.
 
 ---
 
@@ -1054,6 +1054,31 @@ endpoint.
   keeping the other, a billed room, no bills made) and `smoke:screens` (the
   help and Esc, the error's link to the help, preview without saving, unticking,
   confirm, the table showing the figure).
+
+### One-time charge presets
+
+รายการด่วน: buttons on เพิ่มค่าใช้จ่ายครั้งเดียว that fill the name and amount,
+managed on ตั้งค่า. A new table, `one_time_charge_presets`, rather than
+`fee_types` — that one is the recurring-fee catalogue and has its own rules.
+`DATABASE_DESIGN.md` has the table; `routes/presets.js` is mounted at
+`/charge-presets`.
+
+- **Copied, never referenced.** The form posts to `POST /fees/onetime` exactly
+  as before; nothing in `one_time_charges` points at a preset. So a preset
+  edited or deleted after being used changes nothing already charged or billed.
+- **Delete is soft** (`is_active = 0`). An active name is unique (checked in the
+  route); a deleted name can be used again.
+- **Reorder sends the whole list.** A list that misses, repeats or invents an
+  id is refused, because it was drawn from a stale picture.
+- **บันทึกเป็นรายการด่วน makes the preset before the charge**, so a refusal
+  leaves nothing saved, and once it exists the tickbox disappears — pressing
+  บันทึก again after a failed charge cannot make it twice.
+- Tested: `smoke:rules` (create, 0 kept, blank/missing/non-number/duplicate
+  refused, order and each bad order refused, partial update with `??`, the
+  charge and the bill line unchanged after the preset is edited, soft delete,
+  a deleted name reusable) and `smoke:screens` (buttons in order, filling
+  without saving, changing the amount before saving, the tickbox making a
+  preset, ↑ ↓ and ลบ on ตั้งค่า).
 
 ## Where the two sides do not line up
 

@@ -142,6 +142,27 @@ function openDatabase(file) {
       amount      REAL NOT NULL
     );
 
+    -- Quick-pick buttons for one-time charges that come up often: cleaning,
+    -- a lost key, a late fee. A preset is a shortcut for typing, nothing more:
+    -- choosing one fills the add-charge form, and what is saved is the text and
+    -- amount in one_time_charges, copied, exactly as if they had been typed.
+    -- Nothing refers back here, so editing or deleting a preset cannot change a
+    -- charge or a bill — the same copy-don't-reference rule as rent at move-in.
+    --
+    -- Not fee_types: those are recurring fees attached to a lease, with a
+    -- percentage form and an in-use check, and none of that applies here.
+    --
+    -- Deleting sets is_active = 0, so the row stays as a record of what was
+    -- offered. sort_order is the order of the buttons.
+    CREATE TABLE IF NOT EXISTS one_time_charge_presets (
+      id             INTEGER PRIMARY KEY AUTOINCREMENT,
+      name           TEXT NOT NULL,
+      default_amount REAL NOT NULL,
+      sort_order     INTEGER NOT NULL DEFAULT 0,
+      is_active      INTEGER NOT NULL DEFAULT 1,
+      created_at     TEXT DEFAULT (datetime('now','localtime'))
+    );
+
     CREATE TABLE IF NOT EXISTS bills (
       id            INTEGER PRIMARY KEY AUTOINCREMENT,
       lease_id      INTEGER NOT NULL REFERENCES leases(id),

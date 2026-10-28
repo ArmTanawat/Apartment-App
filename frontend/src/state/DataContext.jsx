@@ -24,7 +24,7 @@ const DataContext = createContext(null);
 const EMPTY = {
   units: [], tenants: [], leases: [], bills: [], readings: [],
   previousReadings: {}, feeTypes: [], feeBasis: {}, settings: null, applyMinimum: true,
-  paymentQr: null,
+  paymentQr: null, presets: [],
 };
 
 // GET /readings?period= returns one row per room, with nulls for the rooms not
@@ -54,7 +54,7 @@ export function DataProvider({ children }){
     const want = k => !keys || keys.includes(k);
 
     try {
-      const [units, tenants, leases, bills, readingRows, feeTypes, feeBasis, settings, periodRow, qr] =
+      const [units, tenants, leases, bills, readingRows, feeTypes, feeBasis, settings, periodRow, qr, presets] =
         await Promise.all([
           want('units')     ? get('/units')            : null,
           want('tenants')   ? get('/tenants')          : null,
@@ -71,6 +71,7 @@ export function DataProvider({ children }){
           // The payment QR is kept out of GET /settings (it is an image, not a
           // setting anyone types), so it is its own request.
           want('settings')  ? get('/settings/payment-qr') : null,
+          want('presets')   ? get('/charge-presets')   : null,
         ]);
 
       // The previous figures need the room list, and the rule for finding them
@@ -100,6 +101,7 @@ export function DataProvider({ children }){
         ...(settings       ? { settings } : null),
         ...(periodRow      ? { applyMinimum: periodRow.apply_minimum } : null),
         ...(qr             ? { paymentQr: qr.image } : null),
+        ...(presets        ? { presets } : null),
       }));
       setDown(false);
     } catch (e) {
@@ -116,7 +118,7 @@ export function DataProvider({ children }){
   // Everything, on first mount and whenever the working month changes.
   useEffect(() => {
     setLoading(true);
-    load(['units','tenants','leases','bills','readings','feeTypes','settings','period','prev'])
+    load(['units','tenants','leases','bills','readings','feeTypes','settings','period','prev','presets'])
       .catch(() => {});
   // load closes over state.units, which would re-fire this on every load.
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -202,6 +204,14 @@ export function DataProvider({ children }){
       deleteLeaseFee: id => del(`/fees/lease/${id}`),
       addCharge: c => post('/fees/onetime', c),
       deleteCharge: id => del(`/fees/onetime/${id}`),
+
+      // ---- one-time charge presets ----
+      // Buttons that fill the add-charge form. A charge copies their text and
+      // amount, so changing one here never reaches a charge already made.
+      addPreset: async p => { const made = await post('/charge-presets', p); await after(['presets']); return made; },
+      updatePreset: async (id, patch) => { await put(`/charge-presets/${id}`, patch); await after(['presets']); },
+      deletePreset: async id => { await del(`/charge-presets/${id}`); await after(['presets']); },
+      reorderPresets: async ids => { await put('/charge-presets/order', { ids }); await after(['presets']); },
 
       // ---- bills ----
       generateBills: async body => { const r = await post('/bills/batch', body); await after(['bills']); return r; },

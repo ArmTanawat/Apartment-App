@@ -10,7 +10,8 @@ import { defineConfig } from 'vite'
 // line here too, or it will 404 in development and work when packaged, which
 // is the worst way round to find out.
 const API_PATHS = ['/units', '/tenants', '/leases', '/readings',
-                   '/fees', '/bills', '/receipts', '/settings', '/backups', '/buildings', '/health'];
+                   '/fees', '/bills', '/receipts', '/settings', '/backups', '/buildings', '/health',
+                   '/charge-presets'];
 
 export default defineConfig({
   plugins: [react()],

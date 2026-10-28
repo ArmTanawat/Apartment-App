@@ -32,6 +32,7 @@ before there were buildings is moved in as `b1` on the first start.
 - `routes/tenants.js` — /tenants endpoints
 - `routes/units.js` — /units endpoints (including /units/vacant)
 - `routes/leases.js` — /leases endpoints (including the double-booking check)
+- `routes/presets.js` — /charge-presets, the quick-pick buttons for one-time charges
 
 ## Endpoints so far
 
@@ -94,6 +95,14 @@ Work with nothing open. Everything below them is for the open building only.
 - `POST /fees/onetime` — add a charge for one month only
 - `PUT /fees/onetime/:id`
 - `DELETE /fees/onetime/:id`
+
+### One-time charge presets
+Buttons that fill the add-charge form. A charge copies their text and amount through `POST /fees/onetime`; nothing refers back, so these can never change a charge or a bill.
+- `GET /charge-presets` — the active ones, in button order
+- `POST /charge-presets` — `{name, default_amount}`; 201, added at the end. 400 on a blank name, a non-number, or a name an active preset already has
+- `PUT /charge-presets/order` — `{ids:[…]}`, every active preset exactly once; 400 otherwise
+- `PUT /charge-presets/:id` — rename or reprice; partial, with `??`
+- `DELETE /charge-presets/:id` — soft delete (`is_active = 0`); 204, 404 if already gone
 
 ### Bills
 - `GET /bills?period=2026-08` — bills for a month, or all

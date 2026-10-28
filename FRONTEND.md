@@ -172,6 +172,9 @@ Not in the nav. A full page rather than a panel, because there is too much here 
 | ย้ายออก | `PUT /leases/:id/end` |
 | Add or remove a recurring fee | `POST /fees/lease`, `DELETE /fees/lease/:id` |
 | ค่าใช้จ่ายครั้งเดียว | `POST /fees/onetime` |
+| Its quick-pick buttons | `GET /charge-presets` (and `POST` for บันทึกเป็นรายการด่วน) |
+
+**The add-charge form has a row of รายการด่วน buttons** above its two boxes, each showing name and amount. Pressing one fills both boxes and saves nothing, so the amount can still be changed for this once. The boxes work exactly as before. When the typed name is not already a button, a tickbox บันทึกเป็นรายการด่วน offers to make it one; the preset is made before the charge, so if the server refuses it nothing has been saved.
 
 **One-time charges belong to a lease, not a room.** In a handover month a room has two: the tenant who left and the one who arrived. A repair on the 10th is the departing tenant's. So the form asks who is being charged whenever the month holds more than one lease, and skips the question when there is only one.
 
@@ -314,12 +317,15 @@ Changing a rate shows a quiet note: bills already generated keep their amounts.
 
 **Fee types** are a list with add, rename, reprice, and a ใช้งาน toggle. Retiring rather than deleting, because old bills reference them. The form should hint at bilingual naming: `ค่าส่วนกลาง Facility fee`.
 
+**รายการด่วน** — the one-time charge buttons, in the order they appear on the form: add, แก้ (name and amount), ↑ ↓ to reorder (the whole order is sent, so what is saved is what is shown), ลบ with a confirm. Editing or deleting one never changes a charge already made with it, and the screen says so.
+
 **Backups** show the date of the last copy, how many exist, and a สำรองข้อมูลเดี๋ยวนี้ button. Copies happen automatically when the server starts; without this block there is no way to know that is true.
 
 | Action | Call |
 |---|---|
 | Rates | `GET /settings`, `PUT /settings` |
 | Payment QR | `GET`/`PUT`/`DELETE /settings/payment-qr` |
+| รายการด่วน | `GET`/`POST /charge-presets`, `PUT /charge-presets/:id`, `PUT /charge-presets/order`, `DELETE /charge-presets/:id` |
 | Fee types | `GET`/`POST`/`PUT`/`DELETE /fees/types` |
 | Backup list | `GET /backups` |
 | Backup now | `POST /backups` |
