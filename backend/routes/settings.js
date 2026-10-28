@@ -39,12 +39,22 @@ const LOOK_KEYS = { building_color: look.COLORS, building_icon: look.ICONS };
 
 const ALLOWED_KEYS = [...NUMERIC_KEYS, ...TEXT_KEYS, ...Object.keys(LOOK_KEYS)];
 
+// The payment QR printed beside the bank details, as a data URL. A row in this
+// table so the backup — a copy of the building's file — carries it without
+// anyone remembering a second file. It is not in ALLOWED_KEYS and readAll()
+// leaves it out: a few hundred kilobytes riding along on every GET /settings
+// is waste, and a screen that writes back what it read would be refused for a
+// key PUT /settings does not take. It has its own three routes below.
+const QR_KEY = 'payment_qr_image';
+const QR_MAX_BYTES = 1024 * 1024;
+const QR_PATTERN = /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+=*$/;
+
 // Everything is stored as text so one table can hold both a rate and a name.
 // Numeric settings are converted here, once, so nothing downstream has to
 // remember that `9` arrived as a string and `'9' + 1` would give `'91'`.
 function readAll() {
   const out = {};
-  db.prepare('SELECT key, value FROM settings').all().forEach(row => {
+  db.prepare('SELECT key, value FROM settings WHERE key <> ?').all(QR_KEY).forEach(row => {
     out[row.key] = NUMERIC_KEYS.includes(row.key) ? Number(row.value) : row.value;
   });
   return out;
@@ -107,6 +117,42 @@ router.put('/', (req, res) => {
 
   write();
   res.json(readAll());
+});
+
+// GET /settings/payment-qr — the QR image, or null when none is set.
+router.get('/payment-qr', (req, res) => {
+  const row = db.prepare('SELECT value FROM settings WHERE key = ?').get(QR_KEY);
+  res.json({ image: row ? row.value : null });
+});
+
+// PUT /settings/payment-qr — { image: 'data:image/png;base64,...' }
+//
+// The screen shrinks the picture before sending it. This checks again rather
+// than trusting that, because the image is printed on every bill and a broken
+// one would be found on paper.
+router.put('/payment-qr', (req, res) => {
+  const image = req.body && req.body.image;
+
+  if (typeof image !== 'string' || !QR_PATTERN.test(image)) {
+    return res.status(400).json({ error: 'ไฟล์นี้ไม่ใช่รูปภาพ ใช้ไฟล์ PNG, JPG หรือ WebP' });
+  }
+  const bytes = Math.floor((image.length - image.indexOf(',') - 1) * 3 / 4);
+  if (bytes > QR_MAX_BYTES) {
+    return res.status(400).json({ error: 'รูป QR ใหญ่เกิน 1 MB ลองใช้รูปที่เล็กลงหรือครอบเฉพาะตัว QR' });
+  }
+
+  db.prepare(`
+    INSERT INTO settings (key, value) VALUES (?, ?)
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value
+  `).run(QR_KEY, image);
+
+  res.json({ image });
+});
+
+// DELETE /settings/payment-qr — bills go back to the bank details alone.
+router.delete('/payment-qr', (req, res) => {
+  db.prepare('DELETE FROM settings WHERE key = ?').run(QR_KEY);
+  res.status(204).send();
 });
 
 // GET /settings/period/2026-09 — is the minimum charge applied this month?

@@ -3,6 +3,7 @@ import ErrBox from '../components/ErrBox.jsx';
 import Switch from '../components/Switch.jsx';
 import { get, messageOf } from '../lib/api.js';
 import { baht, shareLabel } from '../lib/helpers.js';
+import { shrinkImage } from '../lib/image.js';
 import { useApi } from '../lib/useApi.js';
 import { useData } from '../state/DataContext.jsx';
 import { useUi } from '../state/UiContext.jsx';
@@ -154,6 +155,8 @@ export default function SettingsPage(){
         </div>
       </div>
 
+      <PaymentQr />
+
       <RateBlock kind="water" label="ค่าน้ำ" shown={shown} setNumber={setNumber}
         settings={settings} units={exampleUnits.water} drafts={drafts} setDrafts={setDrafts}
         setUnits={v => setExampleUnits(x => ({ ...x, water: v }))} />
@@ -247,6 +250,51 @@ function RateBlock({ kind, label, shown, setNumber, settings, units, setUnits, d
         <span>หน่วย จะเป็น</span>
         <b>{example.data ? baht(example.data.amount) : "—"}</b>
         <span>บาท</span>
+      </div>
+    </div>
+  );
+}
+
+/* The QR a tenant scans to pay, printed beside the bank details on every
+   bill. Shrunk here before it is sent, and checked again by the server. */
+function PaymentQr(){
+  const { paymentQr, setPaymentQr } = useData();
+  const { openModal } = useUi();
+  const [error, setError] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const input = useRef(null);
+
+  const pick = async e => {
+    const file = e.target.files && e.target.files[0];
+    // Cleared so choosing the same file again still fires a change.
+    e.target.value = "";
+    if(!file) return;
+    setError(null); setBusy(true);
+    try { await setPaymentQr(await shrinkImage(file)); }
+    catch (err) { setError(messageOf(err)); }
+    finally { setBusy(false); }
+  };
+
+  return (
+    <div className="setcard">
+      <h2>QR ชำระเงิน</h2>
+      <p className="lead">แสดงข้างข้อมูลบัญชีบนใบแจ้งหนี้ทุกใบ ให้ผู้เช่าสแกนจ่ายได้
+        เช่น QR พร้อมเพย์ของบัญชีนี้ ไม่ขึ้นบนใบเสร็จ
+        บิลเก่าที่เปิดหรือพิมพ์ซ้ำจะแสดง QR ล่าสุดเสมอ</p>
+      <ErrBox>{error}</ErrBox>
+      {paymentQr
+        ? <img className="payqr" src={paymentQr} alt="QR ชำระเงิน"
+            style={{border:"1px solid var(--line)",borderRadius:"6px",marginBottom:"12px"}} />
+        : <p className="none">ยังไม่ได้ตั้ง QR บิลจะมีแค่ข้อมูลบัญชี</p>}
+      <input ref={input} type="file" accept="image/png,image/jpeg,image/webp"
+        style={{display:"none"}} onChange={pick} />
+      <div className="actions">
+        <button className="btn quiet" disabled={busy} onClick={() => input.current.click()}>
+          {busy ? "กำลังอัปโหลด…" : paymentQr ? "เปลี่ยนรูป QR" : "อัปโหลดรูป QR"}</button>
+        {paymentQr && (
+          <button className="btn ghost" disabled={busy}
+            onClick={() => openModal({kind:"removeQr"})}>ลบ QR</button>
+        )}
       </div>
     </div>
   );

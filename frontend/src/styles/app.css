@@ -442,6 +442,12 @@ h1{font-size:32px; font-weight:700; margin:0; line-height:1.4}
 /* Now only a weight: the footer is black throughout, and ชำระเงิน is its
    heading rather than the one dark line in a grey block. */
 .pfoot b{font-weight:500}
+/* The payment QR beside the bank details. A fixed physical size, because it
+   has to scan off a sheet of A4 from a home printer: 3.5cm is comfortably
+   above what a phone camera needs and small enough to sit beside four lines
+   of text. It wraps under the text only when the paper is too narrow. */
+.paywith{display:flex; flex-wrap:wrap; align-items:flex-start; justify-content:space-between; gap:12px 24px}
+.payqr{width:3.5cm; height:3.5cm; object-fit:contain; display:block; flex:none}
 .papers .paper{margin-bottom:20px}
 /* A report is the same paper as an invoice, but a table of every room needs
    more width than a document addressed to one of them. */

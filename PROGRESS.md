@@ -117,6 +117,7 @@ frontend/src/
 │   ├── api.js                 THE base URL, and the two kinds of failure
 │   ├── bills.js               preview, and the line-by-line staleness diff
 │   ├── helpers.js             the rule-mirroring helpers, pure
+│   ├── image.js               shrinks the payment QR picture before upload
 │   ├── useApi.js              page-scoped fetching
 │   └── useSubmit.js           what a dialog does with a write
 ├── state/
@@ -985,6 +986,36 @@ machines will never do. Not worth it at this size; revisit if it is ever handed
 to people who do not know who wrote it.
 
 ---
+
+## Added on 2026-10-28
+
+Four features, one commit each, on `MultipleBuilding`.
+
+### The payment QR on bills
+
+One picture, uploaded on ตั้งค่า, printed beside the bank details on every
+bill. Stored as a data URL in `settings` (`payment_qr_image`) so the backup
+carries it; the database is still one file per building. It is not a bill
+amount and is not frozen: an old bill reprinted shows today's QR, which is
+intended — it always points at the current account. Receipts never show it.
+
+- `GET`/`PUT`/`DELETE /settings/payment-qr`, in `routes/settings.js`. The
+  server re-checks what the screen already checked: a PNG/JPEG/WebP data URL,
+  at most 1 MB.
+- `GET /settings` leaves the key out and `PUT /settings` does not accept it.
+  A screen or suite that reads every setting and writes them all back
+  (`smoke:rules` does) would otherwise be refused, and a few hundred KB would
+  ride along on every load. `DataContext` fetches it beside the settings as
+  `paymentQr`.
+- `server.js` gives `/settings/payment-qr` alone a 2 MB body limit, ahead of
+  the general `express.json()`. A body over a limit is now a 413 with a Thai
+  message rather than the generic 500.
+- `lib/image.js` shrinks the file before upload: 600px long side, PNG first
+  (kept under 300 KB), WebP or JPEG only if PNG is too big.
+- Tested: `smoke:rules` (saved, read back, absent from `GET /settings`, a
+  non-image, an empty body, over 1 MB, over the body limit, the limit not
+  leaking to other routes, removed) and `smoke:screens` (no QR → no box and the
+  footer's markup unchanged; with one → on every bill, inside the bank block).
 
 ## Where the two sides do not line up
 

@@ -26,6 +26,10 @@ const buildingsRouter = require('./routes/buildings.js');
 
 const app = express();
 
+// The payment QR arrives as an image in the body, far above the 100kb default.
+// The larger limit is for that one path, ahead of the general parser, which
+// then finds the body already read and leaves it alone.
+app.use('/settings/payment-qr', express.json({ limit: '2mb' }));
 app.use(express.json());
 
 // Mounting. Every route inside tenants.js is prefixed with /tenants here,
@@ -68,6 +72,11 @@ if (fs.existsSync(webRoot)) {
 // Any error thrown inside a route lands here instead of crashing the process.
 // Four arguments is what marks this as an error handler in Express.
 app.use((err, req, res, next) => {
+  // A body over the parser's limit is the user's file being too large, not a
+  // fault in the server, and they can act on that.
+  if (err.type === 'entity.too.large') {
+    return res.status(413).json({ error: 'ไฟล์ที่ส่งมาใหญ่เกินไป' });
+  }
   console.error(err);
   res.status(500).json({ error: 'เกิดข้อผิดพลาดที่เซิร์ฟเวอร์' });
 });

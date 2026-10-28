@@ -299,6 +299,8 @@ Changing a rate shows a quiet note: bills already generated keep their amounts.
 
 **The building's own details** — name, address, phone — sit at the top, with a live preview of the invoice header they produce. Only the name is required; a blank address prints as a blank rather than a placeholder.
 
+**QR ชำระเงิน** — a preview, an upload/replace button and ลบ QR (confirmed). The picture is shrunk in the browser before it is sent (`lib/image.js`: at most 600px on the long side, PNG kept when it is under 300 KB because a QR is flat black and white and JPEG smears its edges) and refused with a Thai message if it is not an image or is still over 1 MB. It prints on every bill, old ones included, and never on a receipt.
+
 **Fee types** are a list with add, rename, reprice, and a ใช้งาน toggle. Retiring rather than deleting, because old bills reference them. The form should hint at bilingual naming: `ค่าส่วนกลาง Facility fee`.
 
 **Backups** show the date of the last copy, how many exist, and a สำรองข้อมูลเดี๋ยวนี้ button. Copies happen automatically when the server starts; without this block there is no way to know that is true.
@@ -306,6 +308,7 @@ Changing a rate shows a quiet note: bills already generated keep their amounts.
 | Action | Call |
 |---|---|
 | Rates | `GET /settings`, `PUT /settings` |
+| Payment QR | `GET`/`PUT`/`DELETE /settings/payment-qr` |
 | Fee types | `GET`/`POST`/`PUT`/`DELETE /fees/types` |
 | Backup list | `GET /backups` |
 | Backup now | `POST /backups` |
@@ -321,6 +324,8 @@ Opened from a single bill. Not a nav page.
 `GET /bills/:id` already returns everything needed — tenant name, phone, address, room, period, and the itemised lines with their working. The layout is a print stylesheet over that data.
 
 Labels are already bilingual and frozen into the record, so nothing is translated at print time.
+
+**The payment QR** sits to the right of the ชำระเงิน block in the footer, 3.5 cm square on screen and on paper (`.payqr`), and wraps under the text only when the paper is too narrow. It is a bill-only element: a receipt has no bank details and so no QR. With no QR set the footer's markup is exactly what it was before the QR existed — `smoke:screens` compares it.
 
 ---
 

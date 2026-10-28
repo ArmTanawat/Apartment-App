@@ -619,6 +619,40 @@ section('ออกใบเสร็จทุกห้อง refuses what it can
      && empty.body.error.includes('2019-03'), JSON.stringify(empty.body));
 }
 
+section('the payment QR is checked by the server, not only by the screen');
+{
+  const png = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+  const before = (await GET('/settings/payment-qr')).body.image;
+
+  const saved = await PUT('/settings/payment-qr', { image: png });
+  ok('an image is saved', saved.status === 200 && saved.body.image === png, JSON.stringify(saved.body).slice(0, 120));
+  ok('and read back', (await GET('/settings/payment-qr')).body.image === png);
+  ok('GET /settings does not carry it', !('payment_qr_image' in (await GET('/settings')).body));
+  const roundTrip = await PUT('/settings', (await GET('/settings')).body);
+  ok('so writing back everything GET /settings returned is still accepted', roundTrip.status === 200,
+     JSON.stringify(roundTrip.body));
+
+  const text = await PUT('/settings/payment-qr', { image: 'data:text/html;base64,PGI+aGk8L2I+' });
+  ok('something that is not an image is refused', text.status === 400 && /รูปภาพ/.test(text.body.error),
+     JSON.stringify(text.body));
+  const none = await PUT('/settings/payment-qr', {});
+  ok('an empty body is refused', none.status === 400);
+  const big = await PUT('/settings/payment-qr', { image: 'data:image/png;base64,' + 'A'.repeat(1500000) });
+  ok('an image over 1 MB is refused by name', big.status === 400 && /1 MB/.test(big.body.error),
+     JSON.stringify(big.body));
+  const huge = await PUT('/settings/payment-qr', { image: 'data:image/png;base64,' + 'A'.repeat(3000000) });
+  ok('a body over the route\'s limit is a message, not a crash', huge.status === 413 && !!huge.body.error,
+     `${huge.status} ${JSON.stringify(huge.body)}`);
+  const other = await PUT('/settings', { bill_note: 'x'.repeat(200000) });
+  ok('the larger limit is that route\'s alone', other.status === 413, `${other.status}`);
+  ok('a refused upload leaves the saved one in place', (await GET('/settings/payment-qr')).body.image === png);
+
+  const gone = await DEL('/settings/payment-qr');
+  ok('it can be removed', gone.status === 204 && (await GET('/settings/payment-qr')).body.image === null);
+  if(before) await PUT('/settings/payment-qr', { image: before });
+}
+
+
 // second run then fails on the UNIQUE name rather than on anything real.
 for(const f of (await GET('/fees/types?all=true')).body){
   if(f.name.startsWith('ทดสอบ')) await DEL(`/fees/types/${f.id}`);

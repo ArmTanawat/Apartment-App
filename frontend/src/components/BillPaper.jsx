@@ -23,11 +23,22 @@ import { useData } from '../state/DataContext.jsx';
  *   its own note                        — about this payment, not about every bill
  *   no bank details                     — the money has already arrived; telling
  *                                         someone how to pay it again is wrong
+ *                                         (and so no payment QR either)
+ *
+ * The payment QR is read from settings like the bank details, not from the
+ * bill: it says where to pay today, so an old bill reprinted shows the current
+ * one. With none set the footer is exactly what it was before the QR existed.
  */
 export default function BillPaper({ bill: b, receipt = null }){
-  const { settings } = useData();
+  const { settings, paymentQr } = useData();
   const isReceipt = !!receipt;
   const bank = [settings.bank_name, settings.bank_account_number].filter(Boolean).join("  ");
+  const payment = (settings.bank_name || settings.bank_account_number) ? <>
+    <b>ชำระเงิน</b><br />
+    เงินสดที่สำนักงาน หรือโอนเข้าบัญชี<br />
+    {bank}
+    {settings.bank_account_name ? <><br />ชื่อบัญชี {settings.bank_account_name}</> : null}
+  </> : <><b>ชำระเงิน</b><br />เงินสดที่สำนักงาน</>;
 
   return (
     <div className="paper">
@@ -112,12 +123,12 @@ export default function BillPaper({ bill: b, receipt = null }){
         </div>
       </> : (
         <div className="pfoot">
-          {(settings.bank_name || settings.bank_account_number) ? <>
-            <b>ชำระเงิน</b><br />
-            เงินสดที่สำนักงาน หรือโอนเข้าบัญชี<br />
-            {bank}
-            {settings.bank_account_name ? <><br />ชื่อบัญชี {settings.bank_account_name}</> : null}
-          </> : <><b>ชำระเงิน</b><br />เงินสดที่สำนักงาน</>}
+          {paymentQr ? (
+            <div className="paywith">
+              <div>{payment}</div>
+              <img className="payqr" src={paymentQr} alt="QR ชำระเงิน" />
+            </div>
+          ) : payment}
           {settings.bill_note ? <div style={{marginTop:"10px"}}>{settings.bill_note}</div> : null}
           <div style={{marginTop:"12px",fontSize:"12px"}}>ออกบิลเมื่อ <span className="num">{b.created_at}</span></div>
         </div>

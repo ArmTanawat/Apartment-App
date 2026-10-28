@@ -7,6 +7,7 @@ import { EditPrevModal, MeterModal, RoomYearModal } from './MeterModals.jsx';
 import { ChargeModal, DeleteFeeModal, DeleteFeeTypeModal, FeeModal, FeeTypeModal } from './FeeModals.jsx';
 import { AddTenantModal, DeleteTenantModal, EditTenantModal } from './TenantModals.jsx';
 import { DeleteBillModal, IssueAllReceiptsModal, IssueReceiptModal } from './BillModals.jsx';
+import { RemoveQrModal } from './SettingsModals.jsx';
 
 /* Which record each dialog is about.
  *
@@ -85,6 +86,7 @@ export default function ModalHost(){
     // about is worked out inside, against the server, when it opens.
     case "issueAllReceipts": return <IssueAllReceiptsModal period={modal.period} />;
     case "roomYear":      return <RoomYearModal unitId={modal.unitId} year={modal.year} />;
+    case "removeQr":      return <RemoveQrModal />;
     default: return null;
   }
 }

@@ -3,7 +3,8 @@
  * print structure, and the invoice previews on ตั้งค่า.
  */
 import './seed.mjs';
-import { $, $$, body, byText, check, click, done, nav, section, settle, text, type } from './harness.jsx';
+import { $, $$, body, byText, check, click, done, nav, remount, section, settle, text, type } from './harness.jsx';
+import { API } from './api-base.mjs';
 
 const p2 = n => String(n).padStart(2,'0');
 const d = new Date();
@@ -140,6 +141,32 @@ check('everything that is not the invoice is marked .noprint',
   !!$('.noprint') && $('.noprint').contains(byText('.head h1', 'พิมพ์ทั้งเดือน')));
 check('each invoice carries its own total', papers.every(p => p.textContent.includes('รวมทั้งสิ้น Total')));
 check('and its own tenant and room', papers.every(p => p.querySelector('.pto dd').textContent.trim().length > 0));
+
+section('the payment QR — beside the bank details on a bill, absent otherwise');
+// A 1×1 PNG. What is checked is where the picture goes, not what it shows.
+const QR = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+const qrCall = (method, b) => fetch(API + '/settings/payment-qr', { method,
+  headers: {'Content-Type':'application/json'}, body: b && JSON.stringify(b) });
+await qrCall('DELETE');
+await remount();
+await nav('บิล');
+await click(byText('.btn', 'พิมพ์ทั้งเดือน'), 600);
+const plainFoot = $('.paper .pfoot').innerHTML;
+check('with no QR set there is no QR and no empty box on the bill',
+  !$('.payqr') && !$('.paywith'));
+await qrCall('PUT', { image: QR });
+await remount();
+await nav('บิล');
+await click(byText('.btn', 'พิมพ์ทั้งเดือน'), 600);
+check('with one set, every bill carries it', $$('.paper').every(p => p.querySelector('.pfoot .paywith img.payqr')),
+  `${$$('.payqr').length} of ${$$('.paper').length}`);
+check('and it sits beside the bank details, in the same block',
+  $('.paywith').textContent.includes('ชำระเงิน') && $('.payqr').getAttribute('src') === QR);
+await qrCall('DELETE');
+await remount();
+await nav('บิล');
+await click(byText('.btn', 'พิมพ์ทั้งเดือน'), 600);
+check('removing it puts the footer back exactly as it was', $('.paper .pfoot').innerHTML === plainFoot);
 
 section('ตั้งค่า — the invoice preview has to match the invoice');
 await nav('บิล');

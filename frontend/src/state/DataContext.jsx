@@ -24,6 +24,7 @@ const DataContext = createContext(null);
 const EMPTY = {
   units: [], tenants: [], leases: [], bills: [], readings: [],
   previousReadings: {}, feeTypes: [], feeBasis: {}, settings: null, applyMinimum: true,
+  paymentQr: null,
 };
 
 // GET /readings?period= returns one row per room, with nulls for the rooms not
@@ -53,7 +54,7 @@ export function DataProvider({ children }){
     const want = k => !keys || keys.includes(k);
 
     try {
-      const [units, tenants, leases, bills, readingRows, feeTypes, feeBasis, settings, periodRow] =
+      const [units, tenants, leases, bills, readingRows, feeTypes, feeBasis, settings, periodRow, qr] =
         await Promise.all([
           want('units')     ? get('/units')            : null,
           want('tenants')   ? get('/tenants')          : null,
@@ -67,6 +68,9 @@ export function DataProvider({ children }){
           want('feeTypes')  ? get('/fees/basis')       : null,
           want('settings')  ? get('/settings')         : null,
           want('period')    ? get(`/settings/period/${period}`) : null,
+          // The payment QR is kept out of GET /settings (it is an image, not a
+          // setting anyone types), so it is its own request.
+          want('settings')  ? get('/settings/payment-qr') : null,
         ]);
 
       // The previous figures need the room list, and the rule for finding them
@@ -95,6 +99,7 @@ export function DataProvider({ children }){
         ...(feeBasis       ? { feeBasis } : null),
         ...(settings       ? { settings } : null),
         ...(periodRow      ? { applyMinimum: periodRow.apply_minimum } : null),
+        ...(qr             ? { paymentQr: qr.image } : null),
       }));
       setDown(false);
     } catch (e) {
@@ -217,6 +222,8 @@ export function DataProvider({ children }){
 
       // ---- settings ----
       patchSettings: async patch => { await put('/settings', patch); await after(['settings']); },
+      setPaymentQr: async image => { await put('/settings/payment-qr', { image }); await after(['settings']); },
+      removePaymentQr: async () => { await del('/settings/payment-qr'); await after(['settings']); },
       setApplyMinimum: async (p, on) => {
         const r = await put(`/settings/period/${p}`, { apply_minimum: on });
         await after(['period']);

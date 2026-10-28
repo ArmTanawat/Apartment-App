@@ -117,6 +117,9 @@ There is deliberately no `DELETE`. See "Receipts are numbered" below.
 - `PUT /settings` — update one or several, e.g. `{"water_rate": 10}`
 - `GET /settings/period/:period` — is the minimum applied this month?
 - `PUT /settings/period/:period` — turn the minimum on or off for a month
+- `GET /settings/payment-qr` — `{image}`, the payment QR as a data URL, or `null`
+- `PUT /settings/payment-qr` — `{image: 'data:image/png;base64,…'}`; PNG, JPEG or WebP, at most 1 MB, else 400. This path alone takes a body up to 2 MB (`server.js`); over that is 413
+- `DELETE /settings/payment-qr` — remove it; 204
 
 ### Backups
 - `GET /backups` — the open building's copies, newest first
