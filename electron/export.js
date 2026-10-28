@@ -22,7 +22,8 @@ const { BrowserWindow } = require('electron');
 const fs = require('fs');
 const path = require('path');
 
-const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+const MONTHS = ['january', 'february', 'march', 'april', 'may', 'june',
+  'july', 'august', 'september', 'october', 'november', 'december'];
 
 // A4 is 210mm, which at the 96 CSS pixels to the inch the page is laid out in
 // is 793.7px. The capture sheet is exactly that wide.
@@ -32,12 +33,18 @@ const READY_TIMEOUT_MS = 30000;
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-// billing2026oct, receipt2026oct: Gregorian year, the month in three
-// lowercase English letters, so the folders sort and read the same anywhere.
+// billoctober2026 and receiptoctober2026 for the folders, and 102-oct2026.png
+// for a picture: the month in lowercase English, then the Gregorian year. The
+// month is in the file name too, so a picture sent on LINE and saved on a
+// tenant's phone still says which month it is once it is out of its folder.
 function folderNames(period) {
   const [y, m] = period.split('-');
-  const mon = MONTHS[Number(m) - 1];
-  return { bills: `billing${y}${mon}`, receipts: `receipt${y}${mon}` };
+  const month = MONTHS[Number(m) - 1];
+  return {
+    bills: `bill${month}${y}`,
+    receipts: `receipt${month}${y}`,
+    suffix: `${month.slice(0, 3)}${y}`,
+  };
 }
 
 async function getJson(port, p) {
@@ -50,6 +57,7 @@ async function getJson(port, p) {
 // Photographs every sheet of one capture view into `dir`, calling `each`
 // after every file. Returns the names written.
 async function captureInto(port, kind, period, dir, each) {
+  const { suffix } = folderNames(period);
   const win = new BrowserWindow({
     show: false,
     width: SHEET_WIDTH,
@@ -91,7 +99,9 @@ async function captureInto(port, kind, period, dir, each) {
         captureBeyondViewport: true,
         clip: { x: 0, y: 0, width: SHEET_WIDTH, height, scale: 1 },
       });
-      const file = `${state.files[i]}.png`;
+      // The page names the room (102, or 102-2 for the second lease in a
+      // handover month); the month goes on here.
+      const file = `${state.files[i]}-${suffix}.png`;
       fs.writeFileSync(path.join(dir, file), Buffer.from(shot.data, 'base64'));
       written.push(file);
       each();

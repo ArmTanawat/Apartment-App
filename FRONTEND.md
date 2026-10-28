@@ -336,7 +336,7 @@ A note that backups sit on the same machine, and the folder should be copied els
 
 **Export เป็นรูปภาพ** sits beside พิมพ์ทั้งเดือน: the month's bills and receipts as one PNG per room, to send to tenants on LINE. Desktop program only — in a browser the dialog says so and points at พิมพ์ทั้งเดือน → PDF, because the pictures are made by the shell (`electron/export.js`), and a second, browser-side renderer would not match the printed page.
 
-- The dialog shows the remembered folder (`export_folder`, per building) with เลือกโฟลเดอร์…, and what will be made: `billing2026oct` — one file per bill, `receipt2026oct` — one per receipt, or "ยังไม่มีใบเสร็จ — จะไม่สร้างโฟลเดอร์ใบเสร็จ". Files are named by room, `102.png`; the second bill in a handover month is `102-2.png`.
+- The dialog shows the remembered folder (`export_folder`, per building) with เลือกโฟลเดอร์…, and what will be made: `billoctober2026` — one file per bill, `receiptoctober2026` — one per receipt, or "ยังไม่มีใบเสร็จ — จะไม่สร้างโฟลเดอร์ใบเสร็จ". Files are named by room and month, `102-oct2026.png`; the second bill in a handover month is `102-2-oct2026.png`. Folders spell the month out, files use its first three letters; the year is Gregorian.
 - A folder already there is asked about — เขียนทับ removes its old pictures first (other files stay), ยกเลิก writes nothing — so an earlier export's files are never mixed with this one's.
 - While it runs: `กำลัง export 12 / 30 ไฟล์`, and the dialog cannot be clicked away. At the end: the counts and เปิดโฟลเดอร์.
 - Read-only. Nothing about a bill or a receipt changes.

@@ -1096,7 +1096,9 @@ managed on ตั้งค่า. A new table, `one_time_charge_presets`, rather
 ### Bills and receipts as pictures
 
 Export เป็นรูปภาพ on บิล, beside พิมพ์ทั้งเดือน: one PNG per room into
-`billing<YYYY><mon>` and `receipt<YYYY><mon>` under a folder chosen once and
+`bill<month><YYYY>` and `receipt<month><YYYY>` (`billoctober2026`), each
+file `<room>-<mon><YYYY>.png` (`102-oct2026.png`, so a picture saved on a
+tenant's phone still says its month), under a folder chosen once and
 remembered in `settings.export_folder` (per building). `FRONTEND.md` §4 and §7.
 
 - **One template.** `CapturePage` renders the same `BillPaper` as the print

@@ -114,7 +114,7 @@ export function ExportModal({ period }){
     <Modal>
       <h3>Export เป็นรูปภาพ</h3>
       <p className="lead">บิลและใบเสร็จงวด {periodLabel(period)} เป็นไฟล์ PNG หนึ่งห้องหนึ่งไฟล์
-        ชื่อไฟล์ตามเลขห้อง เช่น 102.png หน้าตาเหมือนที่พิมพ์ รวม QR ชำระเงิน
+        ชื่อไฟล์ตามเลขห้องและเดือน เช่น {names ? `102-${names.suffix}.png` : "102-oct2026.png"} หน้าตาเหมือนที่พิมพ์ รวม QR ชำระเงิน
         ส่งให้ผู้เช่าทางไลน์ได้เลย</p>
       <ErrBox>{error}</ErrBox>
       <div className="field"><label>เก็บไว้ที่</label>

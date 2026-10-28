@@ -154,10 +154,14 @@ async function main() {
 
     section('export');
     const names = folderNames(period);
-    ok('folder names are billing<YYYY><mon> and receipt<YYYY><mon>',
-       /^billing\d{4}(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)$/.test(names.bills)
-       && names.receipts === names.bills.replace('billing', 'receipt'), JSON.stringify(names));
-    ok('2026-10 is billing2026oct', folderNames('2026-10').bills === 'billing2026oct');
+    const png = n => `${n}-${names.suffix}.png`;
+    ok('folder names are bill<month><YYYY> and receipt<month><YYYY>',
+       /^bill(january|february|march|april|may|june|july|august|september|october|november|december)\d{4}$/.test(names.bills)
+       && names.receipts === names.bills.replace('bill', 'receipt'), JSON.stringify(names));
+    ok('2026-10 is billoctober2026, receiptoctober2026, and files end -oct2026',
+       folderNames('2026-10').bills === 'billoctober2026' && folderNames('2026-10').receipts === 'receiptoctober2026'
+       && folderNames('2026-10').suffix === 'oct2026', JSON.stringify(folderNames('2026-10')));
+    ok('september is sep, not sept', folderNames('2026-09').suffix === 'sep2026');
 
     const ticks = [];
     const started = Date.now();
@@ -167,22 +171,22 @@ async function main() {
     const billFiles = fs.readdirSync(billDir).sort();
     ok('one bill picture per bill', r.bills.count === bills.length && billFiles.length === bills.length,
        `${billFiles.length} of ${bills.length}`);
-    ok('named by room number', bills.every(x => billFiles.includes(`${x.unit_number}.png`)), billFiles.join(','));
+    ok('named by room number and month, 102-oct2026.png', bills.every(x => billFiles.includes(png(x.unit_number))), billFiles.join(','));
     const twice = bills.map(x => x.unit_number).filter((n, i, all) => all.indexOf(n) !== i);
     if (twice.length) {
-      ok(`a room billed twice in a handover month is ${twice[0]}.png and ${twice[0]}-2.png`,
-         billFiles.includes(`${twice[0]}.png`) && billFiles.includes(`${twice[0]}-2.png`), billFiles.join(','));
+      ok(`a room billed twice in a handover month is ${png(twice[0])} and ${png(twice[0] + '-2')}`,
+         billFiles.includes(png(twice[0])) && billFiles.includes(png(twice[0] + '-2')), billFiles.join(','));
     } else {
       console.log('  (no handover month in the seed — the -2 name is not exercised)');
     }
     ok('one receipt picture, for the one receipt', r.receipts && fs.readdirSync(receiptDir).length === 1
-       && fs.existsSync(path.join(receiptDir, `${bills[0].unit_number}.png`)));
+       && fs.existsSync(path.join(receiptDir, png(bills[0].unit_number))));
     ok('progress counted up to the total', ticks.length > 2 && ticks[ticks.length - 1].done === bills.length + 1
        && ticks[ticks.length - 1].total === bills.length + 1, JSON.stringify(ticks.slice(-2)));
 
     const sizeOf = f => nativeImage.createFromPath(f).getSize();
-    const normal = sizeOf(path.join(billDir, billFiles.find(f => f !== `${longBill.unit_number}.png`)));
-    const long = sizeOf(path.join(billDir, `${longBill.unit_number}.png`));
+    const normal = sizeOf(path.join(billDir, billFiles.find(f => f !== png(longBill.unit_number))));
+    const long = sizeOf(path.join(billDir, png(longBill.unit_number)));
     ok('twice the A4 width in pixels', normal.width === 1588 && long.width === 1588, `${normal.width}`);
     ok('the long bill is captured to its full height, past one A4 page',
        long.height > 2246 && long.height > normal.height + 1500, `${normal.height} vs ${long.height}`);
@@ -191,7 +195,7 @@ async function main() {
 
     ok('the QR scans out of an exported bill', readQr(path.join(billDir, billFiles[0])) === QR_TEXT,
        String(readQr(path.join(billDir, billFiles[0]))));
-    ok('and out of the long one', readQr(path.join(billDir, `${longBill.unit_number}.png`)) === QR_TEXT);
+    ok('and out of the long one', readQr(path.join(billDir, png(longBill.unit_number))) === QR_TEXT);
     ok('a receipt has no QR', readQr(path.join(receiptDir, fs.readdirSync(receiptDir)[0])) === null);
 
     const after = JSON.stringify([await api('GET', `/bills?period=${period}`), await api('GET', `/receipts?period=${period}`)]);
@@ -230,7 +234,7 @@ async function main() {
 
     // APARTMENT_KEEP_EXPORT=1 keeps the pictures, to look at by eye.
     if (process.env.APARTMENT_KEEP_EXPORT) {
-      fs.copyFileSync(path.join(billDir, `${longBill.unit_number}.png`), path.join(work, 'long.png'));
+      fs.copyFileSync(path.join(billDir, png(longBill.unit_number)), path.join(work, 'long.png'));
       fs.copyFileSync(path.join(billDir, billFiles[0]), path.join(work, 'normal.png'));
       console.log(`\n  pictures kept for a look: ${work}`);
     }
